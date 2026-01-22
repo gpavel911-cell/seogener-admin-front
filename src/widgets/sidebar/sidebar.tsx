@@ -10,7 +10,6 @@ export function Sidebar() {
 
   return (
     <SidebarContainer>
-      <Brand>Админ-панель</Brand>
       <Navigation aria-label="Основная навигация">
         <NavList>
           {SIDEBAR_ITEMS.map((item) => {
@@ -31,7 +30,6 @@ export function Sidebar() {
 
 const SidebarContainer = styled.aside`
   width: 240px;
-  min-height: 100vh;
   background: #ffffff;
   border-right: 1px solid #e5e7eb;
   padding: 24px 16px;

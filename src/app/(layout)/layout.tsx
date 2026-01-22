@@ -1,5 +1,8 @@
+"use client";
+
 import { type ReactNode } from "react";
 
+import { AuthGuard } from "@/shared/ui/auth-guard";
 import { AppLayout } from "@/widgets/app-layout/app-layout";
 
 type LayoutProps = {
@@ -7,5 +10,9 @@ type LayoutProps = {
 };
 
 export default function Layout({ children }: LayoutProps) {
-  return <AppLayout>{children}</AppLayout>;
+  return (
+    <AuthGuard>
+      <AppLayout>{children}</AppLayout>
+    </AuthGuard>
+  );
 }
