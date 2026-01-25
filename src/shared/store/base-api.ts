@@ -5,8 +5,8 @@ import {
   createApi,
   fetchBaseQuery,
 } from "@reduxjs/toolkit/query/react";
-import type { AuthResponse } from "@/entities/auth/types";
-import { API_ROUTES } from "@/shared/config/api-routes";
+import type { AuthResponse } from "@entities/auth/types";
+import { API_ROUTES } from "@shared/config/api-routes";
 import { clearCredentials, setCredentials } from "./auth-slice";
 import type { RootState } from "./store";
 
@@ -29,9 +29,11 @@ const rawBaseQuery = fetchBaseQuery({
   },
 });
 
+const AUTH_ENDPOINTS = Object.values(API_ROUTES.AUTH);
+
 const isAuthEndpoint = (args: string | FetchArgs) => {
   const url = typeof args === "string" ? args : args.url;
-  return url.startsWith(API_ROUTES.AUTH_BASE);
+  return AUTH_ENDPOINTS.some((endpoint) => url.startsWith(endpoint));
 };
 
 const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> = async (
@@ -44,7 +46,7 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
   if (result.error && result.error.status === 401 && !isAuthEndpoint(args)) {
     const refreshResult = await rawBaseQuery(
       {
-        url: API_ROUTES.AUTH_REFRESH,
+        url: API_ROUTES.AUTH.REFRESH,
         method: "POST",
       },
       api,

@@ -2,8 +2,8 @@
 
 import { type ReactNode } from "react";
 
-import { AuthGuard } from "@/shared/ui/auth-guard";
-import { AppLayout } from "@/widgets/app-layout/app-layout";
+import { AuthGuard } from "@shared/ui/auth-guard";
+import { AppLayout } from "@widgets/app-layout/app-layout";
 
 type LayoutProps = {
   children: ReactNode;

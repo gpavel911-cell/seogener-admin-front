@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import styled from "styled-components";
-import { SIDEBAR_ITEMS } from "@/shared/config/navigation";
+import { SIDEBAR_ITEMS } from "@shared/config/navigation";
 
 export function Sidebar() {
   const pathname = usePathname();

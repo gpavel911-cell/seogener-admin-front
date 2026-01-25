@@ -4,9 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import styled from "styled-components";
 import { FaUserCircle } from "react-icons/fa";
-import { useLogoutMutation } from "@/entities/auth/api";
-import { ROUTES } from "@/shared/config/routes";
-import { clearCredentials, selectAuth, useAppDispatch, useAppSelector } from "@/shared/store";
+import { useLogoutMutation } from "@entities/auth/api";
+import { ROUTES } from "@shared/config/routes";
+import { clearCredentials, selectAuth, useAppDispatch, useAppSelector } from "@shared/store";
 
 export function TopBar() {
   const router = useRouter();

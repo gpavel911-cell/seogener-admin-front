@@ -1,4 +1,4 @@
-import type { AuthUser } from "@/entities/auth/types";
+import type { AuthUser } from "@entities/auth/types";
 
 export type StoredAuthState = {
   accessToken: string | null;

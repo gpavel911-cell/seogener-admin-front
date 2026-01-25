@@ -2,9 +2,9 @@
 
 import { type ReactNode, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useRefreshMutation } from "@/entities/auth/api";
-import { ROUTES } from "@/shared/config/routes";
-import { clearCredentials, selectAuth, setCredentials, useAppDispatch, useAppSelector } from "@/shared/store";
+import { useRefreshMutation } from "@entities/auth/api";
+import { ROUTES } from "@shared/config/routes";
+import { clearCredentials, selectAuth, setCredentials, useAppDispatch, useAppSelector } from "@shared/store";
 
 type AuthGuardProps = {
   children: ReactNode;

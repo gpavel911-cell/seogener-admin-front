@@ -1,8 +1,8 @@
 import { type ReactNode } from "react";
 import styled from "styled-components";
 
-import { Sidebar } from "@/widgets/sidebar/sidebar";
-import { TopBar } from "@/widgets/top-bar/top-bar";
+import { Sidebar } from "@widgets/sidebar/sidebar";
+import { TopBar } from "@widgets/top-bar/top-bar";
 
 type AppLayoutProps = {
   children: ReactNode;

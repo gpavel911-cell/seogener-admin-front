@@ -3,17 +3,19 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import styled from "styled-components";
-import { useLoginMutation } from "@/entities/auth/api";
-import { ROUTES } from "@/shared/config/routes";
-import { selectIsAuthenticated, setCredentials, useAppDispatch, useAppSelector } from "@/shared/store";
+import { useLoginMutation } from "@entities/auth/api";
+import { ROUTES } from "@shared/config/routes";
+import { selectIsAuthenticated, setCredentials, useAppDispatch, useAppSelector } from "@shared/store";
+import { useToast } from "@shared/ui";
 
 export default function LoginPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
-  const [login, { isLoading, error }] = useLoginMutation();
+  const [login, { isLoading }] = useLoginMutation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const { showToast } = useToast();
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -28,14 +30,9 @@ export default function LoginPage() {
       dispatch(setCredentials(result));
       router.replace(ROUTES.DASHBOARD);
     } catch {
-      // handled via error state
+      showToast({ variant: "error", message: "Ошибка входа" });
     }
   };
-
-  const errorMessage =
-    error && typeof error === "object" && "data" in error
-      ? (error as { data?: { message?: string } }).data?.message ?? "Login failed"
-      : "Login failed";
 
   return (
     <Page>
@@ -64,7 +61,6 @@ export default function LoginPage() {
               required
             />
           </Field>
-          {error ? <ErrorText>{errorMessage}</ErrorText> : null}
           <SubmitButton type="submit" disabled={isLoading}>
             {isLoading ? "Signing in..." : "Sign in"}
           </SubmitButton>
@@ -145,8 +141,3 @@ const SubmitButton = styled.button`
   }
 `;
 
-const ErrorText = styled.p`
-  margin: 0;
-  color: #b91c1c;
-  font-size: 14px;
-`;

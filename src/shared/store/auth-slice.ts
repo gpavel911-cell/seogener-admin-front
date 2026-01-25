@@ -1,5 +1,5 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
-import type { AuthResponse, AuthUser } from "@/entities/auth/types";
+import type { AuthResponse, AuthUser } from "@entities/auth/types";
 import { clearAuthState, loadAuthState, persistAuthState, type StoredAuthState } from "./auth-storage";
 import type { RootState } from "./store";
 

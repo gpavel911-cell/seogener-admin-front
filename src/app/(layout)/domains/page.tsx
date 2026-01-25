@@ -1,5 +1,5 @@
-import { PageTitle } from "@/shared/ui/page-title";
+import { DomainsPage } from "@pages/domains";
 
-export default function DomainsPage() {
-  return <PageTitle>Домены</PageTitle>;
+export default function Page() {
+  return <DomainsPage />;
 }
