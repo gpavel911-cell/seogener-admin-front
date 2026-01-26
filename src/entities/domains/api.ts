@@ -1,6 +1,6 @@
 import { API_ROUTES } from "@shared/config/api-routes";
 import { baseApi } from "@shared/store";
-import type { DomainListResponse } from "./types";
+import type { DomainDetailsDto, DomainListResponse } from "./types";
 
 export const domainsApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
@@ -8,6 +8,11 @@ export const domainsApi = baseApi.injectEndpoints({
       query: ({ page, limit }) => ({
         url: API_ROUTES.DOMAINS.GET_ALL,
         params: { pageNumber: page, pageSize: limit },
+      }),
+    }),
+    getDomainDetails: builder.query<DomainDetailsDto, number>({
+      query: (id) => ({
+        url: API_ROUTES.DOMAINS.GET_DETAILS(id),
       }),
     }),
     syncDomains: builder.mutation<void, void>({
@@ -19,4 +24,8 @@ export const domainsApi = baseApi.injectEndpoints({
   }),
 });
 
-export const { useGetDomainsQuery, useSyncDomainsMutation } = domainsApi;
+export const {
+  useGetDomainsQuery,
+  useGetDomainDetailsQuery,
+  useSyncDomainsMutation
+} = domainsApi;

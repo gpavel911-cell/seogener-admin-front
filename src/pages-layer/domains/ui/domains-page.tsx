@@ -1,32 +1,28 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import styled from "styled-components";
-
-import { useGetDomainsQuery, useSyncDomainsMutation } from "@entities/domains/api";
-import { RegistrarPresence, type DomainDto } from "@entities/domains/types";
+import { skipToken } from "@reduxjs/toolkit/query";
+import { useGetDomainDetailsQuery, useGetDomainsQuery, useSyncDomainsMutation } from "@entities/domains/api";
 import { usePagination } from "@shared/lib/use-pagination";
 import { PaginationControls } from "@shared/ui/pagination-controls";
-import {
-  Button,
-  PageTitle,
-  TableWrapper,
-  Table,
-  TableHead,
-  TableBody,
-  TableRow,
-  TableHeaderCell,
-  TableCell,
-  useToast,
-} from "@shared/ui";
+import { Button, PageTitle, useToast } from "@shared/ui";
+import { DomainTable } from "./domain-table";
+import { DomainDetailsPanel } from "./domain-details-panel";
 
 export function DomainsPage() {
   const { page, pageSize, pageSizeOptions, setPage, setPageSize } = usePagination();
+  const [selectedDomainId, setSelectedDomainId] = useState<number | null>(null);
 
   const { data: domainData, isLoading, isFetching, error: loadError, refetch } = useGetDomainsQuery({
     page,
     limit: pageSize,
   });
+  const {
+    data: domainDetails,
+    isFetching: isDetailsLoading,
+    error: detailsError,
+  } = useGetDomainDetailsQuery(selectedDomainId ?? skipToken);
   const [syncDomains, { isLoading: isSyncing }] = useSyncDomainsMutation();
   const { showToast } = useToast();
 
@@ -41,10 +37,23 @@ export function DomainsPage() {
     return "Ошибка загрузки доменов.";
   }, [loadError]);
 
+  const detailsErrorMessage = useMemo(() => {
+    if (!detailsError) return null;
+    if (typeof detailsError === "object" && "status" in detailsError) {
+      return `Ошибка загрузки деталей (status ${(detailsError as { status: number }).status}).`;
+    }
+    return "Ошибка загрузки деталей домена.";
+  }, [detailsError]);
+
   useEffect(() => {
     if (!loadErrorMessage) return;
     showToast({ variant: "error", message: loadErrorMessage });
   }, [loadErrorMessage, showToast]);
+
+  useEffect(() => {
+    if (!detailsErrorMessage) return;
+    showToast({ variant: "error", message: detailsErrorMessage });
+  }, [detailsErrorMessage, showToast]);
 
 
   const onSync = async () => {
@@ -68,39 +77,19 @@ export function DomainsPage() {
         </Actions>
       </Header>
 
-      <TableWrapper>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableHeaderCell>Домен</TableHeaderCell>
-              <TableHeaderCell>Service ID</TableHeaderCell>
-              <TableHeaderCell>State</TableHeaderCell>
-              <TableHeaderCell>Servtype</TableHeaderCell>
-              <TableHeaderCell>Subtype</TableHeaderCell>
-              <TableHeaderCell>Uplink ID</TableHeaderCell>
-              <TableHeaderCell>Создан</TableHeaderCell>
-              <TableHeaderCell>Истекает</TableHeaderCell>
-              <TableHeaderCell>Presence</TableHeaderCell>
-              <TableHeaderCell>Регистратор</TableHeaderCell>
-              <TableHeaderCell>Профиль</TableHeaderCell>
-              <TableHeaderCell>Последний sync</TableHeaderCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={12}>Загрузка...</TableCell>
-              </TableRow>
-            ) : items.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={12}>Домены не найдены.</TableCell>
-              </TableRow>
-            ) : (
-              items.map((domain) => <DomainRow key={domain.id} domain={domain} />)
-            )}
-          </TableBody>
-        </Table>
-      </TableWrapper>
+      <DomainTable
+        items={items}
+        isLoading={isLoading}
+        selectedDomainId={selectedDomainId}
+        onSelect={setSelectedDomainId}
+      />
+
+      <DomainDetailsPanel
+        isOpen={selectedDomainId !== null}
+        isLoading={isDetailsLoading}
+        details={domainDetails}
+        onClose={() => setSelectedDomainId(null)}
+      />
 
       <PaginationControls
         page={page}
@@ -112,30 +101,6 @@ export function DomainsPage() {
         onPageSizeChange={setPageSize}
       />
     </Wrapper>
-  );
-}
-
-
-function DomainRow({ domain }: { domain: DomainDto }) {
-  return (
-    <TableRow>
-      <TableCell>{domain.dname}</TableCell>
-      <TableCell>{domain.serviceId}</TableCell>
-      <TableCell>{domain.state ?? "—"}</TableCell>
-      <TableCell>{domain.servtype}</TableCell>
-      <TableCell>{domain.subtype ?? "—"}</TableCell>
-      <TableCell>{domain.uplinkServiceId ?? "—"}</TableCell>
-      <TableCell>{domain.creationDate ?? "—"}</TableCell>
-      <TableCell>{domain.expirationDate ?? "—"}</TableCell>
-      <TableCell>
-        <Badge data-variant={domain.registrarPresence}>
-          {domain.registrarPresence === RegistrarPresence.MISSING ? "Missing" : "Present"}
-        </Badge>
-      </TableCell>
-      <TableCell>{domain.registrar}</TableCell>
-      <TableCell>{domain.profile}</TableCell>
-      <TableCell>{new Date(domain.lastSeenAt).toLocaleString("ru-RU")}</TableCell>
-    </TableRow>
   );
 }
 
@@ -157,18 +122,3 @@ const Actions = styled.div`
   align-items: center;
   gap: 12px;
 `;
-
-const Badge = styled.span`
-  display: inline-flex;
-  padding: 4px 8px;
-  border-radius: 999px;
-  font-size: 12px;
-  background: #ecfdf3;
-  color: #027a48;
-
-  &[data-variant="MISSING"] {
-    background: #fef3f2;
-    color: #b42318;
-  }
-`;
-

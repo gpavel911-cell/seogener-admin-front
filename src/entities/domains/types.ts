@@ -15,14 +15,24 @@ export type DomainDto = {
   profile: string;
   serviceId: string;
   dname: string;
-  servtype: string;
   state?: string | null;
-  subtype?: string | null;
-  uplinkServiceId?: string | null;
-  creationDate?: string | null;
   expirationDate?: string | null;
   registrarPresence: RegistrarPresence;
   lastSeenAt: string;
 };
 
 export type DomainListResponse = Page<DomainDto>;
+
+export type DomainDetailsDto = {
+  id: number;
+  registrar: RegistrarType;
+  profile: string;
+  serviceId: string;
+  dname: string;
+  state?: string | null;
+  expirationDate?: string | null;
+  registrarPresence: RegistrarPresence;
+  lastSeenAt: string;
+  detailsSyncedAt?: string | null;
+  additionalInfo?: Record<string, unknown>;
+};

@@ -6,6 +6,7 @@ export const API_ROUTES = {
   },
   DOMAINS: {
     GET_ALL: "/api/v1/domains",
+    GET_DETAILS: (id: number) => `/api/v1/domains/${id}`,
     SYNC: "/api/v1/domains/sync",
   },
 } as const;
