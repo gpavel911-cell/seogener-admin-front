@@ -13,7 +13,8 @@ export function Sidebar() {
       <Navigation aria-label="Основная навигация">
         <NavList>
           {SIDEBAR_ITEMS.map((item) => {
-            const isActive = pathname === item.path || pathname.startsWith(`${item.path}/`);
+            const currentPath = pathname ?? "";
+            const isActive = currentPath === item.path || currentPath.startsWith(`${item.path}/`);
             return (
               <NavItem key={item.id}>
                 <NavLink href={item.path} $active={isActive} aria-current={isActive ? "page" : undefined}>
@@ -29,7 +30,10 @@ export function Sidebar() {
 }
 
 const SidebarContainer = styled.aside`
-  width: 240px;
+  width: 250px;
+  min-width: 250px;
+  max-width: 250px;
+  flex: 0 0 250px;
   background: #ffffff;
   border-right: 1px solid #e5e7eb;
   padding: 24px 16px;

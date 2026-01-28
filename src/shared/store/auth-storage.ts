@@ -1,8 +1,8 @@
-import type { AuthUser } from "@entities/auth/types";
+import type { AuthUserResponse } from "@entities/auth/types";
 
 export type StoredAuthState = {
   accessToken: string | null;
-  user: AuthUser | null;
+  user: AuthUserResponse | null;
 };
 
 const STORAGE_KEY = "landings-admin-auth";

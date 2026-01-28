@@ -1,5 +1,5 @@
-import { PageTitle } from "@shared/ui/page-title";
+import { YandexPage } from "@pages/yandex";
 
-export default function YandexPage() {
-  return <PageTitle>Яндекс</PageTitle>;
+export default function Page() {
+  return <YandexPage />;
 }

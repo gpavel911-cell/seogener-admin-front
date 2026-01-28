@@ -5,9 +5,9 @@ import {
   asRecord,
   formatDateTime,
   formatDateValue,
+  formatDomainState,
   formatFieldValue,
   formatPresence,
-  labelForKey,
   toEntries,
 } from "../lib/formatters";
 
@@ -59,12 +59,12 @@ function DomainDetailsContent({ details }: { details: DomainDetailsDto }) {
       <SectionTitle>Основные данные</SectionTitle>
       <DetailGrid>
         <DetailLabel>Домен</DetailLabel>
-        <DetailValue>{details.dname}</DetailValue>
+        <DetailValue>{details.domainName ?? "—"}</DetailValue>
         <DetailLabel>ID услуги</DetailLabel>
         <DetailValue>{details.serviceId}</DetailValue>
         <DetailLabel>Статус</DetailLabel>
-        <DetailValue>{details.state ?? "—"}</DetailValue>
-        <DetailLabel>Истекает</DetailLabel>
+        <DetailValue>{formatDomainState(details.state)}</DetailValue>
+        <DetailLabel>Дата истечения периода</DetailLabel>
         <DetailValue>{formatDateValue(details.expirationDate)}</DetailValue>
         <DetailLabel>Регистратор</DetailLabel>
         <DetailValue>{details.registrar}</DetailValue>
@@ -72,9 +72,9 @@ function DomainDetailsContent({ details }: { details: DomainDetailsDto }) {
         <DetailValue>{details.profile}</DetailValue>
         <DetailLabel>Наличие</DetailLabel>
         <DetailValue>{formatPresence(details.registrarPresence)}</DetailValue>
-        <DetailLabel>Последний sync</DetailLabel>
+        <DetailLabel>Время последнего обновления</DetailLabel>
         <DetailValue>{formatDateTime(details.lastSeenAt)}</DetailValue>
-        <DetailLabel>Последний sync деталей</DetailLabel>
+        <DetailLabel>Время последнего обновления деталей</DetailLabel>
         <DetailValue>{formatDateTime(details.detailsSyncedAt)}</DetailValue>
       </DetailGrid>
 
@@ -106,7 +106,7 @@ function FieldSection({
       <DetailGrid>
         {entries.map(([key, value]) => (
           <DetailRow key={`${title}-${key}`}>
-            <DetailLabel>{labelForKey(key)}</DetailLabel>
+            <DetailLabel>{key}</DetailLabel>
             <DetailValue>{formatFieldValue(key, value)}</DetailValue>
           </DetailRow>
         ))}

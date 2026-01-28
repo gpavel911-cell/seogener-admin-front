@@ -1,4 +1,4 @@
-export type AuthUser = {
+export type AuthUserResponse = {
   id: number;
   email: string;
 };
@@ -6,7 +6,7 @@ export type AuthUser = {
 export type AuthResponse = {
   accessToken: string;
   expiresIn: number;
-  user: AuthUser;
+  user: AuthUserResponse;
 };
 
 export type LoginRequest = {

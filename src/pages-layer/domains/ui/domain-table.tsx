@@ -9,7 +9,7 @@ import {
   TableBody,
   TableCell,
 } from "@shared/ui";
-import { formatDateTime, formatDateValue, formatPresence } from "../lib/formatters";
+import { formatDateTime, formatDateValue, formatDomainState, formatPresence } from "../lib/formatters";
 
 type DomainTableProps = {
   items: DomainDto[];
@@ -18,7 +18,7 @@ type DomainTableProps = {
   onSelect: (id: number) => void;
 };
 
-const COLUMN_COUNT = 8;
+const COLUMN_COUNT = 5;
 
 export function DomainTable({ items, isLoading, selectedDomainId, onSelect }: DomainTableProps) {
   return (
@@ -27,13 +27,10 @@ export function DomainTable({ items, isLoading, selectedDomainId, onSelect }: Do
         <TableHead>
           <TableRow>
             <TableHeaderCell>Домен</TableHeaderCell>
-            <TableHeaderCell>ID услуги</TableHeaderCell>
             <TableHeaderCell>Статус</TableHeaderCell>
-            <TableHeaderCell>Истекает</TableHeaderCell>
+            <TableHeaderCell>Дата истечения периода</TableHeaderCell>
             <TableHeaderCell>Наличие</TableHeaderCell>
-            <TableHeaderCell>Регистратор</TableHeaderCell>
-            <TableHeaderCell>Профиль</TableHeaderCell>
-            <TableHeaderCell>Последний sync</TableHeaderCell>
+            <TableHeaderCell>Время последнего обновления</TableHeaderCell>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -72,17 +69,14 @@ function DomainRow({
 }) {
   return (
     <ClickableRow data-active={isSelected} onClick={() => onSelect(domain.id)}>
-      <TableCell>{domain.dname}</TableCell>
-      <TableCell>{domain.serviceId}</TableCell>
-      <TableCell>{domain.state ?? "—"}</TableCell>
+      <TableCell>{domain.domainName ?? "—"}</TableCell>
+      <TableCell>{formatDomainState(domain.state)}</TableCell>
       <TableCell>{formatDateValue(domain.expirationDate)}</TableCell>
       <TableCell>
         <Badge data-variant={domain.registrarPresence}>
           {formatPresence(domain.registrarPresence)}
         </Badge>
       </TableCell>
-      <TableCell>{domain.registrar}</TableCell>
-      <TableCell>{domain.profile}</TableCell>
       <TableCell>{formatDateTime(domain.lastSeenAt)}</TableCell>
     </ClickableRow>
   );

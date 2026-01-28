@@ -1,9 +1,4 @@
-import { FIELD_LABELS } from "@entities/domains/lib/field-labels";
-import { RegistrarPresence } from "@entities/domains/types";
-
-export function labelForKey(key: string) {
-  return FIELD_LABELS[key] ?? key;
-}
+import { DomainState, RegistrarPresence } from "@entities/domains/types";
 
 export function toEntries(record?: Record<string, unknown>) {
   return Object.entries(record ?? {})
@@ -49,6 +44,19 @@ export function formatDateTime(value?: string | null) {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return value;
   return parsed.toLocaleString("ru-RU");
+}
+
+const DOMAIN_STATE_LABELS: Record<DomainState, string> = {
+  [DomainState.INACTIVE]: "Неактивен",
+  [DomainState.ACTIVE]: "Активен",
+  [DomainState.SUSPENDED]: "Приостановлен",
+  [DomainState.DELETED]: "Удален",
+  [DomainState.TRANSFERRED]: "Перенесен",
+};
+
+export function formatDomainState(value?: DomainState | null) {
+  if (!value) return "—";
+  return DOMAIN_STATE_LABELS[value] ?? value;
 }
 
 export function formatPresence(value: RegistrarPresence) {

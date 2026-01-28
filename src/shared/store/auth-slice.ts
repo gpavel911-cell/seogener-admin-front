@@ -1,5 +1,5 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
-import type { AuthResponse, AuthUser } from "@entities/auth/types";
+import type { AuthResponse, AuthUserResponse } from "@entities/auth/types";
 import { clearAuthState, loadAuthState, persistAuthState, type StoredAuthState } from "./auth-storage";
 import type { RootState } from "./store";
 
@@ -18,7 +18,7 @@ const authSlice = createSlice({
   reducers: {
     setCredentials: (state, action: PayloadAction<AuthResponse>) => {
       state.accessToken = action.payload.accessToken;
-      state.user = action.payload.user as AuthUser;
+      state.user = action.payload.user as AuthUserResponse;
       persistAuthState({
         accessToken: state.accessToken,
         user: state.user,

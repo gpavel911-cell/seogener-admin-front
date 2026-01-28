@@ -17,8 +17,8 @@ type PaginationState = {
 export const usePagination = (options: UsePaginationOptions = {}): PaginationState => {
   const {
     initialPage = 0,
-    initialPageSize = 10,
-    pageSizeOptions = [10, 20, 50],
+    initialPageSize = 20,
+    pageSizeOptions = [20, 50, 100],
   } = options;
 
   const [page, setPageState] = useState(initialPage);
