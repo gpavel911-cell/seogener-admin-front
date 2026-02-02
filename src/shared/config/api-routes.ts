@@ -13,5 +13,6 @@ export const API_ROUTES = {
   ANALYTICS: {
     GET_COUNTERS: "/api/v1/analytics/counters",
     SYNC_COUNTERS: "/api/v1/analytics/counters/sync",
+    GET_REPORT: "/api/v1/analytics/reports",
   },
 } as const;

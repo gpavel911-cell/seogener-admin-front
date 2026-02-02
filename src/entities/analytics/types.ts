@@ -20,3 +20,29 @@ export type AnalyticsCounterListRequest = {
   pageSize: number;
   provider: AnalyticsProvider;
 };
+
+export type AnalyticsCounterReportRequest = {
+  counterId: string;
+  provider: AnalyticsProvider;
+  date1?: string;
+  date2?: string;
+};
+
+export type AnalyticsCounterReportRow = {
+  dimensionValues: string[];
+  metricValues: number[];
+};
+
+export type AnalyticsCounterReportResponse = {
+  metrics: string[];
+  dimensions: string[];
+  totals: number[];
+  rows: AnalyticsCounterReportRow[];
+  containsSensitiveData: boolean;
+};
+
+export type AnalyticsCounterReportsResponse = {
+  visits: AnalyticsCounterReportResponse;
+  entryPages: AnalyticsCounterReportResponse;
+  urlViews: AnalyticsCounterReportResponse;
+};

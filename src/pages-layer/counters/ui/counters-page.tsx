@@ -122,12 +122,12 @@ const CountersTable = ({
       );
     }
     return items.map((item) => (
-      <ZebraRow key={item.id}>
+      <TableRow key={item.id}>
         <TableCell>{item.counterId}</TableCell>
         <TableCell>{item.counterName ?? "—"}</TableCell>
         <TableCell>{item.siteUrl ?? "—"}</TableCell>
         <TableCell>{formatDateTime(item.updatedAt)}</TableCell>
-      </ZebraRow>
+      </TableRow>
     ));
   }, [items, isLoading]);
 
@@ -205,10 +205,4 @@ const TableSection = styled.section`
   display: flex;
   flex-direction: column;
   gap: 16px;
-`;
-
-const ZebraRow = styled(TableRow)`
-  &:nth-child(even) {
-    background: #f9fafb;
-  }
 `;
