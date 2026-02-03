@@ -2,10 +2,12 @@ import { API_ROUTES } from "@shared/config/api-routes";
 import { baseApi } from "@shared/store";
 import type {
   AnalyticsCounterDto,
+  AnalyticsCounterDetailsDto,
   AnalyticsCounterListRequest,
   AnalyticsCountersListResponse,
-  AnalyticsCounterReportRequest,
-  AnalyticsCounterReportsResponse,
+  AnalyticsCounterCreateRequest,
+  AnalyticsCounterStatisticsRequest,
+  AnalyticsCounterStatisticsResponse,
 } from "./types";
 
 export const analyticsApi = baseApi.injectEndpoints({
@@ -19,6 +21,18 @@ export const analyticsApi = baseApi.injectEndpoints({
         };
       },
     }),
+    getCounterDetails: builder.query<AnalyticsCounterDetailsDto, number>({
+      query: (id) => ({
+        url: API_ROUTES.ANALYTICS.GET_COUNTER_DETAILS(id),
+      }),
+    }),
+    createCounter: builder.mutation<void, AnalyticsCounterCreateRequest>({
+      query: (body) => ({
+        url: API_ROUTES.ANALYTICS.CREATE_COUNTER,
+        method: "POST",
+        body,
+      }),
+    }),
     syncCounters: builder.mutation<void, { provider: AnalyticsCounterDto["provider"] }>({
       query: ({ provider }) => ({
         url: API_ROUTES.ANALYTICS.SYNC_COUNTERS,
@@ -26,9 +40,9 @@ export const analyticsApi = baseApi.injectEndpoints({
         params: { provider },
       }),
     }),
-    getReport: builder.query<AnalyticsCounterReportsResponse, AnalyticsCounterReportRequest>({
+    getStatistics: builder.query<AnalyticsCounterStatisticsResponse, AnalyticsCounterStatisticsRequest>({
       query: (params) => ({
-        url: API_ROUTES.ANALYTICS.GET_REPORT,
+        url: API_ROUTES.ANALYTICS.GET_STATISTICS,
         params,
       }),
     }),
@@ -37,6 +51,8 @@ export const analyticsApi = baseApi.injectEndpoints({
 
 export const {
   useGetCountersQuery,
+  useGetCounterDetailsQuery,
+  useCreateCounterMutation,
   useSyncCountersMutation,
-  useLazyGetReportQuery,
+  useLazyGetStatisticsQuery,
 } = analyticsApi;

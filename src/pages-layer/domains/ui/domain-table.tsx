@@ -27,8 +27,8 @@ export function DomainTable({ items, isLoading, selectedDomainId, onSelect }: Do
         <TableHead>
           <TableRow>
             <TableHeaderCell>Домен</TableHeaderCell>
-            <TableHeaderCell>Статус</TableHeaderCell>
             <TableHeaderCell>Дата истечения периода</TableHeaderCell>
+            <TableHeaderCell>Статус</TableHeaderCell>
             <TableHeaderCell>Наличие</TableHeaderCell>
             <TableHeaderCell>Время последнего обновления</TableHeaderCell>
           </TableRow>
@@ -70,11 +70,15 @@ function DomainRow({
   return (
     <ClickableRow data-active={isSelected} onClick={() => onSelect(domain.id)}>
       <TableCell>{domain.domainName ?? "—"}</TableCell>
-      <TableCell>{formatDomainState(domain.state)}</TableCell>
       <TableCell>{formatDateValue(domain.expirationDate)}</TableCell>
       <TableCell>
-        <Badge data-variant={domain.registrarPresence}>
-          {formatPresence(domain.registrarPresence)}
+        <Badge data-variant={domain.status ?? "UNKNOWN"}>
+          {formatDomainState(domain.status)}
+        </Badge>
+      </TableCell>
+      <TableCell>
+        <Badge data-variant={domain.presence}>
+          {formatPresence(domain.presence)}
         </Badge>
       </TableCell>
       <TableCell>{formatDateTime(domain.lastSeenAt)}</TableCell>
@@ -105,5 +109,25 @@ const Badge = styled.span`
   &[data-variant="MISSING"] {
     background: #fef3f2;
     color: #b42318;
+  }
+
+  &[data-variant="INACTIVE"] {
+    background: #fef3f2;
+    color: #b42318;
+  }
+
+  &[data-variant="DELETED"] {
+    background: #fef3f2;
+    color: #b42318;
+  }
+
+  &[data-variant="SUSPENDED"] {
+    background: #fff7ed;
+    color: #b45309;
+  }
+
+  &[data-variant="TRANSFERRED"] {
+    background: #f3f4f6;
+    color: #374151;
   }
 `;

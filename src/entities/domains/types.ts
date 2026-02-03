@@ -23,9 +23,9 @@ export type DomainDto = {
   profile: string;
   serviceId: string;
   domainName: string;
-  state?: DomainState | null;
+  status?: DomainState | null;
   expirationDate?: string | null;
-  registrarPresence: RegistrarPresence;
+  presence: RegistrarPresence;
   lastSeenAt: string;
 };
 
@@ -49,10 +49,9 @@ export type DomainDetailsDto = {
   profile: string;
   serviceId: string;
   domainName: string;
-  state?: DomainState | null;
+  status?: DomainState | null;
   expirationDate?: string | null;
-  registrarPresence: RegistrarPresence;
+  presence: RegistrarPresence;
   lastSeenAt: string;
-  detailsSyncedAt?: string | null;
   additionalInfo?: Record<string, unknown>;
 };

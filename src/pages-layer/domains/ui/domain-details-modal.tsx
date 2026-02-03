@@ -18,7 +18,7 @@ type DomainDetailsPanelProps = {
   onClose: () => void;
 };
 
-export function DomainDetailsPanel({
+export function DomainDetailsModal({
   isOpen,
   isLoading,
   details,
@@ -63,7 +63,7 @@ function DomainDetailsContent({ details }: { details: DomainDetailsDto }) {
         <DetailLabel>ID услуги</DetailLabel>
         <DetailValue>{details.serviceId}</DetailValue>
         <DetailLabel>Статус</DetailLabel>
-        <DetailValue>{formatDomainState(details.state)}</DetailValue>
+        <DetailValue>{formatDomainState(details.status)}</DetailValue>
         <DetailLabel>Дата истечения периода</DetailLabel>
         <DetailValue>{formatDateValue(details.expirationDate)}</DetailValue>
         <DetailLabel>Регистратор</DetailLabel>
@@ -71,11 +71,9 @@ function DomainDetailsContent({ details }: { details: DomainDetailsDto }) {
         <DetailLabel>Профиль</DetailLabel>
         <DetailValue>{details.profile}</DetailValue>
         <DetailLabel>Наличие</DetailLabel>
-        <DetailValue>{formatPresence(details.registrarPresence)}</DetailValue>
+        <DetailValue>{formatPresence(details.presence)}</DetailValue>
         <DetailLabel>Время последнего обновления</DetailLabel>
         <DetailValue>{formatDateTime(details.lastSeenAt)}</DetailValue>
-        <DetailLabel>Время последнего обновления деталей</DetailLabel>
-        <DetailValue>{formatDateTime(details.detailsSyncedAt)}</DetailValue>
       </DetailGrid>
 
       <FieldSection title="Детали" entries={detailEntries} />

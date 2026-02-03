@@ -1,5 +1,5 @@
-import { YandexPage } from "@pages/yandex";
+import { MetricsPage } from "@pages/metrics";
 
 export default function Page() {
-  return <YandexPage />;
+  return <MetricsPage />;
 }

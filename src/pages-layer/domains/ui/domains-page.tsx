@@ -9,16 +9,17 @@ import { usePagination } from "@shared/lib/use-pagination";
 import { PaginationControls } from "@shared/ui/pagination-controls";
 import { Button, PageTitle, useToast } from "@shared/ui";
 import { DomainTable } from "./domain-table";
-import { DomainDetailsPanel } from "./domain-details-panel";
+import { DomainDetailsModal } from "./domain-details-modal";
 
 export function DomainsPage() {
+  const { showToast } = useToast();
   const { page, pageSize, pageSizeOptions, setPage, setPageSize } = usePagination();
   const [selectedDomainId, setSelectedDomainId] = useState<number | null>(null);
   const [activeRegistrar, setActiveRegistrar] = useState<RegistrarType | null>(null);
   const [activeProfile, setActiveProfile] = useState<string | null>(null);
 
-  const { data: profilesData } = useGetDomainProfilesQuery();
-  const fallbackSelection = useMemo(() => {
+  const { data: profilesData, isFetching: isProfilesFetching } = useGetDomainProfilesQuery();
+  const defaultSelection = useMemo(() => {
     if (!profilesData?.length) {
       return { registrar: null, profile: null };
     }
@@ -31,15 +32,14 @@ export function DomainsPage() {
     return { registrar: firstGroup.registrar, profile: firstProfile };
   }, [profilesData]);
 
-  const resolvedRegistrar = activeRegistrar ?? fallbackSelection.registrar;
-  const resolvedProfile = activeProfile ?? fallbackSelection.profile;
+  const resolvedRegistrar = activeRegistrar ?? defaultSelection.registrar;
+  const resolvedProfile = activeProfile ?? defaultSelection.profile;
 
   const domainsQueryArgs = resolvedRegistrar && resolvedProfile
     ? { pageNumber: page, pageSize, profile: resolvedProfile, registrar: resolvedRegistrar }
     : skipToken;
   const { data: domainData, isLoading, isFetching, error: loadError, refetch } = useGetDomainsQuery(domainsQueryArgs);
   const [syncDomains, { isLoading: isSyncing }] = useSyncDomainsMutation();
-  const { showToast } = useToast();
 
   const totalPages = domainData?.totalPages ?? 0;
   const items = domainData?.content ?? [];
@@ -65,6 +65,7 @@ export function DomainsPage() {
       profilesData?.length ? profilesData : items.map((item) => ({ registrar: item.registrar, profile: item.profile }));
     return buildRegistrarGroups(source);
   }, [profilesData, items]);
+  const shouldShowProfilesEmptyState = !isProfilesFetching && (!profilesData || profilesData.length === 0);
 
   const {
     data: domainDetails,
@@ -101,7 +102,6 @@ export function DomainsPage() {
   useEffect(() => {
     setPage(0);
   }, [resolvedRegistrar, resolvedProfile, setPage]);
-
 
   const onSync = async () => {
     try {
@@ -146,29 +146,33 @@ export function DomainsPage() {
         </LeftColumn>
 
         <Main>
-          <DomainTable
-            items={filteredItems}
-            isLoading={isLoading}
-            selectedDomainId={resolvedSelectedDomainId}
-            onSelect={setSelectedDomainId}
-          />
-
-          <DomainDetailsPanel
-            isOpen={resolvedSelectedDomainId !== null}
-            isLoading={isDetailsLoading}
-            details={domainDetails}
-            onClose={() => setSelectedDomainId(null)}
-          />
-
-          <PaginationControls
-            page={page}
-            totalPages={totalPages}
-            pageSize={pageSize}
-            pageSizeOptions={pageSizeOptions}
-            isFetching={isFetching}
-            onPageChange={setPage}
-            onPageSizeChange={setPageSize}
-          />
+          {shouldShowProfilesEmptyState ? (
+            <EmptyState>Профили доменов не найдены. Сначала синхронизируйте домены.</EmptyState>
+          ) : (
+            <>
+              <DomainTable
+                items={filteredItems}
+                isLoading={isLoading}
+                selectedDomainId={resolvedSelectedDomainId}
+                onSelect={setSelectedDomainId}
+              />
+              <DomainDetailsModal
+                isOpen={resolvedSelectedDomainId !== null}
+                isLoading={isDetailsLoading}
+                details={domainDetails}
+                onClose={() => setSelectedDomainId(null)}
+              />
+              <PaginationControls
+                page={page}
+                totalPages={totalPages}
+                pageSize={pageSize}
+                pageSizeOptions={pageSizeOptions}
+                isFetching={isFetching}
+                onPageChange={setPage}
+                onPageSizeChange={setPageSize}
+              />
+            </>
+          )}
         </Main>
       </Body>
     </Wrapper>
@@ -262,4 +266,13 @@ const Main = styled.div`
   display: flex;
   flex-direction: column;
   gap: 16px;
+`;
+
+const EmptyState = styled.div`
+  border: 1px dashed #d1d5db;
+  background: #f9fafb;
+  padding: 20px;
+  border-radius: 12px;
+  font-size: 14px;
+  color: #4b5563;
 `;

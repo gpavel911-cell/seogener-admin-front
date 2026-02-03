@@ -2,48 +2,64 @@
 
 import { useEffect, useMemo, useState } from "react";
 import styled from "styled-components";
-import { useGetCountersQuery, useSyncCountersMutation } from "@entities/analytics/api";
-import { AnalyticsProvider, type AnalyticsCounterDto } from "@entities/analytics/types";
+import { skipToken } from "@reduxjs/toolkit/query";
+import { useGetCounterDetailsQuery, useGetCountersQuery, useSyncCountersMutation } from "@entities/analytics/api";
+import { AnalyticsProvider } from "@entities/analytics/types";
 import { usePagination } from "@shared/lib/use-pagination";
 import {
   Button,
   PageTitle,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeaderCell,
-  TableRow,
-  TableWrapper,
   useToast,
 } from "@shared/ui";
 import { PaginationControls } from "@shared/ui/pagination-controls";
+import { CountersTable } from "./counters-table";
+import { CounterDetailsModal } from "./counter-details-modal";
 
 const PROVIDERS: { id: AnalyticsProvider; label: string }[] = [
   { id: AnalyticsProvider.YANDEX_METRICA, label: "Яндекс Метрика" },
 ];
 
-const DEFAULT_PROVIDER: AnalyticsProvider = PROVIDERS[0]?.id ?? AnalyticsProvider.YANDEX_METRICA;
-
 export function CountersPage() {
-  const {
-    page,
-    pageSize,
-    pageSizeOptions,
-    setPage,
-    setPageSize,
-  } = usePagination();
-  const [activeProvider, setActiveProvider] = useState<AnalyticsProvider>(DEFAULT_PROVIDER);
-  const { data, isFetching, refetch } = useGetCountersQuery({
+  const { showToast } = useToast();
+  const { page, pageSize, pageSizeOptions, setPage, setPageSize } = usePagination();
+  const [activeProvider, setActiveProvider] = useState<AnalyticsProvider>(PROVIDERS[0]?.id);
+  const [selectedCounterId, setSelectedCounterId] = useState<number | null>(null);
+
+  const { data, isFetching, isLoading, error: loadError, refetch } = useGetCountersQuery({
     provider: activeProvider,
     pageNumber: page,
     pageSize,
   });
   const [syncCounters, { isLoading: isSyncingCounters }] = useSyncCountersMutation();
-  const { showToast } = useToast();
 
   const counters = data?.content ?? [];
   const totalPages = data?.totalPages ?? 0;
+  const shouldShowEmptyState = !isLoading && counters.length === 0;
+
+  const resolvedSelectedCounterId = useMemo(() => {
+    if (!selectedCounterId) {
+      return null;
+    }
+    const exists = counters.some((item) => item.id === selectedCounterId);
+    return exists ? selectedCounterId : null;
+  }, [counters, selectedCounterId]);
+
+  const { data: counterDetails, isFetching: isDetailsLoading } = useGetCounterDetailsQuery(
+    resolvedSelectedCounterId ?? skipToken,
+  );
+
+  const loadErrorMessage = useMemo(() => {
+    if (!loadError) return null;
+    if (typeof loadError === "object" && "status" in loadError) {
+      return `Ошибка загрузки счетчиков (status ${(loadError as { status: number }).status}).`;
+    }
+    return "Ошибка загрузки счетчиков.";
+  }, [loadError]);
+
+  useEffect(() => {
+    if (!loadErrorMessage) return;
+    showToast({ variant: "error", message: loadErrorMessage });
+  }, [loadErrorMessage, showToast]);
 
   useEffect(() => {
     setPage(0);
@@ -82,78 +98,39 @@ export function CountersPage() {
         </LeftColumn>
         <Main>
           <TableSection>
-            <CountersTable items={counters} isLoading={isFetching} />
-            <PaginationControls
-              page={page}
-              totalPages={totalPages}
-              pageSize={pageSize}
-              pageSizeOptions={pageSizeOptions}
-              isFetching={isFetching}
-              onPageChange={setPage}
-              onPageSizeChange={setPageSize}
-            />
+            {shouldShowEmptyState ? (
+              <EmptyState>Счетчики не найдены. Выполните синхронизацию.</EmptyState>
+            ) : (
+              <>
+                <CountersTable
+                  items={counters}
+                  isLoading={isLoading}
+                  selectedCounterId={resolvedSelectedCounterId}
+                  onSelect={setSelectedCounterId}
+                />
+                <PaginationControls
+                  page={page}
+                  totalPages={totalPages}
+                  pageSize={pageSize}
+                  pageSizeOptions={pageSizeOptions}
+                  isFetching={isFetching}
+                  onPageChange={setPage}
+                  onPageSizeChange={setPageSize}
+                />
+              </>
+            )}
           </TableSection>
+          <CounterDetailsModal
+            isOpen={resolvedSelectedCounterId !== null}
+            isLoading={isDetailsLoading}
+            details={counterDetails}
+            onClose={() => setSelectedCounterId(null)}
+          />
         </Main>
       </Body>
     </Wrapper>
   );
 }
-
-const CountersTable = ({
-  items,
-  isLoading,
-}: {
-  items: AnalyticsCounterDto[];
-  isLoading: boolean;
-}) => {
-  const rows = useMemo(() => {
-    if (isLoading) {
-      return (
-        <TableRow>
-          <TableCell colSpan={4}>Загрузка...</TableCell>
-        </TableRow>
-      );
-    }
-    if (items.length === 0) {
-      return (
-        <TableRow>
-          <TableCell colSpan={4}>Счетчики не найдены.</TableCell>
-        </TableRow>
-      );
-    }
-    return items.map((item) => (
-      <TableRow key={item.id}>
-        <TableCell>{item.counterId}</TableCell>
-        <TableCell>{item.counterName ?? "—"}</TableCell>
-        <TableCell>{item.siteUrl ?? "—"}</TableCell>
-        <TableCell>{formatDateTime(item.updatedAt)}</TableCell>
-      </TableRow>
-    ));
-  }, [items, isLoading]);
-
-  return (
-    <TableWrapper>
-      <Table>
-        <TableHead>
-          <TableRow>
-            <TableHeaderCell>Номер счетчика</TableHeaderCell>
-            <TableHeaderCell>Название</TableHeaderCell>
-            <TableHeaderCell>Сайт</TableHeaderCell>
-            <TableHeaderCell>Время последнего обновления</TableHeaderCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>{rows}</TableBody>
-      </Table>
-    </TableWrapper>
-  );
-};
-
-const formatDateTime = (value?: string | null) => {
-  if (!value) return "—";
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return value;
-  return parsed.toLocaleString("ru-RU");
-};
 
 const Wrapper = styled.div`
   display: flex;
@@ -205,4 +182,13 @@ const TableSection = styled.section`
   display: flex;
   flex-direction: column;
   gap: 16px;
+`;
+
+const EmptyState = styled.div`
+  border: 1px dashed #d1d5db;
+  background: #f9fafb;
+  padding: 20px;
+  border-radius: 12px;
+  font-size: 14px;
+  color: #4b5563;
 `;
