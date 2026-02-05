@@ -105,93 +105,110 @@ export const MetricsSectionCreateCounter = () => {
   const showProfilesEmptyHint = registrarGroups.length === 0;
 
   return (
-    <Section>
-      <SectionTitle>Создать счетчик</SectionTitle>
-      <FieldRow>
-        <Label>Название</Label>
-        <Input
-          value={counterName}
-          onChange={(event) => setCounterName(event.target.value)}
-          placeholder="Например, Hotel Official"
-        />
-      </FieldRow>
-      <FieldRow>
-        <Label>Регистратор</Label>
-        <Select
-          value={resolvedRegistrar ?? ""}
-          onChange={(event) => handleRegistrarChange(event.target.value as RegistrarType)}
-        >
-          <option value="">Выберите регистратора</option>
-          {registrarGroups.map((group) => (
-            <option key={group.registrar} value={group.registrar}>
-              {group.registrar}
-            </option>
-          ))}
-        </Select>
-      </FieldRow>
-      <FieldRow>
-        <Label>Профиль</Label>
-        <Select
-          value={resolvedProfile ?? ""}
-          onChange={(event) => handleProfileChange(event.target.value)}
-          disabled={!resolvedRegistrar}
-        >
-          <option value="">Выберите профиль</option>
-          {profileOptions.map((profile) => (
-            <option key={profile} value={profile}>
-              {profile}
-            </option>
-          ))}
-        </Select>
-      </FieldRow>
-      <FieldRow>
-        <Label>Домен</Label>
-        <Select
-          value={selectedDomain}
-          onChange={(event) => setSelectedDomain(event.target.value)}
-          disabled={!resolvedRegistrar || !resolvedProfile || isDomainsFetching}
-        >
-          <option value="">Выберите домен</option>
-          {domainOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </Select>
-      </FieldRow>
+    <Stack>
+      <FormCard>
+        <FormRow>
+          <FormFields>
+            <FormField>
+              <Label>Название</Label>
+              <Input
+                value={counterName}
+                onChange={(event) => setCounterName(event.target.value)}
+                placeholder="Например, Hotel Official"
+              />
+            </FormField>
+            <FormField>
+              <Label>Регистратор</Label>
+              <Select
+                value={resolvedRegistrar ?? ""}
+                onChange={(event) => handleRegistrarChange(event.target.value as RegistrarType)}
+              >
+                <option value="">Выберите регистратора</option>
+                {registrarGroups.map((group) => (
+                  <option key={group.registrar} value={group.registrar}>
+                    {group.registrar}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
+            <FormField>
+              <Label>Профиль</Label>
+              <Select
+                value={resolvedProfile ?? ""}
+                onChange={(event) => handleProfileChange(event.target.value)}
+                disabled={!resolvedRegistrar}
+              >
+                <option value="">Выберите профиль</option>
+                {profileOptions.map((profile) => (
+                  <option key={profile} value={profile}>
+                    {profile}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
+            <FormField>
+              <Label>Домен</Label>
+              <Select
+                value={selectedDomain}
+                onChange={(event) => setSelectedDomain(event.target.value)}
+                disabled={!resolvedRegistrar || !resolvedProfile || isDomainsFetching}
+              >
+                <option value="">Выберите домен</option>
+                {domainOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
+          </FormFields>
+          <Actions>
+            <ActionButton type="button" onClick={handleSubmit} disabled={isCreateLoading}>
+              {isCreateLoading ? "Создание..." : "Создать"}
+            </ActionButton>
+          </Actions>
+        </FormRow>
+      </FormCard>
       {showDomainsEmptyHint && <Hint>Нет доменов для выбранного профиля.</Hint>}
       {showProfilesEmptyHint && <Hint>Сначала синхронизируйте домены.</Hint>}
-      <Actions>
-        <Button type="button" onClick={handleSubmit} disabled={isCreateLoading}>
-          {isCreateLoading ? "Создание..." : "Создать"}
-        </Button>
-      </Actions>
-    </Section>
+    </Stack>
   );
 };
 
-const Section = styled.section`
-  background: #ffffff;
-  border-radius: 12px;
+const Stack = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+`;
+
+const FormCard = styled.div`
   border: 1px solid #e5e7eb;
-  padding: 20px;
+  border-radius: 12px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  background: #ffffff;
 `;
 
-const SectionTitle = styled.h2`
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: #111827;
+const FormRow = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-end;
 `;
 
-const FieldRow = styled.label`
+const FormFields = styled.div`
   display: grid;
-  grid-template-columns: 160px 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 12px;
-  align-items: center;
+  flex: 1 1 420px;
+`;
+
+const FormField = styled.label`
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 `;
 
 const Label = styled.span`
@@ -204,6 +221,7 @@ const Input = styled.input`
   border-radius: 8px;
   padding: 8px 12px;
   font-size: 14px;
+  width: 100%;
 `;
 
 const Select = styled.select`
@@ -211,12 +229,20 @@ const Select = styled.select`
   border-radius: 8px;
   padding: 8px 12px;
   font-size: 14px;
+  width: 100%;
 `;
 
 const Actions = styled.div`
   display: flex;
   gap: 12px;
   justify-content: flex-end;
+  align-items: flex-end;
+  flex: 0 0 auto;
+`;
+
+const ActionButton = styled(Button)`
+  font-weight: 600;
+  box-shadow: 0 10px 18px rgba(37, 99, 235, 0.2);
 `;
 
 const Hint = styled.p`

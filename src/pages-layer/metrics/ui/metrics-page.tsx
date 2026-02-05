@@ -15,8 +15,8 @@ export enum AnalyticsAction {
 }
 
 const ANALYTICS_ACTIONS: { id: AnalyticsAction; label: string }[] = [
-  { id: AnalyticsAction.VIEW_ANALYTICS_STATISTICS, label: "Посмотреть статистику" },
   { id: AnalyticsAction.CREATE_COUNTER, label: "Создать счетчик" },
+  { id: AnalyticsAction.VIEW_ANALYTICS_STATISTICS, label: "Посмотреть статистику" },
   { id: AnalyticsAction.VIEW_COUNTER_GOALS, label: "Посмотреть цели" },
 ];
 

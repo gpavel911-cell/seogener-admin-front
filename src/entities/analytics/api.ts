@@ -8,6 +8,8 @@ import type {
   AnalyticsCounterCreateRequest,
   AnalyticsCounterStatisticsRequest,
   AnalyticsCounterStatisticsResponse,
+  AnalyticsCounterGoalsRequest,
+  AnalyticsCounterGoalsResponse,
 } from "./types";
 
 export const analyticsApi = baseApi.injectEndpoints({
@@ -46,6 +48,12 @@ export const analyticsApi = baseApi.injectEndpoints({
         params,
       }),
     }),
+    getGoals: builder.query<AnalyticsCounterGoalsResponse, AnalyticsCounterGoalsRequest>({
+      query: (params) => ({
+        url: API_ROUTES.ANALYTICS.GET_GOALS,
+        params,
+      }),
+    }),
   }),
 });
 
@@ -55,4 +63,5 @@ export const {
   useCreateCounterMutation,
   useSyncCountersMutation,
   useLazyGetStatisticsQuery,
+  useLazyGetGoalsQuery,
 } = analyticsApi;

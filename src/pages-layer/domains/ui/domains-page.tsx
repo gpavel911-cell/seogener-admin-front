@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import styled from "styled-components";
 import { skipToken } from "@reduxjs/toolkit/query";
 import { useGetDomainDetailsQuery, useGetDomainProfilesQuery, useGetDomainsQuery, useSyncDomainsMutation } from "@entities/domains/api";
-import { type DomainProfileDto, type RegistrarType } from "@entities/domains/types";
+import { type DomainProfileDto, RegistrarType } from "@entities/domains/types";
 import { usePagination } from "@shared/lib/use-pagination";
 import { PaginationControls } from "@shared/ui/pagination-controls";
 import { Button, PageTitle, useToast } from "@shared/ui";
@@ -18,7 +18,11 @@ export function DomainsPage() {
   const [activeRegistrar, setActiveRegistrar] = useState<RegistrarType | null>(null);
   const [activeProfile, setActiveProfile] = useState<string | null>(null);
 
-  const { data: profilesData, isFetching: isProfilesFetching } = useGetDomainProfilesQuery();
+  const {
+    data: profilesData,
+    isFetching: isProfilesFetching,
+    refetch: refetchProfiles,
+  } = useGetDomainProfilesQuery();
   const defaultSelection = useMemo(() => {
     if (!profilesData?.length) {
       return { registrar: null, profile: null };
@@ -106,7 +110,10 @@ export function DomainsPage() {
   const onSync = async () => {
     try {
       await syncDomains().unwrap();
-      refetch();
+      await refetchProfiles();
+      if (resolvedRegistrar && resolvedProfile) {
+        await refetch();
+      }
       showToast({ variant: "success", message: "Синхронизация завершена." });
     } catch {
       showToast({ variant: "error", message: "Ошибка синхронизации" });
@@ -128,19 +135,23 @@ export function DomainsPage() {
           {registrarGroups.map((group) => (
             <Sidebar key={`${group.registrar}-profiles`}>
               <SidebarTitle>{group.registrar}</SidebarTitle>
-              {group.profiles.map((profile) => (
-                <SidebarButton
-                  key={`${group.registrar}-${profile}`}
-                  type="button"
-                  $active={resolvedRegistrar === group.registrar && resolvedProfile === profile}
-                  onClick={() => {
-                    setActiveRegistrar(group.registrar);
-                    setActiveProfile(profile);
-                  }}
-                >
-                  {profile}
-                </SidebarButton>
-              ))}
+              {group.profiles.length > 0 ? (
+                group.profiles.map((profile) => (
+                  <SidebarButton
+                    key={`${group.registrar}-${profile}`}
+                    type="button"
+                    $active={resolvedRegistrar === group.registrar && resolvedProfile === profile}
+                    onClick={() => {
+                      setActiveRegistrar(group.registrar);
+                      setActiveProfile(profile);
+                    }}
+                  >
+                    {profile}
+                  </SidebarButton>
+                ))
+              ) : (
+                <SidebarEmpty>Профили не найдены</SidebarEmpty>
+              )}
             </Sidebar>
           ))}
         </LeftColumn>
@@ -186,6 +197,9 @@ type RegistrarGroup = {
 
 const buildRegistrarGroups = (source: DomainProfileDto[]): RegistrarGroup[] => {
   const map = new Map<RegistrarType, Set<string>>();
+  Object.values(RegistrarType).forEach((registrar) => {
+    map.set(registrar, new Set());
+  });
   source.forEach((item) => {
     if (!map.has(item.registrar)) {
       map.set(item.registrar, new Set());
@@ -260,6 +274,12 @@ const SidebarButton = styled.button<{ $active?: boolean }>`
   color: ${({ $active }) => ($active ? "#1d4ed8" : "#111827")};
   font-size: 13px;
   cursor: pointer;
+`;
+
+const SidebarEmpty = styled.div`
+  padding: 8px 12px;
+  font-size: 13px;
+  color: #6b7280;
 `;
 
 const Main = styled.div`

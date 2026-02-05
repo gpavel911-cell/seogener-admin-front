@@ -79,3 +79,38 @@ export type AnalyticsCounterStatisticsResponse = {
   entryPages: AnalyticsCounterStatisticsResponseItem;
   urlViews: AnalyticsCounterStatisticsResponseItem;
 };
+
+export type AnalyticsGoalDailyConversionPoint = {
+  date: string;
+  conversionRate?: number | null;
+};
+
+export type AnalyticsGoalDto = {
+  id: number;
+  name?: string | null;
+  type?: string | null;
+  status?: string | null;
+  isFavorite?: boolean | null;
+  goalSource?: string | null;
+  defaultPrice?: number | null;
+  isRetargeting?: boolean | null;
+  prevGoalId?: number | null;
+  flag?: string | null;
+  conditions?: unknown[] | null;
+  conversionRate?: number | null;
+  goalReaches?: number | null;
+  goalVisits?: number | null;
+  dailyConversion?: AnalyticsGoalDailyConversionPoint[] | null;
+  additionalInfo?: Record<string, unknown> | null;
+};
+
+export type AnalyticsCounterGoalsResponse = {
+  goals: AnalyticsGoalDto[];
+};
+
+export type AnalyticsCounterGoalsRequest = {
+  provider: AnalyticsProvider;
+  counterId: string;
+  date1?: string;
+  date2?: string;
+};

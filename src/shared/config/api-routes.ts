@@ -16,5 +16,6 @@ export const API_ROUTES = {
     GET_COUNTER_DETAILS: (id: number) => `/api/v1/analytics/counters/${id}`,
     SYNC_COUNTERS: "/api/v1/analytics/counters/sync",
     GET_STATISTICS: "/api/v1/analytics/statistics",
+    GET_GOALS: "/api/v1/analytics/goals",
   },
 } as const;
