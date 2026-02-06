@@ -1,30 +1,39 @@
 import styled from "styled-components";
-import {AnalyticsAction} from "@pages/metrics/ui/metrics-page";
+import { Action } from "@pages/metrics/ui/actions-page";
 
 type ActionItem = {
-  id: AnalyticsAction;
+  id: Action;
   label: string;
 };
 
-type MetricsActionsProps = {
+type SidebarSection = {
+  title: string;
   actions: ActionItem[];
-  activeAction: AnalyticsAction;
-  onSelect: (id: AnalyticsAction) => void;
 };
 
-export const MetricsSidebar = ({ actions, activeAction, onSelect }: MetricsActionsProps) => {
+type MetricsActionsProps = {
+  sections: SidebarSection[];
+  activeAction: Action;
+  onSelect: (id: Action) => void;
+};
+
+export const MetricsSidebar = ({ sections, activeAction, onSelect }: MetricsActionsProps) => {
   return (
     <Sidebar>
-      <SidebarTitle>Действия</SidebarTitle>
-      {actions.map((action) => (
-        <ActionButton
-          key={action.id}
-          type="button"
-          $active={activeAction === action.id}
-          onClick={() => onSelect(action.id)}
-        >
-          {action.label}
-        </ActionButton>
+      {sections.map((section) => (
+        <Section key={section.title}>
+          <SidebarTitle>{section.title}</SidebarTitle>
+          {section.actions.map((action) => (
+            <ActionButton
+              key={action.id}
+              type="button"
+              $active={activeAction === action.id}
+              onClick={() => onSelect(action.id)}
+            >
+              {action.label}
+            </ActionButton>
+          ))}
+        </Section>
       ))}
     </Sidebar>
   );
@@ -33,7 +42,7 @@ export const MetricsSidebar = ({ actions, activeAction, onSelect }: MetricsActio
 const Sidebar = styled.aside`
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 16px;
   padding: 16px;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
@@ -46,6 +55,12 @@ const SidebarTitle = styled.h2`
   font-size: 14px;
   font-weight: 600;
   color: #111827;
+`;
+
+const Section = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 `;
 
 const ActionButton = styled.button<{ $active?: boolean }>`

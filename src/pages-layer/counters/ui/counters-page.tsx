@@ -1,10 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import styled from "styled-components";
+import styled, { keyframes } from "styled-components";
+import { FaSyncAlt } from "react-icons/fa";
 import { skipToken } from "@reduxjs/toolkit/query";
-import { useGetCounterDetailsQuery, useGetCountersQuery, useSyncCountersMutation } from "@entities/analytics/api";
-import { AnalyticsProvider } from "@entities/analytics/types";
+import {
+  useGetCounterDetailsQuery,
+  useGetCountersQuery,
+  useGetProfilesQuery,
+  useSyncCountersMutation,
+} from "@entities/analytics/api";
+import { type AnalyticsProfileDto, AnalyticsProvider } from "@entities/analytics/types";
 import { usePagination } from "@shared/lib/use-pagination";
 import {
   Button,
@@ -22,19 +28,61 @@ const PROVIDERS: { id: AnalyticsProvider; label: string }[] = [
 export function CountersPage() {
   const { showToast } = useToast();
   const { page, pageSize, pageSizeOptions, setPage, setPageSize } = usePagination();
-  const [activeProvider, setActiveProvider] = useState<AnalyticsProvider>(PROVIDERS[0]?.id);
+  const [activeProvider, setActiveProvider] = useState<AnalyticsProvider | null>(null);
+  const [activeProfile, setActiveProfile] = useState<string | null>(null);
   const [selectedCounterId, setSelectedCounterId] = useState<number | null>(null);
 
-  const { data, isFetching, isLoading, error: loadError, refetch } = useGetCountersQuery({
-    provider: activeProvider,
-    pageNumber: page,
-    pageSize,
-  });
+  const metricaProfilesQuery = useGetProfilesQuery(AnalyticsProvider.YANDEX_METRICA);
+  const profilesByProvider = useMemo(
+    () =>
+      new Map<AnalyticsProvider, AnalyticsProfileDto[]>([
+        [AnalyticsProvider.YANDEX_METRICA, metricaProfilesQuery.data ?? []],
+      ]),
+    [metricaProfilesQuery.data],
+  );
+
+  const providerGroups = useMemo(
+    () =>
+      PROVIDERS.map((provider) => ({
+        provider: provider.id,
+        label: provider.label,
+        profiles: (profilesByProvider.get(provider.id) ?? []).map((profile) => profile.profile),
+      })),
+    [profilesByProvider],
+  );
+
+  const allProfiles = useMemo(
+    () => Array.from(profilesByProvider.values()).flat(),
+    [profilesByProvider],
+  );
+
+  const defaultSelection = useMemo(() => {
+    if (allProfiles.length === 0) {
+      return { provider: null, profile: null };
+    }
+    if (providerGroups.length === 0) {
+      return { provider: null, profile: null };
+    }
+    const firstGroup = providerGroups[0];
+    const firstProfile = firstGroup.profiles[0] ?? null;
+    return { provider: firstGroup.provider, profile: firstProfile };
+  }, [allProfiles, providerGroups]);
+
+  const resolvedProvider = activeProvider ?? defaultSelection.provider;
+  const resolvedProfile = activeProfile ?? defaultSelection.profile;
+  const isProfilesFetching = metricaProfilesQuery.isFetching;
+
+  const countersQueryArgs = resolvedProvider && resolvedProfile
+    ? { provider: resolvedProvider, profile: resolvedProfile, pageNumber: page, pageSize }
+    : skipToken;
+  const { data, isFetching, isLoading, error: loadError, refetch } = useGetCountersQuery(countersQueryArgs);
   const [syncCounters, { isLoading: isSyncingCounters }] = useSyncCountersMutation();
+  const [syncingProvider, setSyncingProvider] = useState<AnalyticsProvider | null>(null);
 
   const counters = data?.content ?? [];
   const totalPages = data?.totalPages ?? 0;
   const shouldShowEmptyState = !isLoading && counters.length === 0;
+  const shouldShowProfilesEmptyState = !isProfilesFetching && allProfiles.length === 0;
 
   const resolvedSelectedCounterId = useMemo(() => {
     if (!selectedCounterId) {
@@ -63,15 +111,23 @@ export function CountersPage() {
 
   useEffect(() => {
     setPage(0);
-  }, [activeProvider, setPage]);
+    setSelectedCounterId(null);
+  }, [resolvedProvider, resolvedProfile, setPage]);
 
-  const handleSyncCounters = async () => {
+  const handleSyncCounters = async (provider: AnalyticsProvider) => {
+    if (resolvedProvider !== provider || !resolvedProfile) {
+      showToast({ variant: "error", message: "Сначала выберите профиль." });
+      return;
+    }
+    setSyncingProvider(provider);
     try {
-      await syncCounters({ provider: activeProvider }).unwrap();
+      await syncCounters({ provider, profile: resolvedProfile }).unwrap();
       refetch();
       showToast({ variant: "success", message: "Синхронизация завершена." });
     } catch (error) {
       showToast({ variant: "error", message: "Ошибка синхронизации счетчиков." });
+    } finally {
+      setSyncingProvider(null);
     }
   };
 
@@ -79,26 +135,50 @@ export function CountersPage() {
     <Wrapper>
       <Header>
         <PageTitle>Счетчики</PageTitle>
-        <Button type="button" onClick={handleSyncCounters} disabled={isSyncingCounters}>
-          {isSyncingCounters ? "Синхронизация..." : "Синхронизировать"}
-        </Button>
       </Header>
       <Body>
         <LeftColumn>
-          {PROVIDERS.map((provider) => (
-            <IntegrationButton
-              key={provider.id}
-              type="button"
-              $active={activeProvider === provider.id}
-              onClick={() => setActiveProvider(provider.id)}
-            >
-              {provider.label}
-            </IntegrationButton>
+          {providerGroups.map((group) => (
+            <Sidebar key={`${group.provider}-profiles`}>
+              <SidebarHeader>
+                <SidebarTitle>{group.label}</SidebarTitle>
+                <SidebarSyncButton
+                  type="button"
+                  onClick={() => handleSyncCounters(group.provider)}
+                  disabled={isSyncingCounters || resolvedProvider !== group.provider || !resolvedProfile}
+                  aria-label="Синхронизировать"
+                  title="Синхронизировать"
+                  data-loading={isSyncingCounters && syncingProvider === group.provider}
+                >
+                  <FaSyncAlt aria-hidden="true" />
+                </SidebarSyncButton>
+              </SidebarHeader>
+              {group.profiles.length > 0 ? (
+                group.profiles.map((profile) => (
+                  <SidebarButton
+                    key={`${group.provider}-${profile}`}
+                    type="button"
+                    $active={resolvedProvider === group.provider && resolvedProfile === profile}
+                    onClick={() => {
+                      setActiveProvider(group.provider);
+                      setActiveProfile(profile);
+                    }}
+                    disabled={isProfilesFetching}
+                  >
+                    {profile}
+                  </SidebarButton>
+                ))
+              ) : (
+                <SidebarEmpty>Профили не найдены</SidebarEmpty>
+              )}
+            </Sidebar>
           ))}
         </LeftColumn>
         <Main>
           <TableSection>
-            {shouldShowEmptyState ? (
+            {shouldShowProfilesEmptyState ? (
+              <EmptyState>Нет доступных профилей. Проверьте конфигурацию.</EmptyState>
+            ) : shouldShowEmptyState ? (
               <EmptyState>Счетчики не найдены. Выполните синхронизацию.</EmptyState>
             ) : (
               <>
@@ -159,17 +239,79 @@ const LeftColumn = styled.div`
   width: 250px;
 `;
 
-const IntegrationButton = styled.button<{ $active?: boolean }>`
-  width: 250px;
-  padding: 16px;
-  text-align: left;
+const Sidebar = styled.aside`
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
   border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 250px;
+`;
+
+const SidebarHeader = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+`;
+
+const SidebarTitle = styled.h3`
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+`;
+
+const spin = keyframes`
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+`;
+
+const SidebarSyncButton = styled(Button)`
+  padding: 4px;
+  min-width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+
+  svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  &[data-loading="true"] svg {
+    animation: ${spin} 0.9s linear infinite;
+  }
+`;
+
+const SidebarButton = styled.button<{ $active?: boolean }>`
+  padding: 8px 10px;
+  text-align: left;
+  border-radius: 8px;
   border: 1px solid ${({ $active }) => ($active ? "#2563eb" : "#e5e7eb")};
   background: ${({ $active }) => ($active ? "#eff6ff" : "#ffffff")};
   color: ${({ $active }) => ($active ? "#1d4ed8" : "#111827")};
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 13px;
   cursor: pointer;
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+`;
+
+const SidebarEmpty = styled.div`
+  padding: 8px 12px;
+  font-size: 13px;
+  color: #6b7280;
 `;
 
 const Main = styled.div`

@@ -10,7 +10,7 @@ import { buildRegistrarGroups } from "../lib/registrars";
 
 const DEFAULT_PROVIDER = AnalyticsProvider.YANDEX_METRICA;
 
-export const MetricsSectionCreateCounter = () => {
+export const ActionsSectionCreateCounter = () => {
   const [counterName, setCounterName] = useState("");
   const [selectedDomain, setSelectedDomain] = useState("");
   const [activeRegistrar, setActiveRegistrar] = useState<RegistrarType | null>(null);

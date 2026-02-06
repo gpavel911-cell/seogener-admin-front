@@ -1,6 +1,15 @@
 import { API_ROUTES } from "@shared/config/api-routes";
 import { baseApi } from "@shared/store";
-import type { DomainDetailsDto, DomainListRequest, DomainListResponse, DomainProfileDto } from "./types";
+import type {
+  CreateARecordRequest,
+  CreateARecordResponse,
+  DomainDetailsDto,
+  DomainListRequest,
+  DomainListResponse,
+  DomainProfileDto,
+  ListDnsRecordsRequest,
+  ListDnsRecordsResponse,
+} from "./types";
 
 export const domainsApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
@@ -28,10 +37,24 @@ export const domainsApi = baseApi.injectEndpoints({
         url: API_ROUTES.DOMAINS.GET_PROFILES,
       }),
     }),
-    syncDomains: builder.mutation<void, void>({
-      query: () => ({
+    syncDomains: builder.mutation<void, { registrar: string; profile: string }>({
+      query: ({ registrar, profile }) => ({
         url: API_ROUTES.DOMAINS.SYNC,
         method: "POST",
+        params: { registrar, profile },
+      }),
+    }),
+    createARecord: builder.mutation<CreateARecordResponse, CreateARecordRequest>({
+      query: (payload) => ({
+        url: API_ROUTES.DOMAINS.CREATE_A_RECORD,
+        method: "POST",
+        body: payload,
+      }),
+    }),
+    listDnsRecords: builder.query<ListDnsRecordsResponse, ListDnsRecordsRequest>({
+      query: ({ registrar, profileId, domain }) => ({
+        url: API_ROUTES.DOMAINS.LIST_RECORDS,
+        params: { registrar, profileId, domain },
       }),
     }),
   }),
@@ -41,5 +64,8 @@ export const {
   useGetDomainsQuery,
   useGetDomainDetailsQuery,
   useGetDomainProfilesQuery,
-  useSyncDomainsMutation
+  useSyncDomainsMutation,
+  useCreateARecordMutation,
+  useListDnsRecordsQuery,
+  useLazyListDnsRecordsQuery
 } = domainsApi;

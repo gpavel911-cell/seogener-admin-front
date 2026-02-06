@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import styled from "styled-components";
+import styled, { keyframes } from "styled-components";
+import { FaSyncAlt } from "react-icons/fa";
 import { skipToken } from "@reduxjs/toolkit/query";
 import { useGetDomainDetailsQuery, useGetDomainProfilesQuery, useGetDomainsQuery, useSyncDomainsMutation } from "@entities/domains/api";
 import { type DomainProfileDto, RegistrarType } from "@entities/domains/types";
@@ -44,6 +45,7 @@ export function DomainsPage() {
     : skipToken;
   const { data: domainData, isLoading, isFetching, error: loadError, refetch } = useGetDomainsQuery(domainsQueryArgs);
   const [syncDomains, { isLoading: isSyncing }] = useSyncDomainsMutation();
+  const [syncingRegistrar, setSyncingRegistrar] = useState<RegistrarType | null>(null);
 
   const totalPages = domainData?.totalPages ?? 0;
   const items = domainData?.content ?? [];
@@ -107,16 +109,21 @@ export function DomainsPage() {
     setPage(0);
   }, [resolvedRegistrar, resolvedProfile, setPage]);
 
-  const onSync = async () => {
+  const onSync = async (registrar: RegistrarType) => {
+    if (resolvedRegistrar !== registrar || !resolvedProfile) {
+      showToast({ variant: "error", message: "Выберите профиль для синхронизации." });
+      return;
+    }
+    setSyncingRegistrar(registrar);
     try {
-      await syncDomains().unwrap();
+      await syncDomains({ registrar, profile: resolvedProfile }).unwrap();
       await refetchProfiles();
-      if (resolvedRegistrar && resolvedProfile) {
-        await refetch();
-      }
+      await refetch();
       showToast({ variant: "success", message: "Синхронизация завершена." });
     } catch {
       showToast({ variant: "error", message: "Ошибка синхронизации" });
+    } finally {
+      setSyncingRegistrar(null);
     }
   };
 
@@ -124,17 +131,24 @@ export function DomainsPage() {
     <Wrapper>
       <Header>
         <PageTitle>Домены</PageTitle>
-        <Actions>
-          <Button type="button" onClick={onSync} disabled={isSyncing}>
-            {isSyncing ? "Синхронизация..." : "Синхронизировать"}
-          </Button>
-        </Actions>
       </Header>
       <Body>
         <LeftColumn>
           {registrarGroups.map((group) => (
             <Sidebar key={`${group.registrar}-profiles`}>
-              <SidebarTitle>{group.registrar}</SidebarTitle>
+              <SidebarHeader>
+                <SidebarTitle>{group.registrar}</SidebarTitle>
+                <SidebarSyncButton
+                  type="button"
+                  onClick={() => onSync(group.registrar)}
+                  disabled={isSyncing || resolvedRegistrar !== group.registrar || !resolvedProfile}
+                  aria-label="Синхронизировать"
+                  title="Синхронизировать"
+                  data-loading={isSyncing && syncingRegistrar === group.registrar}
+                >
+                  <FaSyncAlt aria-hidden="true" />
+                </SidebarSyncButton>
+              </SidebarHeader>
               {group.profiles.length > 0 ? (
                 group.profiles.map((profile) => (
                   <SidebarButton
@@ -227,12 +241,6 @@ const Header = styled.div`
   gap: 16px;
 `;
 
-const Actions = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 12px;
-`;
-
 const Body = styled.div`
   display: grid;
   grid-template-columns: 250px 1fr;
@@ -258,11 +266,46 @@ const Sidebar = styled.aside`
   width: 250px;
 `;
 
+const SidebarHeader = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+`;
+
 const SidebarTitle = styled.h3`
   margin: 0;
   font-size: 14px;
   font-weight: 600;
   color: #111827;
+`;
+
+const spin = keyframes`
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+`;
+
+const SidebarSyncButton = styled(Button)`
+  padding: 4px;
+  min-width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+
+  svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  &[data-loading="true"] svg {
+    animation: ${spin} 0.9s linear infinite;
+  }
 `;
 
 const SidebarButton = styled.button<{ $active?: boolean }>`

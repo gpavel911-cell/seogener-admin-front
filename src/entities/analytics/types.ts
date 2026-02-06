@@ -14,9 +14,16 @@ export enum AnalyticsCounterPresence {
   MISSING = "MISSING",
 }
 
+export type AnalyticsProfileDto = {
+  provider: AnalyticsProvider;
+  profile: string;
+  username: string;
+};
+
 export type AnalyticsCounterDto = {
   id: number;
   provider: AnalyticsProvider;
+  profile: string;
   counterId: string;
   counterName?: string | null;
   siteUrl?: string | null;
@@ -29,6 +36,7 @@ export type AnalyticsCounterDto = {
 export type AnalyticsCounterDetailsDto = {
   id: number;
   provider: AnalyticsProvider;
+  profile: string;
   counterId: string;
   counterName?: string | null;
   siteUrl?: string | null;
@@ -46,17 +54,20 @@ export type AnalyticsCounterListRequest = {
   pageNumber: number;
   pageSize: number;
   provider: AnalyticsProvider;
+  profile: string;
 };
 
 export type AnalyticsCounterStatisticsRequest = {
   counterId: string;
   provider: AnalyticsProvider;
+  profile: string;
   date1?: string;
   date2?: string;
 };
 
 export type AnalyticsCounterCreateRequest = {
   provider: AnalyticsProvider;
+  profile: string;
   counterName: string;
   siteUrl: string;
 };
@@ -111,6 +122,7 @@ export type AnalyticsCounterGoalsResponse = {
 export type AnalyticsCounterGoalsRequest = {
   provider: AnalyticsProvider;
   counterId: string;
+  profile: string;
   date1?: string;
   date2?: string;
 };

@@ -10,13 +10,14 @@ import type {
   AnalyticsCounterStatisticsResponse,
   AnalyticsCounterGoalsRequest,
   AnalyticsCounterGoalsResponse,
+  AnalyticsProfileDto,
 } from "./types";
 
 export const analyticsApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     getCounters: builder.query<AnalyticsCountersListResponse, AnalyticsCounterListRequest>({
-      query: ({ provider, pageNumber, pageSize }) => {
-        const params: Record<string, string | number> = { provider, pageNumber, pageSize };
+      query: ({ provider, profile, pageNumber, pageSize }) => {
+        const params: Record<string, string | number> = { provider, profile, pageNumber, pageSize };
         return {
           url: API_ROUTES.ANALYTICS.GET_COUNTERS,
           params,
@@ -35,11 +36,11 @@ export const analyticsApi = baseApi.injectEndpoints({
         body,
       }),
     }),
-    syncCounters: builder.mutation<void, { provider: AnalyticsCounterDto["provider"] }>({
-      query: ({ provider }) => ({
+    syncCounters: builder.mutation<void, { provider: AnalyticsCounterDto["provider"]; profile: string }>({
+      query: ({ provider, profile }) => ({
         url: API_ROUTES.ANALYTICS.SYNC_COUNTERS,
         method: "POST",
-        params: { provider },
+        params: { provider, profile },
       }),
     }),
     getStatistics: builder.query<AnalyticsCounterStatisticsResponse, AnalyticsCounterStatisticsRequest>({
@@ -54,6 +55,12 @@ export const analyticsApi = baseApi.injectEndpoints({
         params,
       }),
     }),
+    getProfiles: builder.query<AnalyticsProfileDto[], AnalyticsCounterDto["provider"]>({
+      query: (provider) => ({
+        url: API_ROUTES.ANALYTICS.GET_PROFILES,
+        params: { provider },
+      }),
+    }),
   }),
 });
 
@@ -64,4 +71,5 @@ export const {
   useSyncCountersMutation,
   useLazyGetStatisticsQuery,
   useLazyGetGoalsQuery,
+  useGetProfilesQuery,
 } = analyticsApi;

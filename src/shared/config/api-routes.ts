@@ -9,6 +9,8 @@ export const API_ROUTES = {
     GET_DETAILS: (id: number) => `/api/v1/domains/${id}`,
     GET_PROFILES: "/api/v1/domains/profiles",
     SYNC: "/api/v1/domains/sync",
+    CREATE_A_RECORD: "/api/v1/domains/dns/a-records",
+    LIST_RECORDS: "/api/v1/domains/dns/records",
   },
   ANALYTICS: {
     GET_COUNTERS: "/api/v1/analytics/counters",

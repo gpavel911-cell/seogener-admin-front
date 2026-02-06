@@ -21,7 +21,7 @@ const buildDefaultDateRange = () => {
   return { date1, date2 };
 };
 
-export const MetricsSectionViewCounterGoals = () => {
+export const ActionsSectionViewCounterGoals = () => {
   const { date1: defaultDate1, date2: defaultDate2 } = buildDefaultDateRange();
   const [counterId, setCounterId] = useState("");
   const [date1, setDate1] = useState(defaultDate1);

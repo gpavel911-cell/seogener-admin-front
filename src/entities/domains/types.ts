@@ -55,3 +55,48 @@ export type DomainDetailsDto = {
   lastSeenAt: string;
   additionalInfo?: Record<string, unknown>;
 };
+
+export type CreateARecordRequest = {
+  registrar: RegistrarType;
+  profileId: string;
+  domain: string;
+  subdomain?: string;
+  ipv4: string;
+};
+
+export type CreateARecordResponse = {
+  result: string;
+  errorCode?: string | null;
+  errorText?: string | null;
+  note?: string | null;
+};
+
+export type ListDnsRecordsRequest = {
+  registrar: RegistrarType;
+  profileId: string;
+  domain: string;
+};
+
+export type DnsRecord = {
+  subname: string;
+  rectype: string;
+  content: string;
+  priority?: number | null;
+  state?: string | null;
+};
+
+export type DnsRecordGroup = {
+  rectype: string;
+  records: DnsRecord[];
+};
+
+export type DnsSoa = {
+  ttl?: string | null;
+  minimumTtl?: string | null;
+};
+
+export type ListDnsRecordsResponse = {
+  domain: string;
+  groups: DnsRecordGroup[];
+  soa?: DnsSoa | null;
+};
