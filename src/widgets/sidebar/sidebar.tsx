@@ -7,13 +7,13 @@ import { SIDEBAR_ITEMS } from "@shared/config/navigation";
 
 export function Sidebar() {
   const pathname = usePathname();
+  const currentPath = pathname ?? "";
 
   return (
     <SidebarContainer>
       <Navigation aria-label="Основная навигация">
         <NavList>
           {SIDEBAR_ITEMS.map((item) => {
-            const currentPath = pathname ?? "";
             const isActive = currentPath === item.path || currentPath.startsWith(`${item.path}/`);
             return (
               <NavItem key={item.id}>
@@ -40,12 +40,6 @@ const SidebarContainer = styled.aside`
   display: flex;
   flex-direction: column;
   gap: 24px;
-`;
-
-const Brand = styled.div`
-  font-size: 18px;
-  font-weight: 600;
-  color: #111827;
 `;
 
 const Navigation = styled.nav`

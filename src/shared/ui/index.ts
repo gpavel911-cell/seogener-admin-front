@@ -11,3 +11,7 @@ export {
   TableHeaderCell,
   TableCell,
 } from "./table";
+export { ProfilesSidebar, type ProfileSidebarGroup } from "./profiles-sidebar";
+export { TableSyncPanel } from "./table-sync-panel";
+export { ActionsSidebar } from "./actions-sidebar";
+export { IntegrationPageLayout } from "./integration-page-layout";

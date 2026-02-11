@@ -1,5 +1,5 @@
-import { ActionsPage } from "@pages/metrics";
+import { MetricsPage } from "@pages/metrics";
 
 export default function Page() {
-  return <ActionsPage />;
+  return <MetricsPage />;
 }
