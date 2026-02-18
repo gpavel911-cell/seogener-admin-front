@@ -1,6 +1,8 @@
 import styled from "styled-components";
 import { type RegistrarDomainDto } from "@entities/registrars/types";
 import {
+  EMPTY_DATA_MESSAGE,
+  ResultLoader,
   TableWrapper,
   Table,
   TableHead,
@@ -14,13 +16,20 @@ import { formatDateTime, formatDateValue, formatDomainState, formatPresence } fr
 type DomainTableProps = {
   items: RegistrarDomainDto[];
   isLoading: boolean;
+  pageSize: number;
   selectedDomainId: number | null;
   onSelect: (id: number) => void;
 };
 
 const COLUMN_COUNT = 5;
 
-export function DomainTable({ items, isLoading, selectedDomainId, onSelect }: DomainTableProps) {
+export function DomainTable({ items, isLoading, pageSize, selectedDomainId, onSelect }: DomainTableProps) {
+  if (isLoading) {
+    return <ResultLoader label="Загрузка доменов..." />;
+  }
+
+  const fillerCount = !isLoading && items.length > 0 ? Math.max(pageSize - items.length, 0) : 0;
+
   return (
     <TableWrapper>
       <Table>
@@ -34,13 +43,9 @@ export function DomainTable({ items, isLoading, selectedDomainId, onSelect }: Do
           </TableRow>
         </TableHead>
         <TableBody>
-          {isLoading ? (
+          {items.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={COLUMN_COUNT}>Загрузка...</TableCell>
-            </TableRow>
-          ) : items.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={COLUMN_COUNT}>Домены не найдены.</TableCell>
+              <TableCell colSpan={COLUMN_COUNT}>{EMPTY_DATA_MESSAGE}</TableCell>
             </TableRow>
           ) : (
             items.map((domain) => (
@@ -52,6 +57,13 @@ export function DomainTable({ items, isLoading, selectedDomainId, onSelect }: Do
               />
             ))
           )}
+          {!isLoading &&
+            fillerCount > 0 &&
+            Array.from({ length: fillerCount }, (_, index) => (
+              <PlaceholderRow key={`domain-placeholder-${index}`}>
+                <TableCell colSpan={COLUMN_COUNT}>&nbsp;</TableCell>
+              </PlaceholderRow>
+            ))}
         </TableBody>
       </Table>
     </TableWrapper>
@@ -90,12 +102,16 @@ const ClickableRow = styled(TableRow)`
   cursor: pointer;
 
   &[data-active="true"] {
-    background: #f3f4f6;
+    background: #edf4ff;
   }
 
   &:hover {
-    background: #f9fafb;
+    background: #f8fbff;
   }
+`;
+
+const PlaceholderRow = styled(TableRow)`
+  pointer-events: none;
 `;
 
 const Badge = styled.span`

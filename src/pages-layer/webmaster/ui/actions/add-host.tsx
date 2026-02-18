@@ -1,20 +1,34 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { skipToken } from "@reduxjs/toolkit/query";
-import { useGetRegistrarDomainsQuery, useGetRegistrarProfilesQuery } from "@entities/registrars/api";
 import { RegistrarProviderType } from "@entities/registrars/types";
 import styled from "styled-components";
 import {
   useCreateWebmasterHostMutation,
-  useGetWebmasterProfilesQuery,
 } from "@entities/webmaster/api";
 import {
   type WebmasterApiResponse,
   WebmasterProviderType,
 } from "@entities/webmaster/types";
-import { buildRegistrarGroups } from "@shared/lib/registrars";
-import { Button, useToast } from "@shared/ui";
+import { useRegistrarSelectOptions } from "@entities/registrars/select-options";
+import { useWebmasterSelectOptions } from "@entities/webmaster/select-options";
+import {
+  Button,
+  CenteredState,
+  FieldLabel,
+  FormActions,
+  FormCard,
+  FormField,
+  FormFields,
+  FormRow,
+  FormStack,
+  InlineHint,
+  PlaceholderText,
+  ResultLoader,
+  ResultCard,
+  SelectControl,
+  useToast,
+} from "@shared/ui";
 
 const DEFAULT_PROVIDER = WebmasterProviderType.YANDEX_WEBMASTER;
 
@@ -33,52 +47,38 @@ export const AddHost = ({ fixedProfile }: ActionsSectionWebmasterAddHostProps = 
     data: WebmasterApiResponse;
   } | null>(null);
 
-  const { data: profilesRaw, isFetching: isProfilesFetching } = useGetWebmasterProfilesQuery();
-  const profiles = useMemo(
-    () => (profilesRaw ?? []).filter((profile) => profile.provider === DEFAULT_PROVIDER),
-    [profilesRaw],
-  );
-  const resolvedProfile = useMemo(
-    () => fixedProfile ?? activeProfile ?? profiles?.[0]?.profile ?? null,
-    [fixedProfile, activeProfile, profiles],
-  );
+  const {
+    resolvedProfile,
+    profileOptions: webmasterProfileOptions,
+    isProfilesFetching,
+  } = useWebmasterSelectOptions({
+    activeProfile,
+    fixedProfile: fixedProfile ?? null,
+    fixedProvider: DEFAULT_PROVIDER,
+    includeHosts: false,
+  });
   const result = useMemo(
     () => (resolvedProfile && resultByProfile?.profile === resolvedProfile ? resultByProfile.data : null),
     [resolvedProfile, resultByProfile],
   );
 
-  const { data: registrarProfilesRaw, isFetching: isRegistrarProfilesFetching } = useGetRegistrarProfilesQuery();
-  const registrarGroups = useMemo(
-    () => buildRegistrarGroups(registrarProfilesRaw ?? []),
-    [registrarProfilesRaw],
-  );
-  const fallbackRegistrarSelection = useMemo(() => {
-    if (!registrarGroups.length) {
-      return { registrar: null, profile: null };
-    }
-    const regRuGroup = registrarGroups.find((group) => group.registrar === RegistrarProviderType.REG_RU);
-    const firstGroup = regRuGroup ?? registrarGroups[0];
-    return {
-      registrar: firstGroup.registrar,
-      profile: firstGroup.profiles[0] ?? null,
-    };
-  }, [registrarGroups]);
-  const resolvedRegistrar = activeRegistrar ?? fallbackRegistrarSelection.registrar;
-  const profileOptions = useMemo(() => {
-    if (!resolvedRegistrar) {
-      return [];
-    }
-    return registrarGroups.find((group) => group.registrar === resolvedRegistrar)?.profiles ?? [];
-  }, [registrarGroups, resolvedRegistrar]);
-  const resolvedRegistrarProfile = activeRegistrarProfile ?? fallbackRegistrarSelection.profile;
-
-  const domainsQueryArgs = resolvedRegistrar && resolvedRegistrarProfile
-    ? { pageNumber: 0, pageSize: 200, profile: resolvedRegistrarProfile, registrar: resolvedRegistrar }
-    : skipToken;
-  const { data: domainsData, isFetching: isDomainsFetching } = useGetRegistrarDomainsQuery(domainsQueryArgs);
+  const {
+    registrarGroups,
+    resolvedRegistrar,
+    resolvedProfile: resolvedRegistrarProfile,
+    registrarOptions,
+    profileOptions: registrarProfileOptions,
+    domainOptions: domainSelectOptions,
+    isProfilesFetching: isRegistrarProfilesFetching,
+    isDomainsFetching,
+  } = useRegistrarSelectOptions({
+    activeRegistrar,
+    activeProfile: activeRegistrarProfile,
+    preferredRegistrar: RegistrarProviderType.REG_RU,
+  });
   const domainOptions = useMemo(
-    () => (domainsData?.content ?? []).map((item) => item.domainName),
-    [domainsData?.content],
+    () => domainSelectOptions.map((item) => item.value),
+    [domainSelectOptions],
   );
   const resolvedDomain = useMemo(() => {
     if (domain && domainOptions.includes(domain)) {
@@ -120,185 +120,86 @@ export const AddHost = ({ fixedProfile }: ActionsSectionWebmasterAddHostProps = 
   };
 
   return (
-    <Stack>
+    <FormStack>
       <FormCard>
         <FormRow>
           <FormFields>
             {!fixedProfile && (
               <FormField>
-                <Label>Профиль Вебмастера</Label>
-                <Select
+                <FieldLabel>Профиль Вебмастера</FieldLabel>
+                <SelectControl
                   value={resolvedProfile ?? ""}
-                  onChange={(event) => setActiveProfile(event.target.value)}
+                  onValueChange={setActiveProfile}
                   disabled={isProfilesFetching}
-                >
-                  <option value="">Выберите профиль</option>
-                  {(profiles ?? []).map((profile) => (
-                    <option key={profile.profile} value={profile.profile}>
-                      {profile.profile}
-                    </option>
-                  ))}
-                </Select>
+                  options={webmasterProfileOptions}
+                  placeholder="Выберите профиль"
+                />
               </FormField>
             )}
             <FormField>
-              <Label>Регистратор</Label>
-              <Select
+              <FieldLabel>Регистратор</FieldLabel>
+              <SelectControl
                 value={resolvedRegistrar ?? ""}
-                onChange={(event) => {
-                  const nextRegistrar = event.target.value as RegistrarProviderType;
+                onValueChange={(value) => {
+                  const nextRegistrar = value as RegistrarProviderType;
                   setActiveRegistrar(nextRegistrar || null);
                   const nextProfiles = registrarGroups.find((group) => group.registrar === nextRegistrar)?.profiles ?? [];
                   setActiveRegistrarProfile(nextProfiles[0] ?? null);
                   setDomain("");
                 }}
                 disabled={isRegistrarProfilesFetching}
-              >
-                <option value="">Выберите регистратора</option>
-                {registrarGroups.map((group) => (
-                  <option key={group.registrar} value={group.registrar}>
-                    {group.registrar}
-                  </option>
-                ))}
-              </Select>
+                options={registrarOptions}
+                placeholder="Выберите регистратора"
+              />
             </FormField>
             <FormField>
-              <Label>Профиль регистратора</Label>
-              <Select
+              <FieldLabel>Профиль регистратора</FieldLabel>
+              <SelectControl
                 value={resolvedRegistrarProfile ?? ""}
-                onChange={(event) => {
-                  setActiveRegistrarProfile(event.target.value || null);
+                onValueChange={(value) => {
+                  setActiveRegistrarProfile(value || null);
                   setDomain("");
                 }}
                 disabled={!resolvedRegistrar}
-              >
-                <option value="">Выберите профиль</option>
-                {profileOptions.map((profile) => (
-                  <option key={profile} value={profile}>
-                    {profile}
-                  </option>
-                ))}
-              </Select>
+                options={registrarProfileOptions}
+                placeholder="Выберите профиль"
+              />
             </FormField>
             <FormField>
-              <Label>Домен</Label>
-              <Select
+              <FieldLabel>Домен</FieldLabel>
+              <SelectControl
                 value={resolvedDomain}
-                onChange={(event) => setDomain(event.target.value)}
+                onValueChange={setDomain}
                 disabled={!resolvedRegistrar || !resolvedRegistrarProfile || isDomainsFetching}
-              >
-                <option value="">Выберите домен</option>
-                {domainOptions.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </Select>
+                options={domainSelectOptions}
+                placeholder="Выберите домен"
+              />
             </FormField>
           </FormFields>
-          <Actions>
-            <ActionButton type="button" onClick={handleSubmit} disabled={isLoading}>
+          <FormActions>
+            <Button type="button" variant="primary" onClick={handleSubmit} disabled={isLoading}>
               {isLoading ? "Добавление..." : "Добавить"}
-            </ActionButton>
-          </Actions>
+            </Button>
+          </FormActions>
         </FormRow>
       </FormCard>
       {!isDomainsFetching && domainOptions.length === 0 && (
-        <HintBlock>Нет доступных доменов. Сначала синхронизируйте домены в разделе Регистраторы.</HintBlock>
+        <InlineHint>Нет доступных доменов. Сначала синхронизируйте домены в разделе Регистраторы.</InlineHint>
       )}
       <ResultCard>
-        {result ? <JsonBlock>{JSON.stringify(result, null, 2)}</JsonBlock> : <Placeholder>Нет данных.</Placeholder>}
+        {isLoading ? (
+          <ResultLoader label="Добавление сайта..." />
+        ) : result ? (
+          <JsonBlock>{JSON.stringify(result, null, 2)}</JsonBlock>
+        ) : (
+          <CenteredState>
+            <PlaceholderText>Нет данных для отображения.</PlaceholderText>
+          </CenteredState>
+        )}
       </ResultCard>
-    </Stack>
+    </FormStack>
   );
 };
-
-const Stack = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-`;
-
-const FormCard = styled.div`
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  background: #ffffff;
-`;
-
-const FormRow = styled.div`
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 16px;
-  align-items: flex-end;
-  overflow-x: auto;
-  padding-bottom: 4px;
-`;
-
-const FormFields = styled.div`
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 12px;
-  flex: 0 1 auto;
-  align-items: flex-end;
-  justify-content: flex-start;
-`;
-
-const FormField = styled.label`
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  flex: 0 1 300px;
-  min-width: 220px;
-  max-width: 300px;
-`;
-
-const Label = styled.span`
-  font-size: 14px;
-  color: #374151;
-`;
-
-const Select = styled.select`
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-size: 14px;
-  width: 100%;
-  max-width: 300px;
-`;
-
-const Actions = styled.div`
-  display: flex;
-  gap: 12px;
-  justify-content: flex-start;
-  align-items: flex-end;
-  flex: 0 0 auto;
-`;
-
-const ActionButton = styled(Button)`
-  font-weight: 600;
-  box-shadow: 0 10px 18px rgba(37, 99, 235, 0.2);
-`;
-
-const HintBlock = styled.div`
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 12px 16px;
-  background: #f9fafb;
-  color: #374151;
-  font-size: 13px;
-`;
-
-const ResultCard = styled.div`
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 16px;
-  background: #ffffff;
-  min-height: 160px;
-`;
 
 const JsonBlock = styled.pre`
   margin: 0;
@@ -308,13 +209,3 @@ const JsonBlock = styled.pre`
   color: #111827;
 `;
 
-const Placeholder = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 128px;
-  width: 100%;
-  color: #6b7280;
-  font-size: 14px;
-  text-align: center;
-`;

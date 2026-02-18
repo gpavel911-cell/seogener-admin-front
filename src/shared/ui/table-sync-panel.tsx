@@ -1,4 +1,4 @@
-import { FaSyncAlt } from "react-icons/fa";
+import { FaArrowsRotate } from "react-icons/fa6";
 import styled, { keyframes } from "styled-components";
 import { Button } from "./button";
 
@@ -25,7 +25,7 @@ export function TableSyncPanel({
         title={label}
         data-loading={isLoading}
       >
-        <FaSyncAlt aria-hidden="true" />
+        <FaArrowsRotate aria-hidden="true" />
         <span>{label}</span>
       </SyncButton>
     </Panel>
@@ -51,7 +51,9 @@ const Panel = styled.div`
   align-items: center;
 `;
 
-const SyncButton = styled(Button)`
+const SyncButton = styled(Button).attrs({
+  variant: "primary",
+})`
   padding: 8px 12px;
   min-width: 160px;
   height: 36px;
@@ -61,10 +63,19 @@ const SyncButton = styled(Button)`
   gap: 8px;
   line-height: 1;
   font-weight: 500;
+  background: rgba(37, 99, 235, 0.14);
+  border-color: rgba(37, 99, 235, 0.35);
+  color: ${({ theme }) => theme.tokens.color.accentText};
+
+  &:hover:not(:disabled) {
+    background: rgba(37, 99, 235, 0.2);
+    border-color: rgba(37, 99, 235, 0.48);
+    color: ${({ theme }) => theme.tokens.color.accentText};
+  }
 
   svg {
-    width: 16px;
-    height: 16px;
+    width: 14px;
+    height: 14px;
     flex: 0 0 auto;
   }
 

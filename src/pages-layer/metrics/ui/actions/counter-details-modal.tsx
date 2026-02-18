@@ -1,68 +1,78 @@
+import { useState } from "react";
 import styled from "styled-components";
-import type { MetricsCounterDetailsDto } from "@entities/metrics/types";
-import { Button } from "@shared/ui";
+import type { MetricsCounterDto } from "@entities/metrics/types";
+import { ModalDialog } from "@shared/ui-kit/modal-dialog";
 
 type CounterDetailsModalProps = {
   isOpen: boolean;
   isLoading: boolean;
-  details?: MetricsCounterDetailsDto;
+  details?: MetricsCounterDto;
   onClose: () => void;
 };
 
+const CLOSE_ANIMATION_MS = 180;
+
 export function CounterDetailsModal({ isOpen, isLoading, details, onClose }: CounterDetailsModalProps) {
-  if (!isOpen) {
-    return null;
-  }
+  const [closingDetails, setClosingDetails] = useState<MetricsCounterDto | undefined>(undefined);
+  const detailsForRender = details ?? closingDetails;
+  const isLoadingForRender = isOpen && isLoading && !detailsForRender;
+  const handleClose = () => {
+    if (detailsForRender) {
+      setClosingDetails(detailsForRender);
+    }
+    setTimeout(() => setClosingDetails(undefined), CLOSE_ANIMATION_MS);
+    onClose();
+  };
 
   return (
-    <Overlay onClick={onClose}>
-      <Modal onClick={(event) => event.stopPropagation()}>
-        <ModalHeader>
-          <ModalTitle>Детали счетчика</ModalTitle>
-          <Button type="button" onClick={onClose}>
-            Закрыть
-          </Button>
-        </ModalHeader>
-        {isLoading ? (
-          <DetailsPlaceholder>Загрузка деталей...</DetailsPlaceholder>
-        ) : details ? (
-          <DetailsContent>
-            <SectionTitle>Основные данные</SectionTitle>
-            <DetailGrid>
-              <DetailLabel>ID</DetailLabel>
-              <DetailValue>{details.id}</DetailValue>
-              <DetailLabel>Номер счетчика</DetailLabel>
-              <DetailValue>{details.counterId ?? "—"}</DetailValue>
-              <DetailLabel>Название</DetailLabel>
-              <DetailValue>{details.counterName ?? "—"}</DetailValue>
-              <DetailLabel>Сайт</DetailLabel>
-              <DetailValue>{details.siteUrl ?? "—"}</DetailValue>
-              <DetailLabel>Провайдер</DetailLabel>
-              <DetailValue>{details.provider}</DetailValue>
-              <DetailLabel>Статус</DetailLabel>
-              <DetailValue>{details.status ?? "—"}</DetailValue>
-              <DetailLabel>Наличие</DetailLabel>
-              <DetailValue>{details.presence ?? "—"}</DetailValue>
-              <DetailLabel>Создан</DetailLabel>
-              <DetailValue>{formatDateTime(details.createdAt)}</DetailValue>
-              <DetailLabel>Последний раз получен</DetailLabel>
-              <DetailValue>{formatDateTime(details.lastSeenAt)}</DetailValue>
-              <DetailLabel>Обновлен</DetailLabel>
-              <DetailValue>{formatDateTime(details.updatedAt)}</DetailValue>
-            </DetailGrid>
+    <ModalDialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) {
+          handleClose();
+        }
+      }}
+      title="Детали счетчика"
+    >
+      {isLoadingForRender ? (
+        <DetailsPlaceholder>Загрузка деталей...</DetailsPlaceholder>
+      ) : detailsForRender ? (
+        <DetailsContent>
+          <SectionTitle>Основные данные</SectionTitle>
+          <DetailGrid>
+            <DetailLabel>ID</DetailLabel>
+            <DetailValue>{detailsForRender.id}</DetailValue>
+            <DetailLabel>Номер счетчика</DetailLabel>
+            <DetailValue>{detailsForRender.counterId ?? "—"}</DetailValue>
+            <DetailLabel>Название</DetailLabel>
+            <DetailValue>{detailsForRender.counterName ?? "—"}</DetailValue>
+            <DetailLabel>Сайт</DetailLabel>
+            <DetailValue>{detailsForRender.siteUrl ?? "—"}</DetailValue>
+            <DetailLabel>Провайдер</DetailLabel>
+            <DetailValue>{detailsForRender.provider}</DetailValue>
+            <DetailLabel>Статус</DetailLabel>
+            <DetailValue>{detailsForRender.status ?? "—"}</DetailValue>
+            <DetailLabel>Наличие</DetailLabel>
+            <DetailValue>{detailsForRender.presence ?? "—"}</DetailValue>
+            <DetailLabel>Создан</DetailLabel>
+            <DetailValue>{formatDateTime(detailsForRender.createdAt)}</DetailValue>
+            <DetailLabel>Последний раз получен</DetailLabel>
+            <DetailValue>{formatDateTime(detailsForRender.lastSeenAt)}</DetailValue>
+            <DetailLabel>Обновлен</DetailLabel>
+            <DetailValue>{formatDateTime(detailsForRender.updatedAt)}</DetailValue>
+          </DetailGrid>
 
-            <SectionTitle>Метаданные</SectionTitle>
-            {details.additionalInfoJson ? (
-              <MetadataBlock>{JSON.stringify(details.additionalInfoJson, null, 2)}</MetadataBlock>
-            ) : (
-              <DetailsPlaceholder>Нет метаданных.</DetailsPlaceholder>
-            )}
-          </DetailsContent>
-        ) : (
-          <DetailsPlaceholder>Детали недоступны.</DetailsPlaceholder>
-        )}
-      </Modal>
-    </Overlay>
+          <SectionTitle>Метаданные</SectionTitle>
+          {detailsForRender.additionalInfoJson ? (
+            <MetadataBlock>{JSON.stringify(detailsForRender.additionalInfoJson, null, 2)}</MetadataBlock>
+          ) : (
+            <DetailsPlaceholder>Нет метаданных.</DetailsPlaceholder>
+          )}
+        </DetailsContent>
+      ) : (
+        <DetailsPlaceholder>Детали недоступны.</DetailsPlaceholder>
+      )}
+    </ModalDialog>
   );
 }
 
@@ -72,42 +82,6 @@ const formatDateTime = (value?: string | null) => {
   if (Number.isNaN(parsed.getTime())) return value;
   return parsed.toLocaleString("ru-RU");
 };
-
-const Overlay = styled.div`
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  background: rgba(15, 23, 42, 0.55);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-`;
-
-const Modal = styled.div`
-  width: min(960px, 100%);
-  max-height: 85vh;
-  overflow: auto;
-  border-radius: 16px;
-  padding: 16px;
-  background: #ffffff;
-  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.2);
-`;
-
-const ModalHeader = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 16px;
-`;
-
-const ModalTitle = styled.h2`
-  margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-  color: #111827;
-`;
 
 const DetailsContent = styled.div`
   display: flex;

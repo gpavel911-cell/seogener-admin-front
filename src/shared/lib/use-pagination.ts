@@ -18,7 +18,7 @@ export const usePagination = (options: UsePaginationOptions = {}): PaginationSta
   const {
     initialPage = 0,
     initialPageSize = 20,
-    pageSizeOptions = [20, 50, 100],
+    pageSizeOptions = [5, 10, 15, 20],
   } = options;
 
   const [page, setPageState] = useState(initialPage);

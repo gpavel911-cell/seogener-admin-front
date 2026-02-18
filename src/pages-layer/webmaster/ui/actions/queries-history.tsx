@@ -1,20 +1,29 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { skipToken } from "@reduxjs/toolkit/query";
-import styled from "styled-components";
 import {
-  useGetWebmasterHostsQuery,
-  useGetWebmasterProfilesQuery,
   useLazyGetWebmasterSearchQueriesHistoryQuery,
 } from "@entities/webmaster/api";
+import { useWebmasterSelectOptions } from "@entities/webmaster/select-options";
 import {
-  type WebmasterHostDto,
   type WebmasterSearchQueryStatisticsPointDto,
   WebmasterProviderType,
 } from "@entities/webmaster/types";
 import {
   Button,
+  CenteredState,
+  DateInput,
+  FieldLabel,
+  FormActions,
+  FormCard,
+  FormField,
+  FormFields,
+  FormRow,
+  FormStack,
+  PlaceholderText,
+  ResultLoader,
+  ResultCard,
+  SelectControl,
   Table,
   TableBody,
   TableCell,
@@ -56,15 +65,19 @@ export const QueriesHistory = ({ fixedProfile }: ActionsSectionWebmasterQueriesH
     dateTo: string;
   } | null>(null);
 
-  const { data: profilesRaw, isFetching: isProfilesFetching } = useGetWebmasterProfilesQuery();
-  const profiles = useMemo(
-    () => (profilesRaw ?? []).filter((profile) => profile.provider === DEFAULT_PROVIDER),
-    [profilesRaw],
-  );
-  const resolvedProfile = useMemo(
-    () => fixedProfile ?? activeProfile ?? profiles?.[0]?.profile ?? null,
-    [fixedProfile, activeProfile, profiles],
-  );
+  const {
+    resolvedProfile,
+    profileOptions,
+    hostOptions,
+    resolvedHostId,
+    isProfilesFetching,
+    isHostsFetching,
+  } = useWebmasterSelectOptions({
+    activeProfile,
+    fixedProfile: fixedProfile ?? null,
+    fixedProvider: DEFAULT_PROVIDER,
+    activeHostId: hostId,
+  });
   const result = useMemo(
     () => (resolvedProfile && resultByProfile?.profile === resolvedProfile ? resultByProfile : null),
     [resolvedProfile, resultByProfile],
@@ -104,21 +117,6 @@ export const QueriesHistory = ({ fixedProfile }: ActionsSectionWebmasterQueriesH
     }
     return weight > 0 ? roundToTwoDecimals(weighted / weight) : null;
   }, [resultRows]);
-  const hostsQueryArgs = resolvedProfile
-    ? { provider: DEFAULT_PROVIDER, profile: resolvedProfile, pageNumber: 0, pageSize: 500 }
-    : skipToken;
-  const { data: hostsData, isFetching: isHostsFetching } = useGetWebmasterHostsQuery(hostsQueryArgs);
-  const hosts = useMemo(() => hostsData?.content ?? [], [hostsData?.content]);
-  const resolvedHostId = useMemo(() => {
-    if (!hosts.length) {
-      return "";
-    }
-    if (hostId && hosts.some((item) => item.hostId === hostId)) {
-      return hostId;
-    }
-    return hosts[0]?.hostId ?? "";
-  }, [hostId, hosts]);
-
   const [loadHistory, { isFetching }] = useLazyGetWebmasterSearchQueriesHistoryQuery();
 
   const handleLoad = async () => {
@@ -155,59 +153,59 @@ export const QueriesHistory = ({ fixedProfile }: ActionsSectionWebmasterQueriesH
   };
 
   return (
-    <Stack>
+    <FormStack>
       <FormCard>
         <FormRow>
           <FormFields>
             {!fixedProfile && (
               <FormField>
-                <Label>Профиль Вебмастера</Label>
-                <Select
+                <FieldLabel>Профиль Вебмастера</FieldLabel>
+                <SelectControl
                   value={resolvedProfile ?? ""}
-                  onChange={(event) => setActiveProfile(event.target.value)}
+                  onValueChange={setActiveProfile}
                   disabled={isProfilesFetching}
-                >
-                  <option value="">Выберите профиль</option>
-                  {(profiles ?? []).map((profile) => (
-                    <option key={profile.profile} value={profile.profile}>
-                      {profile.profile}
-                    </option>
-                  ))}
-                </Select>
+                  options={profileOptions}
+                  placeholder="Выберите профиль"
+                />
               </FormField>
             )}
             <FormField>
-              <Label>Сайт</Label>
-              <Select value={resolvedHostId} onChange={(event) => setHostId(event.target.value)} disabled={isHostsFetching}>
-                {!hosts.length && <option value="">Нет сайтов</option>}
-                {hosts.map((host) => (
-                  <option key={`${host.id}-${host.hostId}`} value={host.hostId}>
-                    {formatHostOptionLabel(host)}
-                  </option>
-                ))}
-              </Select>
+              <FieldLabel>Сайт</FieldLabel>
+              <SelectControl
+                value={resolvedHostId}
+                onValueChange={setHostId}
+                disabled={isHostsFetching}
+                options={hostOptions}
+                placeholder={hostOptions.length ? "Выберите сайт" : "Нет сайтов"}
+              />
             </FormField>
             <FormField>
-              <Label>Дата начала</Label>
-              <Input type="date" value={dateFrom} max={dateTo} onChange={(event) => setDateFrom(event.target.value)} />
+              <FieldLabel>Дата начала</FieldLabel>
+              <DateInput value={dateFrom} max={dateTo} onChange={(event) => setDateFrom(event.target.value)} />
             </FormField>
             <FormField>
-              <Label>Дата конца</Label>
-              <Input type="date" value={dateTo} min={dateFrom} onChange={(event) => setDateTo(event.target.value)} />
+              <FieldLabel>Дата конца</FieldLabel>
+              <DateInput value={dateTo} min={dateFrom} onChange={(event) => setDateTo(event.target.value)} />
             </FormField>
           </FormFields>
-          <Actions>
-            <ActionButton type="button" onClick={handleLoad} disabled={isFetching}>
+          <FormActions>
+            <Button type="button" variant="primary" onClick={handleLoad} disabled={isFetching}>
               {isFetching ? "Загрузка..." : "Показать"}
-            </ActionButton>
-          </Actions>
+            </Button>
+          </FormActions>
         </FormRow>
       </FormCard>
       <ResultCard>
-        {!result ? (
-          <Placeholder>Нет данных.</Placeholder>
+        {isFetching ? (
+          <ResultLoader label="Загрузка отчета..." />
+        ) : !result ? (
+          <CenteredState>
+            <PlaceholderText>Нет данных для отображения.</PlaceholderText>
+          </CenteredState>
         ) : weekRows.length === 0 ? (
-          <Placeholder>Нет данных по выбранному периоду.</Placeholder>
+          <CenteredState>
+            <PlaceholderText>Нет данных для отображения.</PlaceholderText>
+          </CenteredState>
         ) : (
           <TableWrapper>
             <Table>
@@ -261,41 +259,8 @@ export const QueriesHistory = ({ fixedProfile }: ActionsSectionWebmasterQueriesH
           </TableWrapper>
         )}
       </ResultCard>
-    </Stack>
+    </FormStack>
   );
-};
-
-const formatHostOptionLabel = (host: WebmasterHostDto): string => {
-  const website = extractWebsite(host.hostUrl, host.hostId);
-  if (website) {
-    return website;
-  }
-  return host.hostId;
-};
-
-const extractWebsite = (hostUrl?: string | null, hostId?: string | null): string | null => {
-  if (hostUrl) {
-    try {
-      const parsed = new URL(hostUrl);
-      if (parsed.hostname) {
-        return parsed.hostname;
-      }
-    } catch {
-      const withoutProtocol = hostUrl.replace(/^https?:\/\//, "");
-      const firstPart = withoutProtocol.split("/")[0]?.trim();
-      if (firstPart) {
-        return firstPart;
-      }
-    }
-  }
-  if (hostId) {
-    const parts = hostId.split(":").filter(Boolean);
-    if (parts.length >= 2) {
-      return parts[1];
-    }
-    return hostId;
-  }
-  return null;
 };
 
 const formatDayLabel = (date: string): string => {
@@ -562,100 +527,3 @@ type StatisticsAccumulator = {
   avgClickPositionWeight: number;
 };
 
-const Stack = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-`;
-
-const FormCard = styled.div`
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  background: #ffffff;
-`;
-
-const FormRow = styled.div`
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 16px;
-  align-items: flex-end;
-  overflow-x: auto;
-  padding-bottom: 4px;
-`;
-
-const FormFields = styled.div`
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 12px;
-  flex: 0 1 auto;
-  align-items: flex-end;
-  justify-content: flex-start;
-`;
-
-const FormField = styled.label`
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  flex: 0 1 300px;
-  min-width: 220px;
-  max-width: 300px;
-`;
-
-const Label = styled.span`
-  font-size: 14px;
-  color: #374151;
-`;
-
-const Select = styled.select`
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-size: 14px;
-  width: 100%;
-  max-width: 300px;
-`;
-
-const Input = styled.input`
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-size: 14px;
-  width: 100%;
-  max-width: 300px;
-`;
-
-const Actions = styled.div`
-  display: flex;
-  gap: 12px;
-  justify-content: flex-start;
-  align-items: flex-end;
-  flex: 0 0 auto;
-`;
-
-const ActionButton = styled(Button)`
-  font-weight: 600;
-  box-shadow: 0 10px 18px rgba(37, 99, 235, 0.2);
-`;
-
-const ResultCard = styled.div`
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 16px;
-  background: #ffffff;
-  min-height: 160px;
-`;
-
-const Placeholder = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 128px;
-  width: 100%;
-  color: #6b7280;
-  font-size: 14px;
-  text-align: center;
-`;

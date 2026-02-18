@@ -2,9 +2,9 @@ import { API_ROUTES } from "@shared/config/api-routes";
 import { baseApi } from "@shared/store";
 import type {
   MetricsCounterDto,
-  MetricsCounterDetailsDto,
   MetricsCounterListRequest,
   MetricsCountersListResponse,
+  MetricsCounterOptionDto,
   MetricsCounterCreateRequest,
   MetricsCounterStatisticsRequest,
   MetricsCounterStatisticsResponse,
@@ -36,9 +36,10 @@ export const analyticsApi = baseApi.injectEndpoints({
         };
       },
     }),
-    getMetricsCounterDetails: builder.query<MetricsCounterDetailsDto, number>({
-      query: (id) => ({
-        url: API_ROUTES.METRICS.GET_METRICS_COUNTER_DETAILS(id),
+    getMetricsCounterOptions: builder.query<MetricsCounterOptionDto[], { provider: MetricsCounterDto["provider"]; profile: string }>({
+      query: ({ provider, profile }) => ({
+        url: API_ROUTES.METRICS.GET_METRICS_COUNTER_OPTIONS,
+        params: { provider, profile },
       }),
     }),
     createMetricsCounter: builder.mutation<void, MetricsCounterCreateRequest>({
@@ -67,7 +68,7 @@ export const {
   useGetMetricsProfilesQuery,
   useSyncMetricsCountersMutation,
   useGetMetricsCountersQuery,
-  useGetMetricsCounterDetailsQuery,
+  useGetMetricsCounterOptionsQuery,
   useCreateMetricsCounterMutation,
   useLazyGetMetricsStatisticsQuery,
   useLazyGetMetricsGoalsQuery,

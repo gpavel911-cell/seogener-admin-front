@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { skipToken } from "@reduxjs/toolkit/query";
 import {
-  useGetWebmasterHostDetailsQuery,
   useGetWebmasterHostsQuery,
   useGetWebmasterProfilesQuery,
   useSyncWebmasterHostsMutation,
@@ -15,7 +14,7 @@ import {
   WEBMASTER_PROVIDER_TYPES,
 } from "@entities/webmaster/types";
 import { usePagination } from "@shared/lib/use-pagination";
-import { IntegrationPageLayout, useToast } from "@shared/ui";
+import { EMPTY_DATA_MESSAGE, IntegrationPageLayout, useToast } from "@shared/ui";
 import { PaginationControls } from "@shared/ui/pagination-controls";
 import {
   WEBMASTER_ACTION_SECTIONS,
@@ -85,7 +84,7 @@ export function WebmasterPage() {
   const { data, isFetching, isLoading, error: loadError, refetch } = useGetWebmasterHostsQuery(hostsQueryArgs);
   const [syncHosts, { isLoading: isSyncingHosts }] = useSyncWebmasterHostsMutation();
 
-  const hosts = data?.content ?? [];
+  const hosts = useMemo(() => data?.content ?? [], [data?.content]);
   const totalPages = data?.totalPages ?? 0;
   const shouldShowEmptyState = !isLoading && hosts.length === 0;
   const shouldShowProfilesEmptyState = !isProfilesFetching && allProfiles.length === 0;
@@ -98,9 +97,20 @@ export function WebmasterPage() {
     return exists ? selectedHostId : null;
   }, [hosts, selectedHostId]);
 
-  const { data: hostDetails, isFetching: isDetailsLoading } = useGetWebmasterHostDetailsQuery(
-    resolvedSelectedHostId ?? skipToken,
-  );
+  const selectedHostDetails = useMemo(() => {
+    if (!resolvedSelectedHostId) {
+      return undefined;
+    }
+    const selected = hosts.find((item) => item.id === resolvedSelectedHostId);
+    if (!selected) {
+      return undefined;
+    }
+    return {
+      ...selected,
+      createdAt: selected.createdAt ?? selected.updatedAt,
+      additionalInfoJson: selected.additionalInfoJson ?? null,
+    };
+  }, [hosts, resolvedSelectedHostId]);
 
   const loadErrorMessage = useMemo(() => {
     if (!loadError) return null;
@@ -138,6 +148,7 @@ export function WebmasterPage() {
       <WebmasterHostsTable
         items={hosts}
         isLoading={isLoading}
+        pageSize={pageSize}
         selectedHostId={resolvedSelectedHostId}
         onSelect={setSelectedHostId}
       />
@@ -176,13 +187,13 @@ export function WebmasterPage() {
       showProfilesEmptyState={shouldShowProfilesEmptyState}
       profilesEmptyMessage="Нет доступных профилей. Проверьте конфигурацию."
       showTableEmptyState={shouldShowEmptyState}
-      tableEmptyMessage="Сайты не найдены. Выполните синхронизацию."
+      tableEmptyMessage={EMPTY_DATA_MESSAGE}
       tableContent={tableContent}
       tableDetailsContent={(
         <WebmasterHostDetailsModal
           isOpen={resolvedSelectedHostId !== null}
-          isLoading={isDetailsLoading}
-          details={hostDetails}
+          isLoading={false}
+          details={selectedHostDetails}
           onClose={() => setSelectedHostId(null)}
         />
       )}

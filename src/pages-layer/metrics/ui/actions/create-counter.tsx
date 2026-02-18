@@ -1,12 +1,25 @@
 import { useEffect, useMemo, useState } from "react";
-import styled from "styled-components";
-import { skipToken } from "@reduxjs/toolkit/query";
-import { useCreateMetricsCounterMutation, useGetMetricsCountersQuery, useGetMetricsProfilesQuery } from "@entities/metrics/api";
+import { useCreateMetricsCounterMutation } from "@entities/metrics/api";
 import { MetricsProviderType } from "@entities/metrics/types";
-import { useGetRegistrarProfilesQuery, useGetRegistrarDomainsQuery, useLazyGetRegistrarDomainsQuery } from "@entities/registrars/api";
+import { useLazyGetRegistrarDomainsQuery } from "@entities/registrars/api";
 import type { RegistrarProviderType } from "@entities/registrars/types";
-import { buildRegistrarGroups, resolveRegistrarProfile, resolveRegistrarProvider } from "@shared/lib/registrars";
-import { Button, useToast } from "@shared/ui";
+import { useMetricsSelectOptions } from "@entities/metrics/select-options";
+import { useRegistrarSelectOptions } from "@entities/registrars/select-options";
+import { resolveRegistrarProfile, resolveRegistrarProvider } from "@shared/lib/registrars";
+import {
+  Button,
+  FieldLabel,
+  FormActions,
+  FormCard,
+  FormField,
+  FormFields,
+  FormRow,
+  FormStack,
+  InlineHint,
+  SelectControl,
+  TextInput,
+  useToast,
+} from "@shared/ui";
 
 const DEFAULT_PROVIDER = MetricsProviderType.YANDEX_METRICA;
 
@@ -24,58 +37,30 @@ export const CreateCounter = ({ fixedProfile }: ActionsSectionCreateCounterProps
   const [isLoadingAllDomains, setIsLoadingAllDomains] = useState(false);
 
   const { showToast } = useToast();
-  const { data: accountProfilesRaw, isFetching: isAccountsFetching } = useGetMetricsProfilesQuery();
-  const accountProfiles = useMemo(
-    () => (accountProfilesRaw ?? []).filter((profile) => profile.provider === DEFAULT_PROVIDER),
-    [accountProfilesRaw],
-  );
-  const resolvedMetricaProfile = useMemo(
-    () => fixedProfile ?? activeMetricaProfile ?? accountProfiles?.[0]?.profile ?? null,
-    [fixedProfile, activeMetricaProfile, accountProfiles],
-  );
-  const countersQueryArgs = resolvedMetricaProfile
-    ? { provider: DEFAULT_PROVIDER, profile: resolvedMetricaProfile, pageNumber: 0, pageSize: 100 }
-    : skipToken;
-  const { refetch: refetchCounters } = useGetMetricsCountersQuery(countersQueryArgs);
-  const { data: profilesData } = useGetRegistrarProfilesQuery();
-  const registrarGroups = useMemo(() => buildRegistrarGroups(profilesData ?? []), [profilesData]);
-  const fallbackSelection = useMemo(() => {
-    if (registrarGroups.length === 0) {
-      return { registrar: null, profile: null };
-    }
-    const firstGroup = registrarGroups[0];
-    const firstProfile = firstGroup.profiles[0] ?? null;
-    return { registrar: firstGroup.registrar, profile: firstProfile };
-  }, [registrarGroups]);
-
-  const resolvedRegistrar = activeRegistrar ?? fallbackSelection.registrar;
-  const resolvedProfile = activeProfile ?? fallbackSelection.profile;
-
-  const domainsQueryArgs = resolvedRegistrar && resolvedProfile
-    ? { pageNumber: 0, pageSize: 200, profile: resolvedProfile, registrar: resolvedRegistrar }
-    : skipToken;
-  const { data: domainsData, isFetching: isDomainsFetching } = useGetRegistrarDomainsQuery(domainsQueryArgs);
+  const {
+    resolvedProfile: resolvedMetricaProfile,
+    profileOptions: metricaProfileOptions,
+    isProfilesFetching: isAccountsFetching,
+    refetchCounters,
+  } = useMetricsSelectOptions({
+    activeProfile: activeMetricaProfile,
+    fixedProfile: fixedProfile ?? null,
+    fixedProvider: DEFAULT_PROVIDER,
+  });
+  const {
+    profilesData,
+    registrarGroups,
+    resolvedRegistrar,
+    resolvedProfile,
+    registrarOptions,
+    profileOptions: profileSelectOptions,
+    domainOptions: selectedDomainOptions,
+    isDomainsFetching,
+  } = useRegistrarSelectOptions({
+    activeRegistrar,
+    activeProfile,
+  });
   const [loadDomainsByProfile] = useLazyGetRegistrarDomainsQuery();
-  const profileOptions = useMemo(() => {
-    if (!resolvedRegistrar) {
-      return [];
-    }
-    return registrarGroups.find((group) => group.registrar === resolvedRegistrar)?.profiles ?? [];
-  }, [registrarGroups, resolvedRegistrar]);
-
-  const selectedDomainOptions = useMemo(
-    () => {
-      const page = domainsData as { content?: Array<{ domainName?: string; domain?: string }> } | undefined;
-      return (page?.content ?? [])
-        .map((domain) => domain.domainName ?? domain.domain ?? "")
-        .filter((name) => name.length > 0)
-        .map((name) => ({
-          value: name,
-          label: name,
-        }));
-    },
-    [domainsData],
-  );
   const allDomainOptions = useMemo(
     () =>
       allDomains.map((domain) => ({
@@ -211,13 +196,13 @@ export const CreateCounter = ({ fixedProfile }: ActionsSectionCreateCounterProps
   const showProfilesEmptyHint = registrarGroups.length === 0;
 
   return (
-    <Stack>
+    <FormStack>
       <FormCard>
         <FormRow>
           <FormFields>
             <FormField>
-              <Label>Название</Label>
-              <Input
+              <FieldLabel>Название</FieldLabel>
+              <TextInput
                 value={counterName}
                 onChange={(event) => setCounterName(event.target.value)}
                 placeholder="Например, Hotel Official"
@@ -225,160 +210,56 @@ export const CreateCounter = ({ fixedProfile }: ActionsSectionCreateCounterProps
             </FormField>
             {!fixedProfile && (
               <FormField>
-                <Label>Профиль Метрики</Label>
-                <Select
+                <FieldLabel>Профиль Метрики</FieldLabel>
+                <SelectControl
                   value={resolvedMetricaProfile ?? ""}
-                  onChange={(event) => setActiveMetricaProfile(event.target.value)}
+                  onValueChange={setActiveMetricaProfile}
                   disabled={isAccountsFetching}
-                >
-                  <option value="">Выберите профиль</option>
-                  {(accountProfiles ?? []).map((profile) => (
-                    <option key={profile.profile} value={profile.profile}>
-                      {profile.profile}
-                    </option>
-                  ))}
-                </Select>
+                  options={metricaProfileOptions}
+                  placeholder="Выберите профиль"
+                />
               </FormField>
             )}
             <FormField>
-              <Label>Регистратор</Label>
-              <Select
+              <FieldLabel>Регистратор</FieldLabel>
+              <SelectControl
                 value={resolvedRegistrar ?? ""}
-                onChange={(event) => handleRegistrarChange(event.target.value as RegistrarProviderType)}
-              >
-                <option value="">Выберите регистратора</option>
-                {registrarGroups.map((group) => (
-                  <option key={group.registrar} value={group.registrar}>
-                    {group.registrar}
-                  </option>
-                ))}
-              </Select>
+                onValueChange={(value) => handleRegistrarChange(value as RegistrarProviderType)}
+                options={registrarOptions}
+                placeholder="Выберите регистратора"
+              />
             </FormField>
             <FormField>
-              <Label>Профиль</Label>
-              <Select
+              <FieldLabel>Профиль</FieldLabel>
+              <SelectControl
                 value={resolvedProfile ?? ""}
-                onChange={(event) => handleProfileChange(event.target.value)}
+                onValueChange={handleProfileChange}
                 disabled={!resolvedRegistrar}
-              >
-                <option value="">Выберите профиль</option>
-                {profileOptions.map((profile) => (
-                  <option key={profile} value={profile}>
-                    {profile}
-                  </option>
-                ))}
-              </Select>
+                options={profileSelectOptions}
+                placeholder="Выберите профиль"
+              />
             </FormField>
             <FormField>
-              <Label>Домен</Label>
-              <Select
+              <FieldLabel>Домен</FieldLabel>
+              <SelectControl
                 value={selectedDomain}
-                onChange={(event) => setSelectedDomain(event.target.value)}
+                onValueChange={setSelectedDomain}
                 disabled={isDomainsFetching || isLoadingAllDomains || domainOptions.length === 0}
-              >
-                <option value="">Выберите домен</option>
-                {domainOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </Select>
+                options={domainOptions}
+                placeholder="Выберите домен"
+              />
             </FormField>
           </FormFields>
-          <Actions>
-            <ActionButton type="button" onClick={handleSubmit} disabled={isCreateLoading}>
+          <FormActions>
+            <Button type="button" variant="primary" onClick={handleSubmit} disabled={isCreateLoading}>
               {isCreateLoading ? "Создание..." : "Создать"}
-            </ActionButton>
-          </Actions>
+            </Button>
+          </FormActions>
         </FormRow>
       </FormCard>
-      {showDomainsEmptyHint && <Hint>Нет доменов для выбранного профиля.</Hint>}
-      {showProfilesEmptyHint && <Hint>Сначала синхронизируйте домены.</Hint>}
-    </Stack>
+      {showDomainsEmptyHint && <InlineHint>Нет доменов для выбранного профиля.</InlineHint>}
+      {showProfilesEmptyHint && <InlineHint>Сначала синхронизируйте домены.</InlineHint>}
+    </FormStack>
   );
 };
 
-const Stack = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-`;
-
-const FormCard = styled.div`
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  background: #ffffff;
-`;
-
-const FormRow = styled.div`
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 16px;
-  align-items: flex-end;
-  overflow-x: auto;
-  padding-bottom: 4px;
-`;
-
-const FormFields = styled.div`
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 12px;
-  flex: 0 1 auto;
-  align-items: flex-end;
-  justify-content: flex-start;
-`;
-
-const FormField = styled.label`
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  flex: 0 1 300px;
-  min-width: 220px;
-  max-width: 300px;
-`;
-
-const Label = styled.span`
-  font-size: 14px;
-  color: #374151;
-`;
-
-const Input = styled.input`
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-size: 14px;
-  width: 100%;
-  max-width: 300px;
-`;
-
-const Select = styled.select`
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-size: 14px;
-  width: 100%;
-  max-width: 300px;
-`;
-
-const Actions = styled.div`
-  display: flex;
-  gap: 12px;
-  justify-content: flex-start;
-  align-items: flex-end;
-  flex: 0 0 auto;
-`;
-
-const ActionButton = styled(Button)`
-  font-weight: 600;
-  box-shadow: 0 10px 18px rgba(37, 99, 235, 0.2);
-`;
-
-const Hint = styled.p`
-  margin: 0;
-  font-size: 12px;
-  color: #6b7280;
-`;

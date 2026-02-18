@@ -1,5 +1,5 @@
-import { PageTitle } from "@shared/ui/page-title";
+import { DashboardPage } from "@pages/dashboard";
 
-export default function DashboardPage() {
-  return <PageTitle>Главная</PageTitle>;
+export default function Page() {
+  return <DashboardPage />;
 }

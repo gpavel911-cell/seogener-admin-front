@@ -1,6 +1,6 @@
 import { type ReactNode } from "react";
 import styled from "styled-components";
-import { PageTitle } from "./page-title";
+import { PageHeader } from "./page-header";
 import { ProfilesSidebar, type ProfileSidebarGroup } from "./profiles-sidebar";
 import { ActionsSidebar, type SidebarSection } from "./actions-sidebar";
 import { TableSyncPanel } from "./table-sync-panel";
@@ -52,9 +52,7 @@ export const IntegrationPageLayout = <TProvider extends string>({
 }: IntegrationPageLayoutProps<TProvider>) => {
   return (
     <Wrapper>
-      <Header>
-        <PageTitle>{title}</PageTitle>
-      </Header>
+      <PageHeader title={title} />
       <Body>
         <LeftColumn>
           <ProfilesSidebar
@@ -85,9 +83,9 @@ export const IntegrationPageLayout = <TProvider extends string>({
                 disabled={syncDisabled}
               />
               {showProfilesEmptyState ? (
-                <EmptyState>{profilesEmptyMessage}</EmptyState>
+                <SelectionState>{profilesEmptyMessage}</SelectionState>
               ) : showTableEmptyState ? (
-                <EmptyState>{tableEmptyMessage}</EmptyState>
+                <SelectionState>{tableEmptyMessage}</SelectionState>
               ) : (
                 tableContent
               )}
@@ -105,21 +103,21 @@ export const IntegrationPageLayout = <TProvider extends string>({
 const Wrapper = styled.div`
   display: flex;
   flex-direction: column;
+  flex: 1;
+  height: 100%;
+  min-height: 0;
   gap: 24px;
-`;
-
-const Header = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
 `;
 
 const Body = styled.div`
   display: grid;
   grid-template-columns: 250px 1fr;
-  gap: 16px;
-  align-items: flex-start;
+  grid-template-rows: minmax(0, 1fr);
+  gap: 14px;
+  align-items: stretch;
+  flex: 1;
+  height: 100%;
+  min-height: 0;
 `;
 
 const LeftColumn = styled.div`
@@ -133,31 +131,39 @@ const Main = styled.div`
   display: flex;
   flex-direction: column;
   gap: 16px;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
 `;
 
 const ActionBlock = styled.section`
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-height: 0;
   gap: 12px;
 `;
 
 const TableSection = styled.section`
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-height: 0;
   gap: 16px;
 `;
 
 const EmptyState = styled.div`
-  border: 1px dashed #d1d5db;
-  background: #f9fafb;
+  border: 1px solid ${({ theme }) => theme.tokens.color.borderSubtle};
+  background: ${({ theme }) => theme.tokens.color.bgSurface};
   padding: 20px;
-  border-radius: 12px;
+  border-radius: ${({ theme }) => theme.tokens.radius.md};
   font-size: 14px;
-  color: #4b5563;
+  color: ${({ theme }) => theme.tokens.color.textSecondary};
 `;
 
 const SelectionState = styled(EmptyState)`
-  height: 200px;
+  flex: 1;
+  min-height: 0;
   display: flex;
   align-items: center;
   justify-content: center;

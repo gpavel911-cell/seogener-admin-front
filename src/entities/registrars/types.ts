@@ -36,9 +36,15 @@ export type RegistrarDomainDto = {
   expirationDate?: string | null;
   presence: RegistrarDomainPresence;
   lastSeenAt: string;
+  additionalInfo?: Record<string, unknown>;
 };
 
 export type RegistrarDomainListResponse = Page<RegistrarDomainDto>;
+
+export type RegistrarDomainOptionDto = {
+  value: string;
+  label: string;
+};
 
 export type RegistrarDomainListRequest = {
   pageNumber: number;
@@ -50,19 +56,6 @@ export type RegistrarDomainListRequest = {
 export type RegistrarDomainProfileDto = {
   registrar: RegistrarProviderType;
   profile: string;
-};
-
-export type RegistrarDomainDetailsDto = {
-  id: number;
-  registrar: RegistrarProviderType;
-  profile: string;
-  serviceId: string;
-  domainName: string;
-  status?: RegistrarDomainState | null;
-  expirationDate?: string | null;
-  presence: RegistrarDomainPresence;
-  lastSeenAt: string;
-  additionalInfo?: Record<string, unknown>;
 };
 
 export type CreateARecordRequest = {

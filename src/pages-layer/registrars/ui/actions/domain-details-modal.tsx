@@ -1,6 +1,7 @@
+import { useState } from "react";
 import styled from "styled-components";
-import type { RegistrarDomainDetailsDto } from "@entities/registrars/types";
-import { Button } from "@shared/ui";
+import type { RegistrarDomainDto } from "@entities/registrars/types";
+import { ModalDialog } from "@shared/ui-kit/modal-dialog";
 import {
   asRecord,
   formatDateTime,
@@ -14,9 +15,11 @@ import {
 type DomainDetailsPanelProps = {
   isOpen: boolean;
   isLoading: boolean;
-  details?: RegistrarDomainDetailsDto;
+  details?: RegistrarDomainDto;
   onClose: () => void;
 };
+
+const CLOSE_ANIMATION_MS = 180;
 
 export function DomainDetailsModal({
   isOpen,
@@ -24,31 +27,39 @@ export function DomainDetailsModal({
   details,
   onClose,
 }: DomainDetailsPanelProps) {
-  if (!isOpen) {
-    return null;
-  }
+  const [closingDetails, setClosingDetails] = useState<RegistrarDomainDto | undefined>(undefined);
+  const detailsForRender = details ?? closingDetails;
+  const isLoadingForRender = isOpen && isLoading && !detailsForRender;
+  const handleClose = () => {
+    if (detailsForRender) {
+      setClosingDetails(detailsForRender);
+    }
+    setTimeout(() => setClosingDetails(undefined), CLOSE_ANIMATION_MS);
+    onClose();
+  };
+
   return (
-    <Overlay onClick={onClose}>
-      <Modal onClick={(event) => event.stopPropagation()}>
-        <ModalHeader>
-          <ModalTitle>Детали домена</ModalTitle>
-          <Button type="button" onClick={onClose}>
-            Закрыть
-          </Button>
-        </ModalHeader>
-        {isLoading ? (
-          <DetailsPlaceholder>Загрузка деталей...</DetailsPlaceholder>
-        ) : details ? (
-          <DomainDetailsContent details={details} />
-        ) : (
-          <DetailsPlaceholder>Детали недоступны.</DetailsPlaceholder>
-        )}
-      </Modal>
-    </Overlay>
+    <ModalDialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) {
+          handleClose();
+        }
+      }}
+      title="Детали домена"
+    >
+      {isLoadingForRender ? (
+        <DetailsPlaceholder>Загрузка деталей...</DetailsPlaceholder>
+      ) : detailsForRender ? (
+        <DomainDetailsContent details={detailsForRender} />
+      ) : (
+        <DetailsPlaceholder>Детали недоступны.</DetailsPlaceholder>
+      )}
+    </ModalDialog>
   );
 }
 
-function DomainDetailsContent({ details }: { details: RegistrarDomainDetailsDto }) {
+function DomainDetailsContent({ details }: { details: RegistrarDomainDto }) {
   const payload = asRecord(details.additionalInfo);
   const detailEntries = toEntries(asRecord(payload.details));
   const contactEntries = toEntries(asRecord(payload.contacts));
@@ -112,42 +123,6 @@ function FieldSection({
     </>
   );
 }
-
-const Overlay = styled.div`
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  background: rgba(15, 23, 42, 0.55);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-`;
-
-const Modal = styled.div`
-  width: min(960px, 100%);
-  max-height: 85vh;
-  overflow: auto;
-  border-radius: 16px;
-  padding: 16px;
-  background: #ffffff;
-  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.2);
-`;
-
-const ModalHeader = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 16px;
-`;
-
-const ModalTitle = styled.h2`
-  margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-  color: #111827;
-`;
 
 const DetailsContent = styled.div`
   display: flex;

@@ -1,16 +1,25 @@
 import styled from "styled-components";
 import type { MetricsCounterDto } from "@entities/metrics/types";
-import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow, TableWrapper } from "@shared/ui";
+import { EMPTY_DATA_MESSAGE, ResultLoader, Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow, TableWrapper } from "@shared/ui";
 import { formatDateTime } from "../../lib/formatters";
 
 type CountersTableProps = {
   items: MetricsCounterDto[];
   isLoading: boolean;
+  pageSize: number;
   selectedCounterId: number | null;
   onSelect: (id: number) => void;
 };
 
-export const CountersTable = ({ items, isLoading, selectedCounterId, onSelect }: CountersTableProps) => {
+const COLUMN_COUNT = 6;
+
+export const CountersTable = ({ items, isLoading, pageSize, selectedCounterId, onSelect }: CountersTableProps) => {
+  if (isLoading) {
+    return <ResultLoader label="Загрузка счетчиков..." />;
+  }
+
+  const fillerCount = !isLoading && items.length > 0 ? Math.max(pageSize - items.length, 0) : 0;
+
   return (
     <TableWrapper>
       <Table>
@@ -25,14 +34,9 @@ export const CountersTable = ({ items, isLoading, selectedCounterId, onSelect }:
           </TableRow>
         </TableHead>
         <TableBody>
-          {isLoading && (
-            <TableRow>
-              <TableCell colSpan={6}>Загрузка...</TableCell>
-            </TableRow>
-          )}
           {!isLoading && items.length === 0 && (
             <TableRow>
-              <TableCell colSpan={6}>Счетчики не найдены.</TableCell>
+              <TableCell colSpan={COLUMN_COUNT}>{EMPTY_DATA_MESSAGE}</TableCell>
             </TableRow>
           )}
           {!isLoading &&
@@ -50,6 +54,13 @@ export const CountersTable = ({ items, isLoading, selectedCounterId, onSelect }:
                 </TableCell>
                 <TableCell>{formatDateTime(item.updatedAt)}</TableCell>
               </ClickableRow>
+            ))}
+          {!isLoading &&
+            fillerCount > 0 &&
+            Array.from({ length: fillerCount }, (_, index) => (
+              <PlaceholderRow key={`counter-placeholder-${index}`}>
+                <TableCell colSpan={COLUMN_COUNT}>&nbsp;</TableCell>
+              </PlaceholderRow>
             ))}
         </TableBody>
       </Table>
@@ -94,10 +105,14 @@ const ClickableRow = styled(TableRow)`
   cursor: pointer;
 
   &[data-active="true"] {
-    background: #f3f4f6;
+    background: #edf4ff;
   }
 
   &:hover {
-    background: #f9fafb;
+    background: #f8fbff;
   }
+`;
+
+const PlaceholderRow = styled(TableRow)`
+  pointer-events: none;
 `;

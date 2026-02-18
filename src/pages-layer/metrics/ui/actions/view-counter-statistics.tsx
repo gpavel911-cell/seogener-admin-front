@@ -1,9 +1,32 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import styled from "styled-components";
-import { skipToken } from "@reduxjs/toolkit/query";
-import { useGetMetricsCountersQuery, useGetMetricsProfilesQuery, useLazyGetMetricsStatisticsQuery } from "@entities/metrics/api";
+import { useLazyGetMetricsStatisticsQuery } from "@entities/metrics/api";
+import { useMetricsSelectOptions } from "@entities/metrics/select-options";
 import { MetricsProviderType, type MetricsCounterStatisticsResponse } from "@entities/metrics/types";
-import { Button, Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow, TableWrapper, useToast } from "@shared/ui";
+import {
+  Button,
+  CenteredState,
+  DateInput,
+  FieldLabel,
+  FormActions,
+  FormCard,
+  FormField,
+  FormFields,
+  FormRow,
+  FormStack,
+  PlaceholderText,
+  ResultLoader,
+  ResultCard,
+  SelectControl,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeaderCell,
+  TableRow,
+  TableWrapper,
+  useToast,
+} from "@shared/ui";
 import { formatDecimal, formatDurationSeconds } from "../../lib/formatters";
 
 const DEFAULT_PROVIDER = MetricsProviderType.YANDEX_METRICA;
@@ -30,30 +53,21 @@ export const ViewCounterStatistics = ({ fixedProfile }: ActionsSectionViewCounte
   const [activeProfile, setActiveProfile] = useState<string | null>(null);
 
   const { showToast } = useToast();
-  const { data: accountProfilesRaw, isFetching: isAccountsFetching } = useGetMetricsProfilesQuery();
-  const accountProfiles = useMemo(
-    () => (accountProfilesRaw ?? []).filter((profile) => profile.provider === DEFAULT_PROVIDER),
-    [accountProfilesRaw],
-  );
-  const resolvedProfile = useMemo(
-    () => fixedProfile ?? activeProfile ?? accountProfiles?.[0]?.profile ?? null,
-    [fixedProfile, activeProfile, accountProfiles],
-  );
-  const countersQueryArgs = resolvedProfile
-    ? { provider: DEFAULT_PROVIDER, profile: resolvedProfile, pageNumber: 0, pageSize: 100 }
-    : skipToken;
-  const { data: countersData, isFetching: isCountersFetching } = useGetMetricsCountersQuery(countersQueryArgs);
-  const counters = countersData?.content ?? [];
   const [loadStatistics, { isFetching: isStatisticsLoading }] = useLazyGetMetricsStatisticsQuery();
-
-  const counterOptions = useMemo(
-    () =>
-      counters.map((counter) => ({
-        value: counter.counterId,
-        label: counter.siteUrl ? `${counter.counterId} · ${counter.siteUrl}` : counter.counterId,
-      })),
-    [counters],
-  );
+  const {
+    resolvedProfile,
+    resolvedCounterId,
+    profileOptions,
+    counterOptions: counterSelectOptions,
+    isProfilesFetching: isAccountsFetching,
+    isCountersFetching,
+  } = useMetricsSelectOptions({
+    activeProfile,
+    fixedProfile: fixedProfile ?? null,
+    fixedProvider: DEFAULT_PROVIDER,
+    activeCounterId: counterId,
+  });
+  const effectiveCounterId = resolvedCounterId || counterId;
 
   const handleProfileChange = (value: string) => {
     setActiveProfile(value || null);
@@ -62,7 +76,7 @@ export const ViewCounterStatistics = ({ fixedProfile }: ActionsSectionViewCounte
   };
 
   const handleStatistics = async () => {
-    if (!counterId) {
+    if (!effectiveCounterId) {
       showToast({ variant: "error", message: "Выберите счетчик." });
       return;
     }
@@ -72,7 +86,7 @@ export const ViewCounterStatistics = ({ fixedProfile }: ActionsSectionViewCounte
     }
     try {
       const response = await loadStatistics({
-        counterId,
+        counterId: effectiveCounterId,
         provider: DEFAULT_PROVIDER,
         profile: resolvedProfile,
         date1,
@@ -85,67 +99,55 @@ export const ViewCounterStatistics = ({ fixedProfile }: ActionsSectionViewCounte
   };
 
   return (
-    <Stack>
+    <FormStack>
       <FormCard>
         <FormRow>
           <FormFields>
             {!fixedProfile && (
               <FormField>
-                <Label>Профиль Метрики</Label>
-                <Select
+                <FieldLabel>Профиль Метрики</FieldLabel>
+                <SelectControl
                   value={resolvedProfile ?? ""}
-                  onChange={(event) => handleProfileChange(event.target.value)}
+                  onValueChange={handleProfileChange}
                   disabled={isAccountsFetching}
-                >
-                  <option value="">Выберите профиль</option>
-                  {(accountProfiles ?? []).map((profile) => (
-                    <option key={profile.profile} value={profile.profile}>
-                      {profile.profile}
-                    </option>
-                  ))}
-                </Select>
+                  options={profileOptions}
+                  placeholder="Выберите профиль"
+                />
               </FormField>
             )}
             <FormField>
-              <Label>Счетчик</Label>
-              <Select
-                 value={counterId}
-                 onChange={(event) => setCounterId(event.target.value)}
-                 disabled={isCountersFetching}
-              >
-                <option value="">Выберите счетчик</option>
-                {counterOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </Select>
+              <FieldLabel>Счетчик</FieldLabel>
+              <SelectControl
+                value={effectiveCounterId}
+                onValueChange={setCounterId}
+                disabled={isCountersFetching}
+                options={counterSelectOptions}
+                placeholder="Выберите счетчик"
+              />
             </FormField>
             <FormField>
-              <Label>Дата начала</Label>
-              <Input type="date" value={date1} onChange={(event) => setDate1(event.target.value)} />
+              <FieldLabel>Дата начала</FieldLabel>
+              <DateInput value={date1} onChange={(event) => setDate1(event.target.value)} />
             </FormField>
             <FormField>
-              <Label>Дата конца</Label>
-              <Input type="date" value={date2} onChange={(event) => setDate2(event.target.value)} />
+              <FieldLabel>Дата конца</FieldLabel>
+              <DateInput value={date2} onChange={(event) => setDate2(event.target.value)} />
             </FormField>
           </FormFields>
-          <Actions>
-            <ActionButton type="button" onClick={handleStatistics} disabled={isStatisticsLoading}>
+          <FormActions>
+            <Button type="button" variant="primary" onClick={handleStatistics} disabled={isStatisticsLoading}>
               {isStatisticsLoading ? "Загрузка..." : "Показать"}
-            </ActionButton>
-          </Actions>
+            </Button>
+          </FormActions>
         </FormRow>
       </FormCard>
       <ResultCard>
         {isStatisticsLoading ? (
-          <EmptyState>
-            <Placeholder>Загрузка статистики...</Placeholder>
-          </EmptyState>
+          <ResultLoader label="Загрузка статистики..." />
         ) : statistics === null ? (
-          <EmptyState>
-            <Placeholder>Нет данных для отображения.</Placeholder>
-          </EmptyState>
+          <CenteredState>
+            <PlaceholderText>Нет данных для отображения.</PlaceholderText>
+          </CenteredState>
         ) : (
           <>
             <StatisticsSection>
@@ -207,7 +209,7 @@ export const ViewCounterStatistics = ({ fixedProfile }: ActionsSectionViewCounte
           </>
         )}
       </ResultCard>
-    </Stack>
+    </FormStack>
   );
 };
 
@@ -232,7 +234,7 @@ const StatisticsTable = ({ headers, rows }: { headers: string[]; rows: Array<Arr
           ))}
           {rows.length === 0 && (
             <TableRow>
-              <TableCell colSpan={headers.length}>Нет данных</TableCell>
+              <TableCell colSpan={headers.length}>Нет данных для отображения.</TableCell>
             </TableRow>
           )}
         </TableBody>
@@ -241,108 +243,6 @@ const StatisticsTable = ({ headers, rows }: { headers: string[]; rows: Array<Arr
   );
 };
 
-const Stack = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-`;
-
-const FormCard = styled.div`
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  background: #ffffff;
-`;
-
-const ResultCard = styled.div`
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  background: #ffffff;
-  min-height: 160px;
-`;
-
-const FormRow = styled.div`
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 16px;
-  align-items: flex-end;
-  overflow-x: auto;
-  padding-bottom: 4px;
-`;
-
-const FormFields = styled.div`
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 12px;
-  flex: 0 1 auto;
-  align-items: flex-end;
-  justify-content: flex-start;
-`;
-
-const FormField = styled.label`
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  flex: 0 1 300px;
-  min-width: 220px;
-  max-width: 300px;
-`;
-
-const Label = styled.span`
-  font-size: 14px;
-  color: #374151;
-`;
-
-const Input = styled.input`
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-size: 14px;
-  width: 100%;
-  max-width: 300px;
-`;
-
-const Select = styled.select`
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-size: 14px;
-  width: 100%;
-  max-width: 300px;
-`;
-
-const Placeholder = styled.div`
-  color: #6b7280;
-  font-size: 14px;
-`;
-
-const EmptyState = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  flex: 1;
-`;
-
-const Actions = styled.div`
-  display: flex;
-  gap: 12px;
-  justify-content: flex-start;
-  align-items: flex-end;
-  flex: 0 0 auto;
-`;
-
-const ActionButton = styled(Button)`
-  font-weight: 600;
-  box-shadow: 0 10px 18px rgba(37, 99, 235, 0.2);
-`;
 
 const StatisticsSection = styled.section`
   display: flex;
@@ -361,11 +261,11 @@ const StatisticsTitle = styled.h3`
   margin: 0;
   font-size: 14px;
   font-weight: 600;
-  color: #111827;
+  color: ${({ theme }) => theme.tokens.color.textPrimary};
 `;
 
 const Hint = styled.p`
   margin: 0;
   font-size: 12px;
-  color: #6b7280;
+  color: ${({ theme }) => theme.tokens.color.textMuted};
 `;

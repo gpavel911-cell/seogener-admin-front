@@ -3,18 +3,17 @@ import { baseApi } from "@shared/store";
 import type {
   WebmasterApiResponse,
   WebmasterHostCreateRequest,
-  WebmasterHostDetailsDto,
   WebmasterHostVerifyDnsRequest,
   WebmasterHostVerifyDnsResponse,
   WebmasterHostListRequest,
   WebmasterHostsListResponse,
+  WebmasterHostOptionDto,
   WebmasterSearchEventHistoryPointDto,
   WebmasterSearchEventsHistoryRequest,
   WebmasterPopularQueryDto,
   WebmasterSearchQueriesPopularRequest,
   WebmasterProfileDto,
   WebmasterSearchQueriesHistoryRequest,
-  WebmasterSearchQueryHistoryRequest,
   WebmasterSearchQueryStatisticsPointDto,
 } from "./types";
 
@@ -38,9 +37,10 @@ export const webmasterApi = baseApi.injectEndpoints({
         params: { provider, profile, pageNumber, pageSize },
       }),
     }),
-    getWebmasterHostDetails: builder.query<WebmasterHostDetailsDto, number>({
-      query: (id) => ({
-        url: API_ROUTES.WEBMASTER.GET_WEBMASTER_HOST_DETAILS(id),
+    getWebmasterHostOptions: builder.query<WebmasterHostOptionDto[], { provider: WebmasterHostListRequest["provider"]; profile: string }>({
+      query: ({ provider, profile }) => ({
+        url: API_ROUTES.WEBMASTER.GET_WEBMASTER_HOST_OPTIONS,
+        params: { provider, profile },
       }),
     }),
     createWebmasterHost: builder.mutation<WebmasterApiResponse, WebmasterHostCreateRequest>({
@@ -75,12 +75,6 @@ export const webmasterApi = baseApi.injectEndpoints({
         params,
       }),
     }),
-    getWebmasterSearchQueryHistory: builder.query<WebmasterApiResponse, WebmasterSearchQueryHistoryRequest>({
-      query: ({ hostId, queryId, ...params }) => ({
-        url: API_ROUTES.WEBMASTER.GET_WEBMASTER_SEARCH_QUERY_HISTORY(hostId, queryId),
-        params,
-      }),
-    }),
   }),
 });
 
@@ -88,11 +82,10 @@ export const {
   useGetWebmasterProfilesQuery,
   useSyncWebmasterHostsMutation,
   useGetWebmasterHostsQuery,
-  useGetWebmasterHostDetailsQuery,
+  useGetWebmasterHostOptionsQuery,
   useCreateWebmasterHostMutation,
   useVerifyWebmasterHostDnsMutation,
   useLazyGetWebmasterPopularQueriesQuery,
   useLazyGetWebmasterSearchEventsHistoryQuery,
   useLazyGetWebmasterSearchQueriesHistoryQuery,
-  useLazyGetWebmasterSearchQueryHistoryQuery,
 } = webmasterApi;

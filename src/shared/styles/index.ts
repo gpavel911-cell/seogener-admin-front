@@ -1,1 +1,1 @@
-export {};
+export { appTheme, tokens } from "./theme";

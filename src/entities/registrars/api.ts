@@ -5,9 +5,9 @@ import type {
   CreateARecordResponse,
   CreateTxtRecordRequest,
   CreateTxtRecordResponse,
-  RegistrarDomainDetailsDto,
   RegistrarDomainListRequest,
   RegistrarDomainListResponse,
+  RegistrarDomainOptionDto,
   RegistrarDomainProfileDto,
   RegistrarProviderType,
   ListDnsRecordsRequest,
@@ -42,9 +42,10 @@ export const domainsApi = baseApi.injectEndpoints({
         };
       },
     }),
-    getRegistrarDomainDetails: builder.query<RegistrarDomainDetailsDto, number>({
-      query: (id) => ({
-        url: API_ROUTES.REGISTRARS.GET_REGISTRAR_DOMAIN_DETAILS(id),
+    getRegistrarDomainOptions: builder.query<RegistrarDomainOptionDto[], { registrar: RegistrarProviderType; profile: string }>({
+      query: ({ registrar, profile }) => ({
+        url: API_ROUTES.REGISTRARS.GET_REGISTRAR_DOMAIN_OPTIONS,
+        params: { registrar, profile },
       }),
     }),
     getRegistrarDnsRecords: builder.query<ListDnsRecordsResponse, ListDnsRecordsRequest>({
@@ -74,8 +75,8 @@ export const {
   useGetRegistrarProfilesQuery,
   useSyncRegistrarDomainsMutation,
   useGetRegistrarDomainsQuery,
+  useGetRegistrarDomainOptionsQuery,
   useLazyGetRegistrarDomainsQuery,
-  useGetRegistrarDomainDetailsQuery,
   useLazyGetRegistrarDnsRecordsQuery,
   useCreateRegistrarARecordMutation,
   useCreateRegistrarTxtRecordMutation,

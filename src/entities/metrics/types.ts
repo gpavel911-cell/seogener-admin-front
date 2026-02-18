@@ -37,26 +37,18 @@ export type MetricsCounterDto = {
   siteUrl?: string | null;
   status?: MetricsCounterStatus | null;
   presence?: MetricsCounterPresence | null;
-  lastSeenAt?: string | null;
-  updatedAt: string;
-};
-
-export type MetricsCounterDetailsDto = {
-  id: number;
-  provider: MetricsProviderType;
-  profile: string;
-  counterId: string;
-  counterName?: string | null;
-  siteUrl?: string | null;
-  status?: MetricsCounterStatus | null;
-  presence?: MetricsCounterPresence | null;
-  createdAt: string;
+  createdAt?: string | null;
   lastSeenAt?: string | null;
   updatedAt: string;
   additionalInfoJson?: Record<string, unknown> | null;
 };
 
 export type MetricsCountersListResponse = Page<MetricsCounterDto>;
+
+export type MetricsCounterOptionDto = {
+  value: string;
+  label: string;
+};
 
 export type MetricsCounterListRequest = {
   pageNumber: number;

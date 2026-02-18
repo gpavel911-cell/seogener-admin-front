@@ -41,7 +41,7 @@ export const ActionsSidebar = ({ sections, activeAction, onSelect }: ActionsSide
 const SidebarStack = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
   width: 250px;
 `;
 
@@ -49,26 +49,38 @@ const Sidebar = styled.aside`
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 16px;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
+  padding: 14px;
+  border: 1px solid ${({ theme }) => theme.tokens.color.borderSubtle};
+  border-radius: 10px;
   background: #ffffff;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
 `;
 
 const SidebarTitle = styled.h2`
-  margin: 0 0 8px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #111827;
+  margin: 0 0 2px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 500;
+  color: ${({ theme }) => theme.tokens.color.accentText};
 `;
 
 const ActionButton = styled.button<{ $active?: boolean }>`
-  padding: 10px 12px;
+  padding: 9px 10px;
   text-align: left;
-  border-radius: 8px;
-  border: 1px solid ${({ $active }) => ($active ? "#2563eb" : "#e5e7eb")};
-  background: ${({ $active }) => ($active ? "#eff6ff" : "#ffffff")};
-  color: ${({ $active }) => ($active ? "#1d4ed8" : "#111827")};
-  font-size: 14px;
+  border-radius: ${({ theme }) => theme.tokens.radius.sm};
+  border: 1px solid ${({ theme, $active }) => ($active ? "rgba(37, 99, 235, 0.36)" : theme.tokens.color.borderSubtle)};
+  background: ${({ theme, $active }) =>
+    $active ? "linear-gradient(180deg, rgba(37, 99, 235, 0.16) 0%, rgba(37, 99, 235, 0.08) 100%)" : theme.tokens.color.bgSurface};
+  color: ${({ theme, $active }) => ($active ? theme.tokens.color.accentText : theme.tokens.color.textPrimary)};
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+
+  &:hover {
+    background: ${({ theme }) => theme.tokens.color.accentMuted};
+    border-color: ${({ theme }) => theme.tokens.color.borderStrong};
+    transform: translateX(1px);
+  }
 `;

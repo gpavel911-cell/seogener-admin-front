@@ -40,24 +40,17 @@ export type WebmasterHostDto = {
   hostUrl?: string | null;
   verified?: boolean | null;
   presence: WebmasterHostPresence;
+  createdAt?: string | null;
   lastSeenAt: string;
   updatedAt: string;
+  additionalInfoJson?: Record<string, unknown> | null;
 };
 
 export type WebmasterHostsListResponse = Page<WebmasterHostDto>;
 
-export type WebmasterHostDetailsDto = {
-  id: number;
-  provider: WebmasterProviderType;
-  profile: string;
-  hostId: string;
-  hostUrl?: string | null;
-  verified?: boolean | null;
-  presence: WebmasterHostPresence;
-  createdAt: string;
-  lastSeenAt: string;
-  updatedAt: string;
-  additionalInfoJson?: Record<string, unknown> | null;
+export type WebmasterHostOptionDto = {
+  value: string;
+  label: string;
 };
 
 export type WebmasterHostCreateRequest = {
@@ -108,10 +101,6 @@ export type WebmasterSearchQueriesHistoryRequest = {
   dateFrom?: string;
   dateTo?: string;
   deviceTypeIndicator?: string;
-};
-
-export type WebmasterSearchQueryHistoryRequest = WebmasterSearchQueriesHistoryRequest & {
-  queryId: string;
 };
 
 export type WebmasterSearchQueryStatisticsPointDto = {

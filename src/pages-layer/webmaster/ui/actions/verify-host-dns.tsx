@@ -1,25 +1,36 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { skipToken } from "@reduxjs/toolkit/query";
 import styled from "styled-components";
 import {
   useCreateRegistrarTxtRecordMutation,
-  useGetRegistrarProfilesQuery,
   useLazyGetRegistrarDnsRecordsQuery,
 } from "@entities/registrars/api";
 import {
-  getRegistrarProviderTypeLabel,
   RegistrarProviderType,
 } from "@entities/registrars/types";
 import {
-  useGetWebmasterHostsQuery,
-  useGetWebmasterProfilesQuery,
   useVerifyWebmasterHostDnsMutation,
 } from "@entities/webmaster/api";
-import { type WebmasterHostDto, type WebmasterHostVerifyDnsResponse, WebmasterProviderType } from "@entities/webmaster/types";
-import { buildRegistrarGroups } from "@shared/lib/registrars";
-import { Button, useToast } from "@shared/ui";
+import { type WebmasterHostVerifyDnsResponse, WebmasterProviderType } from "@entities/webmaster/types";
+import { useRegistrarSelectOptions } from "@entities/registrars/select-options";
+import { useWebmasterSelectOptions } from "@entities/webmaster/select-options";
+import {
+  Button,
+  CenteredState,
+  FieldLabel,
+  FormActions,
+  FormCard,
+  FormField,
+  FormFields,
+  FormRow,
+  FormStack,
+  PlaceholderText,
+  ResultLoader,
+  ResultCard,
+  SelectControl,
+  useToast,
+} from "@shared/ui";
 
 const DEFAULT_PROVIDER = WebmasterProviderType.YANDEX_WEBMASTER;
 const ROOT_SUBDOMAIN = "@";
@@ -47,69 +58,39 @@ export const VerifyHostDns = ({ fixedProfile }: ActionsSectionVerifyHostDnsProps
   const [isPollingStatus, setIsPollingStatus] = useState(false);
   const [pollAttempt, setPollAttempt] = useState(0);
 
-  const { data: profilesRaw, isFetching: isProfilesFetching } = useGetWebmasterProfilesQuery();
-  const profiles = useMemo(
-    () => (profilesRaw ?? []).filter((profile) => profile.provider === DEFAULT_PROVIDER),
-    [profilesRaw],
-  );
-  const resolvedProfile = useMemo(
-    () => fixedProfile ?? activeProfile ?? profiles?.[0]?.profile ?? null,
-    [fixedProfile, activeProfile, profiles],
-  );
+  const {
+    resolvedProfile,
+    profileOptions: webmasterProfileOptions,
+    hostOptions: hostSelectOptions,
+    resolvedHostId: resolvedHostEntityId,
+    isProfilesFetching,
+    isHostsFetching,
+  } = useWebmasterSelectOptions({
+    activeProfile,
+    fixedProfile: fixedProfile ?? null,
+    fixedProvider: DEFAULT_PROVIDER,
+    activeHostId: selectedHostId,
+  });
 
-  const hostsQueryArgs = resolvedProfile
-    ? { provider: DEFAULT_PROVIDER, profile: resolvedProfile, pageNumber: 0, pageSize: 500 }
-    : skipToken;
-  const { data: hostsData, isFetching: isHostsFetching } = useGetWebmasterHostsQuery(hostsQueryArgs);
-  const hosts = useMemo(() => hostsData?.content ?? [], [hostsData?.content]);
-  const hostOptions = useMemo(
-    () => hosts.filter((host) => host.hostId && host.hostId.trim().length > 0),
-    [hosts],
-  );
+  const {
+    registrarGroups,
+    resolvedRegistrar,
+    resolvedProfile: resolvedRegistrarProfile,
+    registrarOptions,
+    profileOptions: registrarProfileOptions,
+    isProfilesFetching: isRegistrarProfilesFetching,
+  } = useRegistrarSelectOptions({
+    activeRegistrar,
+    activeProfile: activeRegistrarProfile,
+    preferredRegistrar: RegistrarProviderType.REG_RU,
+    includeDomains: false,
+  });
 
-  const { data: registrarProfilesRaw, isFetching: isRegistrarProfilesFetching } = useGetRegistrarProfilesQuery();
-  const registrarGroups = useMemo(
-    () => buildRegistrarGroups(registrarProfilesRaw ?? []),
-    [registrarProfilesRaw],
-  );
-  const fallbackRegistrarSelection = useMemo(() => {
-    if (!registrarGroups.length) {
-      return { registrar: null, profile: null };
-    }
-    const regRuGroup = registrarGroups.find((group) => group.registrar === RegistrarProviderType.REG_RU);
-    const firstGroup = regRuGroup ?? registrarGroups[0];
-    return {
-      registrar: firstGroup.registrar,
-      profile: firstGroup.profiles[0] ?? null,
-    };
-  }, [registrarGroups]);
-  const resolvedRegistrar = activeRegistrar ?? fallbackRegistrarSelection.registrar;
-  const profileOptions = useMemo(() => {
-    if (!resolvedRegistrar) {
-      return [];
-    }
-    return registrarGroups.find((group) => group.registrar === resolvedRegistrar)?.profiles ?? [];
-  }, [registrarGroups, resolvedRegistrar]);
-  const resolvedRegistrarProfile = activeRegistrarProfile ?? fallbackRegistrarSelection.profile;
-
-  const resolvedHost = useMemo(() => {
-    if (!hostOptions.length) {
-      return null;
-    }
-    if (selectedHostId) {
-      const selected = hostOptions.find((item) => item.hostId === selectedHostId);
-      if (selected) {
-        return selected;
-      }
-    }
-    return hostOptions[0] ?? null;
-  }, [hostOptions, selectedHostId]);
-  const resolvedHostEntityId = resolvedHost?.hostId ?? "";
   const resolvedDomain = useMemo(
-    () => normalizeDomain(extractWebsite(resolvedHost?.hostUrl, resolvedHost?.hostId)),
-    [resolvedHost?.hostId, resolvedHost?.hostUrl],
+    () => normalizeDomain(extractWebsite(undefined, resolvedHostEntityId)),
+    [resolvedHostEntityId],
   );
-  const resolvedHostId = resolvedHost?.hostId ?? "";
+  const resolvedHostId = resolvedHostEntityId;
   const result = useMemo(() => {
     if (!resolvedProfile || !resolvedHostId) {
       return null;
@@ -169,7 +150,7 @@ export const VerifyHostDns = ({ fixedProfile }: ActionsSectionVerifyHostDnsProps
     if (!isPollingStatus) {
       return;
     }
-    if (!resolvedProfile || !resolvedDomain || !resolvedHostId || !resolvedHost) {
+    if (!resolvedProfile || !resolvedDomain || !resolvedHostId) {
       return;
     }
     if (isVerified || pollAttempt >= POLLING_ATTEMPTS_LIMIT) {
@@ -181,7 +162,6 @@ export const VerifyHostDns = ({ fixedProfile }: ActionsSectionVerifyHostDnsProps
           provider: DEFAULT_PROVIDER,
           profile: resolvedProfile,
           hostId: resolvedHostId,
-          hostUrl: resolvedHost.hostUrl ?? undefined,
           startVerification: false,
         }).unwrap();
 
@@ -214,7 +194,6 @@ export const VerifyHostDns = ({ fixedProfile }: ActionsSectionVerifyHostDnsProps
     isVerified,
     pollAttempt,
     resolvedDomain,
-    resolvedHost,
     resolvedHostId,
     resolvedProfile,
     showToast,
@@ -230,7 +209,7 @@ export const VerifyHostDns = ({ fixedProfile }: ActionsSectionVerifyHostDnsProps
       showToast({ variant: "error", message: "Выберите домен." });
       return;
     }
-    if (!resolvedHostId || !resolvedHost) {
+    if (!resolvedHostId) {
       showToast({ variant: "error", message: "Для выбранного домена нет площадки в Вебмастере. Сначала добавьте сайт." });
       return;
     }
@@ -239,7 +218,6 @@ export const VerifyHostDns = ({ fixedProfile }: ActionsSectionVerifyHostDnsProps
         provider: DEFAULT_PROVIDER,
         profile: resolvedProfile,
         hostId: resolvedHostId,
-        hostUrl: resolvedHost?.hostUrl ?? undefined,
         startVerification: false,
       }).unwrap();
 
@@ -289,7 +267,7 @@ export const VerifyHostDns = ({ fixedProfile }: ActionsSectionVerifyHostDnsProps
   };
 
   const handleStartVerification = async () => {
-    if (!resolvedProfile || !resolvedDomain || !resolvedHostId || !resolvedHost) {
+    if (!resolvedProfile || !resolvedDomain || !resolvedHostId) {
       showToast({ variant: "error", message: "Сначала выберите профиль, домен и площадку Вебмастера." });
       return;
     }
@@ -298,7 +276,6 @@ export const VerifyHostDns = ({ fixedProfile }: ActionsSectionVerifyHostDnsProps
         provider: DEFAULT_PROVIDER,
         profile: resolvedProfile,
         hostId: resolvedHostId,
-        hostUrl: resolvedHost.hostUrl ?? undefined,
         startVerification: true,
       }).unwrap();
 
@@ -338,107 +315,91 @@ export const VerifyHostDns = ({ fixedProfile }: ActionsSectionVerifyHostDnsProps
     result?.verificationUin
       && resolvedProfile
       && resolvedDomain
-      && resolvedHostId
-      && resolvedHost,
+      && resolvedHostId,
   );
   const disableCreateTxt = !canCreateTxt || isVerified || resolvedTxtPresence === true || isTxtCreating || isTxtChecking;
   const disableStartVerification = !canStartVerification || isVerifying || isPollingStatus || isVerified || resolvedTxtPresence !== true;
 
   return (
-    <Stack>
+    <FormStack>
       <FormCard>
         <FormRow>
           <FormFields>
             {!fixedProfile && (
               <FormField>
-                <Label>Профиль Вебмастера</Label>
-                <Select
+                <FieldLabel>Профиль Вебмастера</FieldLabel>
+                <SelectControl
                   value={resolvedProfile ?? ""}
-                  onChange={(event) => setActiveProfile(event.target.value)}
+                  onValueChange={setActiveProfile}
                   disabled={isProfilesFetching}
-                >
-                  <option value="">Выберите профиль</option>
-                  {(profiles ?? []).map((profile) => (
-                    <option key={profile.profile} value={profile.profile}>
-                      {profile.profile}
-                    </option>
-                  ))}
-                </Select>
+                  options={webmasterProfileOptions}
+                  placeholder="Выберите профиль"
+                />
               </FormField>
             )}
             <FormField>
-              <Label>Регистратор</Label>
-              <Select
+              <FieldLabel>Регистратор</FieldLabel>
+              <SelectControl
                 value={resolvedRegistrar ?? ""}
-                onChange={(event) => {
-                  const nextRegistrar = event.target.value as RegistrarProviderType;
+                onValueChange={(value) => {
+                  const nextRegistrar = value as RegistrarProviderType;
                   setActiveRegistrar(nextRegistrar || null);
                   const nextProfiles = registrarGroups.find((group) => group.registrar === nextRegistrar)?.profiles ?? [];
                   setActiveRegistrarProfile(nextProfiles[0] ?? null);
                 }}
                 disabled={isRegistrarProfilesFetching}
-              >
-                <option value="">Выберите регистратора</option>
-                {registrarGroups.map((group) => (
-                  <option key={group.registrar} value={group.registrar}>
-                    {getRegistrarProviderTypeLabel(group.registrar)}
-                  </option>
-                ))}
-              </Select>
+                options={registrarOptions}
+                placeholder="Выберите регистратора"
+              />
             </FormField>
             <FormField>
-              <Label>Профиль регистратора</Label>
-              <Select
+              <FieldLabel>Профиль регистратора</FieldLabel>
+              <SelectControl
                 value={resolvedRegistrarProfile ?? ""}
-                onChange={(event) => {
-                  setActiveRegistrarProfile(event.target.value || null);
+                onValueChange={(value) => {
+                  setActiveRegistrarProfile(value || null);
                 }}
                 disabled={!resolvedRegistrar}
-              >
-                <option value="">Выберите профиль</option>
-                {profileOptions.map((profile) => (
-                  <option key={profile} value={profile}>
-                    {profile}
-                  </option>
-                ))}
-              </Select>
+                options={registrarProfileOptions}
+                placeholder="Выберите профиль"
+              />
             </FormField>
             <FormField>
-              <Label>Сайт</Label>
-              <Select
+              <FieldLabel>Сайт</FieldLabel>
+              <SelectControl
                 value={resolvedHostEntityId}
-                onChange={(event) => {
-                  setSelectedHostId(event.target.value);
+                onValueChange={(value) => {
+                  setSelectedHostId(value);
                   setResultBySelection(null);
                   setIsPollingStatus(false);
                   setPollAttempt(0);
                 }}
                 disabled={!resolvedProfile || isHostsFetching}
-              >
-                {!hostOptions.length && <option value="">Нет сайтов в Вебмастере</option>}
-                {hostOptions.map((item) => (
-                  <option key={item.hostId} value={item.hostId}>
-                    {extractWebsite(item.hostUrl, item.hostId) ?? item.hostUrl ?? item.hostId}
-                  </option>
-                ))}
-              </Select>
+                options={hostSelectOptions}
+                placeholder={hostSelectOptions.length ? "Выберите сайт" : "Нет сайтов в Вебмастере"}
+              />
             </FormField>
           </FormFields>
-          <Actions>
-            <ActionButton
+          <FormActions>
+            <Button
               type="button"
+              variant="primary"
               onClick={handleLoadVerificationCode}
               disabled={isVerifying || isPollingStatus || isHostsFetching}
             >
               Проверить статус
-            </ActionButton>
-          </Actions>
+            </Button>
+          </FormActions>
         </FormRow>
       </FormCard>
 
       <ResultCard>
-        {!result ? (
-          <Placeholder>Сначала нажмите Проверить статус.</Placeholder>
+        {isVerifying || isTxtCreating || isTxtChecking || isPollingStatus ? (
+          <ResultLoader label="Проверка данных..." />
+        ) : !result ? (
+          <CenteredState>
+            <PlaceholderText>Нет данных для отображения.</PlaceholderText>
+          </CenteredState>
         ) : (
           <ResultGrid>
             <InfoRow>
@@ -470,28 +431,29 @@ export const VerifyHostDns = ({ fixedProfile }: ActionsSectionVerifyHostDnsProps
                     : "отсутствует"}
               </InfoValue>
               <ActionCell>
-                <ActionButton type="button" onClick={handleCreateTxt} disabled={disableCreateTxt}>
+                <Button type="button" variant="primary" onClick={handleCreateTxt} disabled={disableCreateTxt}>
                   {isTxtCreating ? "Сохранение..." : "Создать TXT-запись"}
-                </ActionButton>
+                </Button>
               </ActionCell>
             </InfoRow>
             <InfoRow>
               <InfoLabel>Статус</InfoLabel>
               <InfoValue>{result.verificationState}</InfoValue>
               <ActionCell>
-                <ActionButton
+                <Button
                   type="button"
+                  variant="primary"
                   onClick={handleStartVerification}
                   disabled={disableStartVerification}
                 >
                   {isVerifying || isPollingStatus ? "Проверка..." : "Запустить проверку"}
-                </ActionButton>
+                </Button>
               </ActionCell>
             </InfoRow>
           </ResultGrid>
         )}
       </ResultCard>
-    </Stack>
+    </FormStack>
   );
 };
 
@@ -550,97 +512,6 @@ const hasMatchingTxtRecord = (
   );
 };
 
-const Stack = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-`;
-
-const FormCard = styled.div`
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  background: #ffffff;
-`;
-
-const FormRow = styled.div`
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 16px;
-  align-items: flex-end;
-  overflow-x: auto;
-  padding-bottom: 4px;
-`;
-
-const FormFields = styled.div`
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 12px;
-  flex: 0 1 auto;
-  align-items: flex-end;
-  justify-content: flex-start;
-  overflow-x: auto;
-  padding-bottom: 4px;
-`;
-
-const FormField = styled.label`
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  flex: 0 1 300px;
-  min-width: 220px;
-  max-width: 300px;
-`;
-
-const Label = styled.span`
-  font-size: 14px;
-  color: #374151;
-`;
-
-const Select = styled.select`
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-size: 14px;
-  width: 100%;
-  max-width: 300px;
-`;
-
-const Actions = styled.div`
-  display: flex;
-  gap: 12px;
-  justify-content: flex-start;
-  align-items: center;
-  flex-wrap: wrap;
-`;
-
-const ActionButton = styled(Button)`
-  font-weight: 600;
-  box-shadow: 0 10px 18px rgba(37, 99, 235, 0.2);
-`;
-
-const ResultCard = styled.div`
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 16px;
-  background: #ffffff;
-  min-height: 160px;
-`;
-
-const Placeholder = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 128px;
-  width: 100%;
-  color: #6b7280;
-  font-size: 14px;
-  text-align: center;
-`;
-
 const ResultGrid = styled.div`
   display: grid;
   grid-template-columns: 130px max-content max-content;
@@ -669,13 +540,13 @@ const InfoRow = styled.div`
 `;
 
 const InfoLabel = styled.span`
-  color: #6b7280;
+  color: ${({ theme }) => theme.tokens.color.textMuted};
   font-size: 13px;
   white-space: nowrap;
 `;
 
 const InfoValue = styled.span`
-  color: #111827;
+  color: ${({ theme }) => theme.tokens.color.textPrimary};
   font-size: 14px;
   overflow-wrap: anywhere;
 `;
@@ -684,7 +555,7 @@ const CodeValue = styled.code`
   display: inline-block;
   font-family: Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   font-size: 13px;
-  color: #111827;
+  color: ${({ theme }) => theme.tokens.color.textPrimary};
   background: #f9fafb;
   border: 1px solid #e5e7eb;
   border-radius: 6px;

@@ -1,19 +1,33 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { skipToken } from "@reduxjs/toolkit/query";
 import styled from "styled-components";
 import {
-  useGetWebmasterHostsQuery,
-  useGetWebmasterProfilesQuery,
   useLazyGetWebmasterSearchEventsHistoryQuery,
 } from "@entities/webmaster/api";
+import { useWebmasterSelectOptions } from "@entities/webmaster/select-options";
 import {
-  type WebmasterHostDto,
   type WebmasterSearchEventHistoryPointDto,
   WebmasterProviderType,
 } from "@entities/webmaster/types";
-import { Button, useToast } from "@shared/ui";
+import {
+  Button,
+  CenteredState,
+  DateInput,
+  FieldLabel,
+  FormActions,
+  FormCard,
+  FormField,
+  FormFields,
+  FormRow,
+  FormStack,
+  PlaceholderText,
+  ResultLoader,
+  ResultCard,
+  SelectControl,
+  useToast,
+} from "@shared/ui";
+import { buildAxisIndexes, buildYAxisLabels, formatChartDate } from "@shared/lib/charts";
 
 const DEFAULT_PROVIDER = WebmasterProviderType.YANDEX_WEBMASTER;
 const DEFAULT_RANGE_DAYS = 7;
@@ -47,42 +61,27 @@ export const SearchUrls = ({ fixedProfile }: ActionsSectionWebmasterSearchUrlsPr
     dateTo: string;
   } | null>(null);
 
-  const { data: profilesRaw, isFetching: isProfilesFetching } = useGetWebmasterProfilesQuery();
-  const profiles = useMemo(
-    () => (profilesRaw ?? []).filter((profile) => profile.provider === DEFAULT_PROVIDER),
-    [profilesRaw],
-  );
-  const resolvedProfile = useMemo(
-    () => fixedProfile ?? activeProfile ?? profiles?.[0]?.profile ?? null,
-    [fixedProfile, activeProfile, profiles],
-  );
+  const {
+    resolvedProfile,
+    profileOptions,
+    hostOptions,
+    resolvedHostId,
+    isProfilesFetching,
+    isHostsFetching,
+  } = useWebmasterSelectOptions({
+    activeProfile,
+    fixedProfile: fixedProfile ?? null,
+    fixedProvider: DEFAULT_PROVIDER,
+    activeHostId: hostId,
+  });
   const result = useMemo(
     () => (resolvedProfile && resultByProfile?.profile === resolvedProfile ? resultByProfile : null),
     [resolvedProfile, resultByProfile],
   );
-  const hostsQueryArgs = resolvedProfile
-    ? { provider: DEFAULT_PROVIDER, profile: resolvedProfile, pageNumber: 0, pageSize: 500 }
-    : skipToken;
-  const { data: hostsData, isFetching: isHostsFetching } = useGetWebmasterHostsQuery(hostsQueryArgs);
-  const hosts = useMemo(() => hostsData?.content ?? [], [hostsData?.content]);
-  const resolvedHostId = useMemo(() => {
-    if (!hosts.length) {
-      return "";
-    }
-    if (hostId && hosts.some((item) => item.hostId === hostId)) {
-      return hostId;
-    }
-    return hosts[0]?.hostId ?? "";
-  }, [hostId, hosts]);
   const rows = useMemo(
     () => (result ? buildRowsWithFullRange(result.data, result.dateFrom, result.dateTo) : []),
     [result],
   );
-  const maxValue = useMemo(() => {
-    const values = rows.flatMap((item) => [item.added ?? 0, item.removed ?? 0]);
-    const max = Math.max(0, ...values);
-    return max > 0 ? max : 1;
-  }, [rows]);
   const totals = useMemo(
     () =>
       rows.reduce(
@@ -130,100 +129,62 @@ export const SearchUrls = ({ fixedProfile }: ActionsSectionWebmasterSearchUrlsPr
   };
 
   return (
-    <Stack>
+    <FormStack>
       <FormCard>
         <FormRow>
           <FormFields>
             {!fixedProfile && (
               <FormField>
-                <Label>Профиль Вебмастера</Label>
-                <Select
+                <FieldLabel>Профиль Вебмастера</FieldLabel>
+                <SelectControl
                   value={resolvedProfile ?? ""}
-                  onChange={(event) => setActiveProfile(event.target.value)}
+                  onValueChange={setActiveProfile}
                   disabled={isProfilesFetching}
-                >
-                  <option value="">Выберите профиль</option>
-                  {(profiles ?? []).map((profile) => (
-                    <option key={profile.profile} value={profile.profile}>
-                      {profile.profile}
-                    </option>
-                  ))}
-                </Select>
+                  options={profileOptions}
+                  placeholder="Выберите профиль"
+                />
               </FormField>
             )}
             <FormField>
-              <Label>Сайт</Label>
-              <Select value={resolvedHostId} onChange={(event) => setHostId(event.target.value)} disabled={isHostsFetching}>
-                {!hosts.length && <option value="">Нет сайтов</option>}
-                {hosts.map((host) => (
-                  <option key={`${host.id}-${host.hostId}`} value={host.hostId}>
-                    {formatHostOptionLabel(host)}
-                  </option>
-                ))}
-              </Select>
+              <FieldLabel>Сайт</FieldLabel>
+              <SelectControl
+                value={resolvedHostId}
+                onValueChange={setHostId}
+                disabled={isHostsFetching}
+                options={hostOptions}
+                placeholder={hostOptions.length ? "Выберите сайт" : "Нет сайтов"}
+              />
             </FormField>
             <FormField>
-              <Label>Дата начала</Label>
-              <Input type="date" value={dateFrom} max={dateTo} onChange={(event) => setDateFrom(event.target.value)} />
+              <FieldLabel>Дата начала</FieldLabel>
+              <DateInput value={dateFrom} max={dateTo} onChange={(event) => setDateFrom(event.target.value)} />
             </FormField>
             <FormField>
-              <Label>Дата конца</Label>
-              <Input type="date" value={dateTo} min={dateFrom} onChange={(event) => setDateTo(event.target.value)} />
+              <FieldLabel>Дата конца</FieldLabel>
+              <DateInput value={dateTo} min={dateFrom} onChange={(event) => setDateTo(event.target.value)} />
             </FormField>
           </FormFields>
-          <Actions>
-            <ActionButton type="button" onClick={handleLoad} disabled={isFetching}>
+          <FormActions>
+            <Button type="button" variant="primary" onClick={handleLoad} disabled={isFetching}>
               {isFetching ? "Загрузка..." : "Показать"}
-            </ActionButton>
-          </Actions>
+            </Button>
+          </FormActions>
         </FormRow>
       </FormCard>
       <ResultCard>
-        {!result ? (
-          <Placeholder>Нет данных.</Placeholder>
+        {isFetching ? (
+          <ResultLoader label="Загрузка отчета..." />
+        ) : !result ? (
+          <CenteredState>
+            <PlaceholderText>Нет данных для отображения.</PlaceholderText>
+          </CenteredState>
         ) : rows.length === 0 ? (
-          <Placeholder>Нет данных по выбранному периоду.</Placeholder>
+          <CenteredState>
+            <PlaceholderText>Нет данных для отображения.</PlaceholderText>
+          </CenteredState>
         ) : (
           <ChartWrapper>
-            <Legend>
-              <LegendItem>
-                <LegendDot data-kind="added" />
-                Добавлено
-              </LegendItem>
-              <LegendItem>
-                <LegendDot data-kind="removed" />
-                Удалено
-              </LegendItem>
-            </Legend>
-            <ChartScroll>
-              <Bars $columns={rows.length}>
-                {rows.map((row) => {
-                  const added = row.added ?? 0;
-                  const removed = row.removed ?? 0;
-                  const addedHeight = added > 0 ? Math.max(2, Math.round((added / maxValue) * 100)) : 0;
-                  const removedHeight = removed > 0 ? Math.max(2, Math.round((removed / maxValue) * 100)) : 0;
-                  return (
-                    <DayGroup key={row.date}>
-                      <BarsPair>
-                        <Bar
-                          data-kind="added"
-                          data-value={formatMetricValue(added)}
-                          style={{ height: `${addedHeight}%` }}
-                          title={`${row.date}: Добавлено ${added}`}
-                        />
-                        <Bar
-                          data-kind="removed"
-                          data-value={formatMetricValue(removed)}
-                          style={{ height: `${removedHeight}%` }}
-                          title={`${row.date}: Удалено ${removed}`}
-                        />
-                      </BarsPair>
-                      <DayLabel>{formatDayLabel(row.date)}</DayLabel>
-                    </DayGroup>
-                  );
-                })}
-              </Bars>
-            </ChartScroll>
+            <SearchPagesBarsChart rows={rows} />
             <Totals>
               <TotalItem data-kind="added">Добавлено: {formatMetricValue(totals.added)}</TotalItem>
               <TotalItem data-kind="removed">Удалено: {formatMetricValue(totals.removed)}</TotalItem>
@@ -231,49 +192,11 @@ export const SearchUrls = ({ fixedProfile }: ActionsSectionWebmasterSearchUrlsPr
           </ChartWrapper>
         )}
       </ResultCard>
-    </Stack>
+    </FormStack>
   );
 };
 
-const formatHostOptionLabel = (host: WebmasterHostDto): string => {
-  const website = extractWebsite(host.hostUrl, host.hostId);
-  if (website) {
-    return website;
-  }
-  return host.hostId;
-};
-
-const extractWebsite = (hostUrl?: string | null, hostId?: string | null): string | null => {
-  if (hostUrl) {
-    try {
-      const parsed = new URL(hostUrl);
-      if (parsed.hostname) {
-        return parsed.hostname;
-      }
-    } catch {
-      const withoutProtocol = hostUrl.replace(/^https?:\/\//, "");
-      const firstPart = withoutProtocol.split("/")[0]?.trim();
-      if (firstPart) {
-        return firstPart;
-      }
-    }
-  }
-  if (hostId) {
-    const parts = hostId.split(":").filter(Boolean);
-    if (parts.length >= 2) {
-      return parts[1];
-    }
-    return hostId;
-  }
-  return null;
-};
-
-const formatDayLabel = (date: string): string => {
-  if (date.length >= 10) {
-    return `${date.slice(8, 10)}.${date.slice(5, 7)}`;
-  }
-  return date;
-};
+const formatDayLabel = formatChartDate;
 
 const formatMetricValue = (value: number): string => value.toLocaleString("ru-RU");
 
@@ -333,92 +256,168 @@ const parseDate = (value: string): Date | null => {
   return parsed;
 };
 
-const Stack = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-`;
+type SearchPagesBarsChartProps = {
+  rows: WebmasterSearchEventHistoryPointDto[];
+};
 
-const FormCard = styled.div`
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  background: #ffffff;
-`;
+type HoveredBar = {
+  rowIndex: number;
+  kind: "added" | "removed";
+};
 
-const FormRow = styled.div`
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 16px;
-  align-items: flex-end;
-  overflow-x: auto;
-  padding-bottom: 4px;
-`;
+const SearchPagesBarsChart = ({ rows }: SearchPagesBarsChartProps) => {
+  const [hovered, setHovered] = useState<HoveredBar | null>(null);
 
-const FormFields = styled.div`
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 12px;
-  flex: 0 1 auto;
-  align-items: flex-end;
-  justify-content: flex-start;
-`;
+  if (!rows.length) {
+    return null;
+  }
 
-const FormField = styled.label`
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  flex: 0 1 300px;
-  min-width: 220px;
-  max-width: 300px;
-`;
+  const width = 320;
+  const height = 110;
+  const padding = 10;
+  const plotWidth = width - padding * 2;
+  const plotHeight = height - padding * 2;
+  const maxValue = Math.max(1, ...rows.flatMap((item) => [item.added ?? 0, item.removed ?? 0]));
+  const yLabels = buildYAxisLabels(0, maxValue, 2, 5, (value) => formatMetricValue(Math.round(value)));
+  const slotWidth = plotWidth / rows.length;
+  const pairWidth = Math.max(5, Math.min(16, slotWidth * 0.75));
+  const barGap = 2;
+  const barWidth = Math.max(2, (pairWidth - barGap) / 2);
 
-const Label = styled.span`
-  font-size: 14px;
-  color: #374151;
-`;
+  const bars = rows.map((row, index) => {
+    const addedValue = Math.max(0, row.added ?? 0);
+    const removedValue = Math.max(0, row.removed ?? 0);
+    const addedHeight = maxValue > 0 ? (addedValue / maxValue) * plotHeight : 0;
+    const removedHeight = maxValue > 0 ? (removedValue / maxValue) * plotHeight : 0;
+    const pairStartX = padding + index * slotWidth + (slotWidth - (barWidth * 2 + barGap)) / 2;
+    return {
+      date: row.date,
+      added: {
+        value: addedValue,
+        x: pairStartX,
+        y: height - padding - addedHeight,
+        width: barWidth,
+        height: Math.max(addedHeight, addedValue > 0 ? 1 : 0),
+        centerX: pairStartX + barWidth / 2,
+      },
+      removed: {
+        value: removedValue,
+        x: pairStartX + barWidth + barGap,
+        y: height - padding - removedHeight,
+        width: barWidth,
+        height: Math.max(removedHeight, removedValue > 0 ? 1 : 0),
+        centerX: pairStartX + barWidth + barGap + barWidth / 2,
+      },
+    };
+  });
 
-const Select = styled.select`
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-size: 14px;
-  width: 100%;
-  max-width: 300px;
-`;
+  const hoveredBar = hovered ? bars[hovered.rowIndex]?.[hovered.kind] : null;
+  const hoveredDate = hovered ? bars[hovered.rowIndex]?.date : null;
+  const tooltipLeftPercent = hoveredBar ? (hoveredBar.centerX / width) * 100 : 0;
+  const tooltipTopPercent = hoveredBar ? (hoveredBar.y / height) * 100 : 0;
+  const xLabelIndexes = buildAxisIndexes(rows.length, 5, 10);
 
-const Input = styled.input`
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-size: 14px;
-  width: 100%;
-  max-width: 300px;
-`;
-
-const Actions = styled.div`
-  display: flex;
-  gap: 12px;
-  justify-content: flex-start;
-  align-items: flex-end;
-  flex: 0 0 auto;
-`;
-
-const ActionButton = styled(Button)`
-  font-weight: 600;
-  box-shadow: 0 10px 18px rgba(37, 99, 235, 0.2);
-`;
-
-const ResultCard = styled.div`
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 16px;
-  background: #ffffff;
-  min-height: 160px;
-`;
+  return (
+    <ChartCanvas>
+      <ChartYAxis>
+        {yLabels.map((label, index) => (
+          <span key={`${label}-${index}`}>{label}</span>
+        ))}
+      </ChartYAxis>
+      <ChartPlot>
+        <ChartSvgWrap>
+          <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" onMouseLeave={() => setHovered(null)}>
+            <defs>
+              <linearGradient id="addedBarGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#4ade80" />
+                <stop offset="100%" stopColor="#16a34a" />
+              </linearGradient>
+              <linearGradient id="addedBarGradientActive" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#86efac" />
+                <stop offset="100%" stopColor="#15803d" />
+              </linearGradient>
+              <linearGradient id="removedBarGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#f87171" />
+                <stop offset="100%" stopColor="#dc2626" />
+              </linearGradient>
+              <linearGradient id="removedBarGradientActive" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#fca5a5" />
+                <stop offset="100%" stopColor="#b91c1c" />
+              </linearGradient>
+            </defs>
+            {yLabels.map((_, index) => {
+              const y = padding + (plotHeight * index) / Math.max(yLabels.length - 1, 1);
+              return (
+                <line
+                  key={`grid-${index}`}
+                  x1={padding}
+                  y1={y}
+                  x2={width - padding}
+                  y2={y}
+                  stroke="#e5e7eb"
+                  strokeWidth="1"
+                />
+              );
+            })}
+            <line x1={padding} y1={padding} x2={padding} y2={height - padding} stroke="#d1d5db" strokeWidth="1" />
+            <line x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} stroke="#d1d5db" strokeWidth="1" />
+            {bars.map((bar, rowIndex) => (
+              <g key={`${bar.date}-${rowIndex}`}>
+                <rect
+                  x={bar.added.x}
+                  y={bar.added.y}
+                  width={bar.added.width}
+                  height={bar.added.height}
+                  rx="2"
+                  fill={hovered?.rowIndex === rowIndex && hovered.kind === "added" ? "url(#addedBarGradientActive)" : "url(#addedBarGradient)"}
+                  opacity={hovered === null || hovered.rowIndex === rowIndex ? 1 : 0.5}
+                  onMouseEnter={() => setHovered({ rowIndex, kind: "added" })}
+                />
+                <rect
+                  x={bar.removed.x}
+                  y={bar.removed.y}
+                  width={bar.removed.width}
+                  height={bar.removed.height}
+                  rx="2"
+                  fill={hovered?.rowIndex === rowIndex && hovered.kind === "removed" ? "url(#removedBarGradientActive)" : "url(#removedBarGradient)"}
+                  opacity={hovered === null || hovered.rowIndex === rowIndex ? 1 : 0.5}
+                  onMouseEnter={() => setHovered({ rowIndex, kind: "removed" })}
+                />
+              </g>
+            ))}
+            {hoveredBar ? (
+              <line
+                x1={hoveredBar.centerX}
+                y1={padding}
+                x2={hoveredBar.centerX}
+                y2={height - padding}
+                stroke="#cbd5e1"
+                strokeWidth="1"
+                strokeDasharray="2 3"
+              />
+            ) : null}
+          </svg>
+          {hoveredBar && hoveredDate && hovered ? (
+            <ChartTooltip style={{ left: `${tooltipLeftPercent}%`, top: `${tooltipTopPercent}%` }}>
+              <ChartTooltipDate>{formatDayLabel(hoveredDate)}</ChartTooltipDate>
+              <ChartTooltipValue>
+                {hovered.kind === "added" ? "Добавлено: " : "Удалено: "}
+                {formatMetricValue(hoveredBar.value)}
+              </ChartTooltipValue>
+            </ChartTooltip>
+          ) : null}
+        </ChartSvgWrap>
+        <ChartAxis $columns={rows.length}>
+          {rows.map((row, index) => (
+            <span key={`axis-${row.date}-${index}`}>
+              {xLabelIndexes.has(index) ? formatDayLabel(row.date) : ""}
+            </span>
+          ))}
+        </ChartAxis>
+      </ChartPlot>
+    </ChartCanvas>
+  );
+};
 
 const ChartWrapper = styled.div`
   display: flex;
@@ -426,109 +425,87 @@ const ChartWrapper = styled.div`
   gap: 12px;
 `;
 
-const Legend = styled.div`
-  display: flex;
-  gap: 16px;
-  align-items: center;
-`;
-
-const LegendItem = styled.div`
-  display: inline-flex;
-  gap: 6px;
-  align-items: center;
-  color: #374151;
-  font-size: 13px;
-`;
-
-const LegendDot = styled.span`
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: #16a34a;
-
-  &[data-kind="removed"] {
-    background: #dc2626;
-  }
-`;
-
-const ChartScroll = styled.div`
-  width: 100%;
-  padding-bottom: 6px;
-`;
-
-const Bars = styled.div<{ $columns: number }>`
+const ChartCanvas = styled.div`
   display: grid;
-  grid-template-columns: repeat(${({ $columns }) => Math.max($columns, 1)}, minmax(0, 1fr));
-  align-items: flex-end;
-  gap: clamp(2px, 0.6vw, 10px);
-  min-height: 220px;
-  width: 100%;
+  grid-template-columns: auto 1fr;
+  gap: 8px;
+  align-items: stretch;
+  height: 250px;
 `;
 
-const DayGroup = styled.div`
+const ChartYAxis = styled.div`
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-`;
-
-const BarsPair = styled.div`
-  display: flex;
-  justify-content: center;
-  align-items: flex-end;
-  gap: 2px;
-  height: 180px;
-  width: 100%;
-`;
-
-const Bar = styled.div`
-  position: relative;
-  width: calc((100% - 2px) / 2);
-  min-width: 2px;
-  max-width: 10px;
-  border-radius: 4px 4px 0 0;
-  background: #16a34a;
-  cursor: pointer;
-
-  &[data-kind="removed"] {
-    background: #dc2626;
-  }
-
-  &::after {
-    content: attr(data-value);
-    position: absolute;
-    left: 50%;
-    bottom: calc(100% + 4px);
-    transform: translateX(-50%);
-    background: #111827;
-    color: #ffffff;
-    border-radius: 4px;
-    padding: 2px 6px;
-    font-size: 11px;
-    line-height: 1.2;
-    white-space: nowrap;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 120ms ease;
-  }
-
-  &:hover::after {
-    opacity: 1;
-  }
-`;
-
-const DayLabel = styled.span`
+  justify-content: space-between;
   font-size: 11px;
-  color: #6b7280;
+  color: #64748b;
+  min-width: 48px;
+  text-align: right;
+`;
+
+const ChartPlot = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   width: 100%;
-  text-align: center;
+  min-height: 0;
+`;
+
+const ChartSvgWrap = styled.div`
+  position: relative;
+  width: 100%;
+  min-height: 0;
+  flex: 1;
+`;
+
+const ChartTooltip = styled.div`
+  position: absolute;
+  width: 116px;
+  min-height: 34px;
+  border-radius: 6px;
+  background: rgba(15, 23, 42, 0.92);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  pointer-events: none;
+  padding: 4px 6px;
+  transform: translate(-50%, calc(-100% - 8px));
+`;
+
+const ChartTooltipDate = styled.div`
+  color: #cbd5e1;
+  font-size: 10px;
+  line-height: 1.1;
+`;
+
+const ChartTooltipValue = styled.div`
+  color: #ffffff;
+  font-size: 11px;
+  line-height: 1.2;
+  font-weight: 700;
+`;
+
+const ChartAxis = styled.div<{ $columns: number }>`
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(${({ $columns }) => Math.max($columns, 1)}, minmax(0, 1fr));
+  gap: 4px;
+  font-size: 11px;
+  color: #64748b;
+
+  span {
+    text-align: center;
+    white-space: nowrap;
+  }
 `;
 
 const Totals = styled.div`
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+  justify-content: center;
+  width: 100%;
 `;
 
 const TotalItem = styled.span`
@@ -547,13 +524,3 @@ const TotalItem = styled.span`
   }
 `;
 
-const Placeholder = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 128px;
-  width: 100%;
-  color: #6b7280;
-  font-size: 14px;
-  text-align: center;
-`;

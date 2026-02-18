@@ -1,16 +1,25 @@
 import styled from "styled-components";
 import type { WebmasterHostDto } from "@entities/webmaster/types";
-import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow, TableWrapper } from "@shared/ui";
+import { EMPTY_DATA_MESSAGE, ResultLoader, Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow, TableWrapper } from "@shared/ui";
 import { formatDateTime, formatPresence, formatVerified } from "../../lib/formatters";
 
 type WebmasterHostsTableProps = {
   items: WebmasterHostDto[];
   isLoading: boolean;
+  pageSize: number;
   selectedHostId: number | null;
   onSelect: (id: number) => void;
 };
 
-export const WebmasterHostsTable = ({ items, isLoading, selectedHostId, onSelect }: WebmasterHostsTableProps) => {
+const COLUMN_COUNT = 5;
+
+export const WebmasterHostsTable = ({ items, isLoading, pageSize, selectedHostId, onSelect }: WebmasterHostsTableProps) => {
+  if (isLoading) {
+    return <ResultLoader label="Загрузка сайтов..." />;
+  }
+
+  const fillerCount = !isLoading && items.length > 0 ? Math.max(pageSize - items.length, 0) : 0;
+
   return (
     <TableWrapper>
       <Table>
@@ -24,14 +33,9 @@ export const WebmasterHostsTable = ({ items, isLoading, selectedHostId, onSelect
           </TableRow>
         </TableHead>
         <TableBody>
-          {isLoading && (
-            <TableRow>
-              <TableCell colSpan={5}>Загрузка...</TableCell>
-            </TableRow>
-          )}
           {!isLoading && items.length === 0 && (
             <TableRow>
-              <TableCell colSpan={5}>Сайты не найдены.</TableCell>
+              <TableCell colSpan={COLUMN_COUNT}>{EMPTY_DATA_MESSAGE}</TableCell>
             </TableRow>
           )}
           {!isLoading &&
@@ -51,6 +55,13 @@ export const WebmasterHostsTable = ({ items, isLoading, selectedHostId, onSelect
                 <TableCell>{formatDateTime(item.updatedAt)}</TableCell>
               </ClickableRow>
             ))}
+          {!isLoading &&
+            fillerCount > 0 &&
+            Array.from({ length: fillerCount }, (_, index) => (
+              <PlaceholderRow key={`host-placeholder-${index}`}>
+                <TableCell colSpan={COLUMN_COUNT}>&nbsp;</TableCell>
+              </PlaceholderRow>
+            ))}
         </TableBody>
       </Table>
     </TableWrapper>
@@ -61,12 +72,16 @@ const ClickableRow = styled(TableRow)`
   cursor: pointer;
 
   &[data-active="true"] {
-    background: #f3f4f6;
+    background: #edf4ff;
   }
 
   &:hover {
-    background: #f9fafb;
+    background: #f8fbff;
   }
+`;
+
+const PlaceholderRow = styled(TableRow)`
+  pointer-events: none;
 `;
 
 const PresenceBadge = styled.span`

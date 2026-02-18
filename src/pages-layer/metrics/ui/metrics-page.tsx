@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { skipToken } from "@reduxjs/toolkit/query";
 import {
-  useGetMetricsCounterDetailsQuery,
   useGetMetricsCountersQuery,
   useGetMetricsProfilesQuery,
   useSyncMetricsCountersMutation,
@@ -16,6 +15,7 @@ import {
 } from "@entities/metrics/types";
 import { usePagination } from "@shared/lib/use-pagination";
 import {
+  EMPTY_DATA_MESSAGE,
   IntegrationPageLayout,
   useToast,
 } from "@shared/ui";
@@ -83,7 +83,7 @@ export function MetricsPage() {
   const { data, isFetching, isLoading, error: loadError, refetch } = useGetMetricsCountersQuery(countersQueryArgs);
   const [syncCounters, { isLoading: isSyncingCounters }] = useSyncMetricsCountersMutation();
 
-  const counters = data?.content ?? [];
+  const counters = useMemo(() => data?.content ?? [], [data?.content]);
   const totalPages = data?.totalPages ?? 0;
   const shouldShowEmptyState = !isLoading && counters.length === 0;
   const shouldShowProfilesEmptyState = !isProfilesFetching && allProfiles.length === 0;
@@ -96,9 +96,20 @@ export function MetricsPage() {
     return exists ? selectedCounterId : null;
   }, [counters, selectedCounterId]);
 
-  const { data: counterDetails, isFetching: isDetailsLoading } = useGetMetricsCounterDetailsQuery(
-    resolvedSelectedCounterId ?? skipToken,
-  );
+  const selectedCounterDetails = useMemo(() => {
+    if (!resolvedSelectedCounterId) {
+      return undefined;
+    }
+    const selected = counters.find((item) => item.id === resolvedSelectedCounterId);
+    if (!selected) {
+      return undefined;
+    }
+    return {
+      ...selected,
+      createdAt: selected.createdAt ?? selected.updatedAt,
+      additionalInfoJson: selected.additionalInfoJson ?? null,
+    };
+  }, [counters, resolvedSelectedCounterId]);
 
   const loadErrorMessage = useMemo(() => {
     if (!loadError) return null;
@@ -136,6 +147,7 @@ export function MetricsPage() {
       <CountersTable
         items={counters}
         isLoading={isLoading}
+        pageSize={pageSize}
         selectedCounterId={resolvedSelectedCounterId}
         onSelect={setSelectedCounterId}
       />
@@ -174,13 +186,13 @@ export function MetricsPage() {
       showProfilesEmptyState={shouldShowProfilesEmptyState}
       profilesEmptyMessage="Нет доступных профилей. Проверьте конфигурацию."
       showTableEmptyState={shouldShowEmptyState}
-      tableEmptyMessage="Счетчики не найдены. Выполните синхронизацию."
+      tableEmptyMessage={EMPTY_DATA_MESSAGE}
       tableContent={tableContent}
       tableDetailsContent={(
         <CounterDetailsModal
           isOpen={resolvedSelectedCounterId !== null}
-          isLoading={isDetailsLoading}
-          details={counterDetails}
+          isLoading={false}
+          details={selectedCounterDetails}
           onClose={() => setSelectedCounterId(null)}
         />
       )}

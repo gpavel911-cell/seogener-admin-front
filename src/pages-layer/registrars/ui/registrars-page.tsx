@@ -2,7 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { skipToken } from "@reduxjs/toolkit/query";
-import { useGetRegistrarDomainDetailsQuery, useGetRegistrarProfilesQuery, useGetRegistrarDomainsQuery, useSyncRegistrarDomainsMutation } from "@entities/registrars/api";
+import {
+  useGetRegistrarProfilesQuery,
+  useGetRegistrarDomainsQuery,
+  useSyncRegistrarDomainsMutation,
+} from "@entities/registrars/api";
 import {
   type RegistrarDomainProfileDto,
   getRegistrarProviderTypeLabel,
@@ -11,7 +15,7 @@ import {
 } from "@entities/registrars/types";
 import { usePagination } from "@shared/lib/use-pagination";
 import { PaginationControls } from "@shared/ui/pagination-controls";
-import { IntegrationPageLayout, useToast } from "@shared/ui";
+import { EMPTY_DATA_MESSAGE, IntegrationPageLayout, useToast } from "@shared/ui";
 import {
   REGISTRARS_ACTION_SECTIONS,
   RegistrarsAction,
@@ -80,7 +84,7 @@ export function RegistrarsPage() {
   const { data: domainData, isLoading, isFetching, error: loadError, refetch } = useGetRegistrarDomainsQuery(domainsQueryArgs);
   const [syncDomains, { isLoading: isSyncing }] = useSyncRegistrarDomainsMutation();
 
-  const domains = domainData?.content ?? [];
+  const domains = useMemo(() => domainData?.content ?? [], [domainData?.content]);
   const totalPages = domainData?.totalPages ?? 0;
   const shouldShowEmptyState = !isLoading && domains.length === 0;
   const shouldShowProfilesEmptyState = !isProfilesFetching && allProfiles.length === 0;
@@ -93,11 +97,12 @@ export function RegistrarsPage() {
     return exists ? selectedDomainId : null;
   }, [domains, selectedDomainId]);
 
-  const {
-    data: domainDetails,
-    isFetching: isDetailsLoading,
-    error: detailsError,
-  } = useGetRegistrarDomainDetailsQuery(resolvedSelectedDomainId ?? skipToken);
+  const selectedDomainDetails = useMemo(() => {
+    if (!resolvedSelectedDomainId) {
+      return undefined;
+    }
+    return domains.find((item) => item.id === resolvedSelectedDomainId);
+  }, [domains, resolvedSelectedDomainId]);
 
   const loadErrorMessage = useMemo(() => {
     if (!loadError) return null;
@@ -107,23 +112,10 @@ export function RegistrarsPage() {
     return "Ошибка загрузки доменов.";
   }, [loadError]);
 
-  const detailsErrorMessage = useMemo(() => {
-    if (!detailsError) return null;
-    if (typeof detailsError === "object" && "status" in detailsError) {
-      return `Ошибка загрузки деталей (status ${(detailsError as { status: number }).status}).`;
-    }
-    return "Ошибка загрузки деталей домена.";
-  }, [detailsError]);
-
   useEffect(() => {
     if (!loadErrorMessage) return;
     showToast({ variant: "error", message: loadErrorMessage });
   }, [loadErrorMessage, showToast]);
-
-  useEffect(() => {
-    if (!detailsErrorMessage) return;
-    showToast({ variant: "error", message: detailsErrorMessage });
-  }, [detailsErrorMessage, showToast]);
 
   useEffect(() => {
     setPage(0);
@@ -148,6 +140,7 @@ export function RegistrarsPage() {
       <DomainTable
         items={domains}
         isLoading={isLoading}
+        pageSize={pageSize}
         selectedDomainId={resolvedSelectedDomainId}
         onSelect={setSelectedDomainId}
       />
@@ -186,13 +179,13 @@ export function RegistrarsPage() {
       showProfilesEmptyState={shouldShowProfilesEmptyState}
       profilesEmptyMessage="Нет доступных профилей. Проверьте конфигурацию."
       showTableEmptyState={shouldShowEmptyState}
-      tableEmptyMessage="Домены не найдены. Выполните синхронизацию."
+      tableEmptyMessage={EMPTY_DATA_MESSAGE}
       tableContent={tableContent}
       tableDetailsContent={(
         <DomainDetailsModal
           isOpen={resolvedSelectedDomainId !== null}
-          isLoading={isDetailsLoading}
-          details={domainDetails}
+          isLoading={false}
+          details={selectedDomainDetails}
           onClose={() => setSelectedDomainId(null)}
         />
       )}

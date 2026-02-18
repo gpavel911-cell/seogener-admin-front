@@ -1,17 +1,32 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import styled from "styled-components";
-import { skipToken } from "@reduxjs/toolkit/query";
-import { useGetMetricsCountersQuery, useGetMetricsProfilesQuery, useLazyGetMetricsGoalsQuery } from "@entities/metrics/api";
+import { useLazyGetMetricsGoalsQuery } from "@entities/metrics/api";
+import { useMetricsSelectOptions } from "@entities/metrics/select-options";
 import {
-  MetricsCounterPresence,
-  MetricsCounterStatus,
   MetricsProviderType,
   type MetricsGoalDto,
 } from "@entities/metrics/types";
-import { Button, useToast } from "@shared/ui";
+import {
+  Button,
+  CenteredState,
+  DateInput,
+  FieldLabel,
+  FormActions,
+  FormCard,
+  FormField,
+  FormFields,
+  FormRow,
+  FormStack,
+  PlaceholderText,
+  ResultLoader,
+  ResultCard,
+  SelectControl,
+  useToast,
+} from "@shared/ui";
 import { GoalInfo } from "./components/goal-info";
 
 const DEFAULT_PROVIDER = MetricsProviderType.YANDEX_METRICA;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 const formatDate = (value: Date) => value.toISOString().slice(0, 10);
 
@@ -35,36 +50,21 @@ export const ViewCounterGoals = ({ fixedProfile }: ActionsSectionViewCounterGoal
   const [activeProfile, setActiveProfile] = useState<string | null>(null);
 
   const { showToast } = useToast();
-  const { data: accountProfilesRaw, isFetching: isAccountsFetching } = useGetMetricsProfilesQuery();
-  const accountProfiles = useMemo(
-    () => (accountProfilesRaw ?? []).filter((profile) => profile.provider === DEFAULT_PROVIDER),
-    [accountProfilesRaw],
-  );
-  const resolvedProfile = useMemo(
-    () => fixedProfile ?? activeProfile ?? accountProfiles?.[0]?.profile ?? null,
-    [fixedProfile, activeProfile, accountProfiles],
-  );
-  const countersQueryArgs = resolvedProfile
-    ? { provider: DEFAULT_PROVIDER, profile: resolvedProfile, pageNumber: 0, pageSize: 100 }
-    : skipToken;
-  const { data: countersData, isFetching: isCountersFetching } = useGetMetricsCountersQuery(countersQueryArgs);
-  const counters = countersData?.content ?? [];
+  const {
+    resolvedProfile,
+    isProfilesFetching: isAccountsFetching,
+    isCountersFetching,
+    resolvedCounterId,
+    profileOptions,
+    counterOptions: counterSelectOptions,
+  } = useMetricsSelectOptions({
+    activeProfile,
+    fixedProfile: fixedProfile ?? null,
+    fixedProvider: DEFAULT_PROVIDER,
+    activeCounterId: counterId,
+  });
+  const effectiveCounterId = resolvedCounterId || counterId;
   const [loadGoals, { isFetching: isGoalsLoading }] = useLazyGetMetricsGoalsQuery();
-
-  const counterOptions = useMemo(
-    () =>
-      counters
-        .filter(
-          (counter) =>
-            counter.status === MetricsCounterStatus.ACTIVE &&
-            counter.presence === MetricsCounterPresence.PRESENT,
-        )
-        .map((counter) => ({
-          value: counter.counterId,
-          label: counter.siteUrl ? `${counter.counterId} · ${counter.siteUrl}` : counter.counterId,
-        })),
-    [counters],
-  );
 
   const handleProfileChange = (value: string) => {
     setActiveProfile(value || null);
@@ -73,7 +73,7 @@ export const ViewCounterGoals = ({ fixedProfile }: ActionsSectionViewCounterGoal
   };
 
   const handleLoadGoals = async () => {
-    if (!counterId) {
+    if (!effectiveCounterId) {
       showToast({ variant: "error", message: "Выберите счетчик." });
       return;
     }
@@ -81,9 +81,13 @@ export const ViewCounterGoals = ({ fixedProfile }: ActionsSectionViewCounterGoal
       showToast({ variant: "error", message: "Выберите профиль Метрики." });
       return;
     }
+    if (!isValidOneMonthRange(date1, date2)) {
+      showToast({ variant: "error", message: "Период не может превышать 1 месяц." });
+      return;
+    }
     try {
       const response = await loadGoals({
-        counterId,
+        counterId: effectiveCounterId,
         provider: DEFAULT_PROVIDER,
         profile: resolvedProfile,
         date1,
@@ -96,187 +100,71 @@ export const ViewCounterGoals = ({ fixedProfile }: ActionsSectionViewCounterGoal
   };
 
   return (
-    <Stack>
+    <FormStack>
       <FormCard>
         <FormRow>
           <FormFields>
             {!fixedProfile && (
               <FormField>
-                <Label>Профиль Метрики</Label>
-                <Select
+                <FieldLabel>Профиль Метрики</FieldLabel>
+                <SelectControl
                   value={resolvedProfile ?? ""}
-                  onChange={(event) => handleProfileChange(event.target.value)}
+                  onValueChange={handleProfileChange}
                   disabled={isAccountsFetching}
-                >
-                  <option value="">Выберите профиль</option>
-                  {(accountProfiles ?? []).map((profile) => (
-                    <option key={profile.profile} value={profile.profile}>
-                      {profile.profile}
-                    </option>
-                  ))}
-                </Select>
+                  options={profileOptions}
+                  placeholder="Выберите профиль"
+                />
               </FormField>
             )}
             <FormField>
-              <Label>Счетчик</Label>
-              <Select
-                value={counterId}
-                onChange={(event) => setCounterId(event.target.value)}
+              <FieldLabel>Счетчик</FieldLabel>
+              <SelectControl
+                  value={effectiveCounterId}
+                onValueChange={setCounterId}
                 disabled={isCountersFetching}
-              >
-                <option value="">Выберите счетчик</option>
-                {counterOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </Select>
+                options={counterSelectOptions}
+                placeholder="Выберите счетчик"
+              />
             </FormField>
             <FormField>
-              <Label>Дата начала</Label>
-              <Input type="date" value={date1} onChange={(event) => setDate1(event.target.value)} />
+              <FieldLabel>Дата начала</FieldLabel>
+              <DateInput value={date1} max={date2} onChange={(event) => setDate1(event.target.value)} />
             </FormField>
             <FormField>
-              <Label>Дата конца</Label>
-              <Input type="date" value={date2} onChange={(event) => setDate2(event.target.value)} />
+              <FieldLabel>Дата конца</FieldLabel>
+              <DateInput value={date2} min={date1} onChange={(event) => setDate2(event.target.value)} />
             </FormField>
           </FormFields>
-          <Actions>
-            <ActionButton type="button" onClick={handleLoadGoals} disabled={isGoalsLoading}>
+          <FormActions>
+            <Button type="button" variant="primary" onClick={handleLoadGoals} disabled={isGoalsLoading}>
               {isGoalsLoading ? "Загрузка..." : "Показать"}
-            </ActionButton>
-          </Actions>
+            </Button>
+          </FormActions>
         </FormRow>
       </FormCard>
       <ResultCard>
         {isGoalsLoading ? (
-          <EmptyState>
-            <Placeholder>Загрузка целей...</Placeholder>
-          </EmptyState>
+          <ResultLoader label="Загрузка целей..." />
         ) : goals === null ? (
-          <EmptyState>
-            <Placeholder>Нет данных для отображения.</Placeholder>
-          </EmptyState>
+          <CenteredState>
+            <PlaceholderText>Нет данных для отображения.</PlaceholderText>
+          </CenteredState>
         ) : goals.length === 0 ? (
-          <EmptyState>
-            <Placeholder>Целей нет.</Placeholder>
-          </EmptyState>
+          <CenteredState>
+            <PlaceholderText>Целей нет.</PlaceholderText>
+          </CenteredState>
         ) : (
           <GoalsGrid>
             {goals.map((goal) => (
-              <GoalCard key={goal.id}>
-                <GoalInfo goal={goal} />
-              </GoalCard>
+              <GoalInfo key={goal.id} goal={goal} />
             ))}
           </GoalsGrid>
         )}
       </ResultCard>
-    </Stack>
+    </FormStack>
   );
 };
 
-const Stack = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-`;
-
-const FormCard = styled.div`
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  background: #ffffff;
-`;
-
-const ResultCard = styled.div`
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  background: #ffffff;
-  min-height: 160px;
-`;
-
-const FormRow = styled.div`
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 16px;
-  align-items: flex-end;
-  overflow-x: auto;
-  padding-bottom: 4px;
-`;
-
-const FormFields = styled.div`
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 12px;
-  flex: 0 1 auto;
-  align-items: flex-end;
-  justify-content: flex-start;
-`;
-
-const FormField = styled.label`
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  flex: 0 1 300px;
-  min-width: 220px;
-  max-width: 300px;
-`;
-
-const Label = styled.span`
-  font-size: 14px;
-  color: #374151;
-`;
-
-const Input = styled.input`
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-size: 14px;
-  width: 100%;
-  max-width: 300px;
-`;
-
-const Select = styled.select`
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-size: 14px;
-  width: 100%;
-  max-width: 300px;
-`;
-
-const Actions = styled.div`
-  display: flex;
-  gap: 12px;
-  justify-content: flex-start;
-  align-items: flex-end;
-  flex: 0 0 auto;
-`;
-
-const ActionButton = styled(Button)`
-  font-weight: 600;
-  box-shadow: 0 10px 18px rgba(37, 99, 235, 0.2);
-`;
-
-const Placeholder = styled.div`
-  color: #6b7280;
-  font-size: 14px;
-`;
-
-const EmptyState = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  flex: 1;
-`;
 
 const GoalsGrid = styled.div`
   display: flex;
@@ -284,12 +172,31 @@ const GoalsGrid = styled.div`
   gap: 16px;
 `;
 
-const GoalCard = styled.article`
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  background: #ffffff;
-`;
+const isValidOneMonthRange = (from: string, to: string): boolean => {
+  const fromDate = parseDate(from);
+  const toDate = parseDate(to);
+  if (!fromDate || !toDate || fromDate > toDate) {
+    return false;
+  }
+  const oneMonthEndInclusive = addDays(addMonthsClamped(fromDate, 1), -1);
+  return toDate <= oneMonthEndInclusive;
+};
+
+const parseDate = (value: string): Date | null => {
+  if (!value) {
+    return null;
+  }
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const addMonthsClamped = (value: Date, months: number): Date => {
+  const year = value.getUTCFullYear();
+  const month = value.getUTCMonth() + months;
+  const day = value.getUTCDate();
+  const lastDayOfTargetMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  const clampedDay = Math.min(day, lastDayOfTargetMonth);
+  return new Date(Date.UTC(year, month, clampedDay));
+};
+
+const addDays = (value: Date, days: number): Date => new Date(value.getTime() + days * DAY_MS);
