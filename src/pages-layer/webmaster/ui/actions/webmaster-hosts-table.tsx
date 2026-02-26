@@ -7,13 +7,11 @@ type WebmasterHostsTableProps = {
   items: WebmasterHostDto[];
   isLoading: boolean;
   pageSize: number;
-  selectedHostId: number | null;
-  onSelect: (id: number) => void;
 };
 
 const COLUMN_COUNT = 5;
 
-export const WebmasterHostsTable = ({ items, isLoading, pageSize, selectedHostId, onSelect }: WebmasterHostsTableProps) => {
+export const WebmasterHostsTable = ({ items, isLoading, pageSize }: WebmasterHostsTableProps) => {
   if (isLoading) {
     return <ResultLoader label="Загрузка сайтов..." />;
   }
@@ -41,7 +39,7 @@ export const WebmasterHostsTable = ({ items, isLoading, pageSize, selectedHostId
           {!isLoading &&
             items.length > 0 &&
             items.map((item) => (
-              <ClickableRow key={item.id} data-active={item.id === selectedHostId} onClick={() => onSelect(item.id)}>
+              <TableRow key={item.id}>
                 <TableCell>{item.hostUrl ?? "—"}</TableCell>
                 <TableCell>{item.hostId}</TableCell>
                 <TableCell>
@@ -53,7 +51,7 @@ export const WebmasterHostsTable = ({ items, isLoading, pageSize, selectedHostId
                   <PresenceBadge data-variant={item.presence ?? "UNKNOWN"}>{formatPresence(item.presence)}</PresenceBadge>
                 </TableCell>
                 <TableCell>{formatDateTime(item.updatedAt)}</TableCell>
-              </ClickableRow>
+              </TableRow>
             ))}
           {!isLoading &&
             fillerCount > 0 &&
@@ -67,18 +65,6 @@ export const WebmasterHostsTable = ({ items, isLoading, pageSize, selectedHostId
     </TableWrapper>
   );
 };
-
-const ClickableRow = styled(TableRow)`
-  cursor: pointer;
-
-  &[data-active="true"] {
-    background: #edf4ff;
-  }
-
-  &:hover {
-    background: #f8fbff;
-  }
-`;
 
 const PlaceholderRow = styled(TableRow)`
   pointer-events: none;

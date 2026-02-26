@@ -2,19 +2,14 @@
 
 import { useMemo, useState } from "react";
 import { RegistrarProviderType } from "@entities/registrars/types";
-import styled from "styled-components";
 import {
   useCreateWebmasterHostMutation,
 } from "@entities/webmaster/api";
-import {
-  type WebmasterApiResponse,
-  WebmasterProviderType,
-} from "@entities/webmaster/types";
+import { WebmasterProviderType } from "@entities/webmaster/types";
 import { useRegistrarSelectOptions } from "@entities/registrars/select-options";
 import { useWebmasterSelectOptions } from "@entities/webmaster/select-options";
 import {
   Button,
-  CenteredState,
   FieldLabel,
   FormActions,
   FormCard,
@@ -23,9 +18,6 @@ import {
   FormRow,
   FormStack,
   InlineHint,
-  PlaceholderText,
-  ResultLoader,
-  ResultCard,
   SelectControl,
   useToast,
 } from "@shared/ui";
@@ -42,10 +34,6 @@ export const AddHost = ({ fixedProfile }: ActionsSectionWebmasterAddHostProps = 
   const [activeRegistrar, setActiveRegistrar] = useState<RegistrarProviderType | null>(null);
   const [activeRegistrarProfile, setActiveRegistrarProfile] = useState<string | null>(null);
   const [domain, setDomain] = useState("");
-  const [resultByProfile, setResultByProfile] = useState<{
-    profile: string;
-    data: WebmasterApiResponse;
-  } | null>(null);
 
   const {
     resolvedProfile,
@@ -57,11 +45,6 @@ export const AddHost = ({ fixedProfile }: ActionsSectionWebmasterAddHostProps = 
     fixedProvider: DEFAULT_PROVIDER,
     includeHosts: false,
   });
-  const result = useMemo(
-    () => (resolvedProfile && resultByProfile?.profile === resolvedProfile ? resultByProfile.data : null),
-    [resolvedProfile, resultByProfile],
-  );
-
   const {
     registrarGroups,
     resolvedRegistrar,
@@ -103,16 +86,11 @@ export const AddHost = ({ fixedProfile }: ActionsSectionWebmasterAddHostProps = 
       return;
     }
     try {
-      const response = await addHost({
+      await addHost({
         provider: DEFAULT_PROVIDER,
         profile: resolvedProfile,
         hostUrl,
       }).unwrap();
-
-      setResultByProfile({
-        profile: resolvedProfile,
-        data: response,
-      });
       showToast({ variant: "success", message: "Сайт добавлен." });
     } catch {
       showToast({ variant: "error", message: "Ошибка добавления сайта." });
@@ -186,26 +164,6 @@ export const AddHost = ({ fixedProfile }: ActionsSectionWebmasterAddHostProps = 
       {!isDomainsFetching && domainOptions.length === 0 && (
         <InlineHint>Нет доступных доменов. Сначала синхронизируйте домены в разделе Регистраторы.</InlineHint>
       )}
-      <ResultCard>
-        {isLoading ? (
-          <ResultLoader label="Добавление сайта..." />
-        ) : result ? (
-          <JsonBlock>{JSON.stringify(result, null, 2)}</JsonBlock>
-        ) : (
-          <CenteredState>
-            <PlaceholderText>Нет данных для отображения.</PlaceholderText>
-          </CenteredState>
-        )}
-      </ResultCard>
     </FormStack>
   );
 };
-
-const JsonBlock = styled.pre`
-  margin: 0;
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-size: 12px;
-  color: #111827;
-`;
-

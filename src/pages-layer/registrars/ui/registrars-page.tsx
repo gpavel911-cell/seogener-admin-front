@@ -22,12 +22,10 @@ import {
   renderRegistrarsActionContent,
 } from "../lib/actions";
 import { DomainTable } from "./actions/domain-table";
-import { DomainDetailsModal } from "./actions/domain-details-modal";
 
 export function RegistrarsPage() {
   const { showToast } = useToast();
   const { page, pageSize, pageSizeOptions, setPage, setPageSize } = usePagination();
-  const [selectedDomainId, setSelectedDomainId] = useState<number | null>(null);
   const [activeRegistrar, setActiveRegistrar] = useState<RegistrarProviderType | null>(null);
   const [activeProfile, setActiveProfile] = useState<string | null>(null);
   const [selectedAction, setSelectedAction] = useState<RegistrarsAction | null>(null);
@@ -89,21 +87,6 @@ export function RegistrarsPage() {
   const shouldShowEmptyState = !isLoading && domains.length === 0;
   const shouldShowProfilesEmptyState = !isProfilesFetching && allProfiles.length === 0;
 
-  const resolvedSelectedDomainId = useMemo(() => {
-    if (!selectedDomainId) {
-      return null;
-    }
-    const exists = domains.some((item) => item.id === selectedDomainId);
-    return exists ? selectedDomainId : null;
-  }, [domains, selectedDomainId]);
-
-  const selectedDomainDetails = useMemo(() => {
-    if (!resolvedSelectedDomainId) {
-      return undefined;
-    }
-    return domains.find((item) => item.id === resolvedSelectedDomainId);
-  }, [domains, resolvedSelectedDomainId]);
-
   const loadErrorMessage = useMemo(() => {
     if (!loadError) return null;
     if (typeof loadError === "object" && "status" in loadError) {
@@ -141,8 +124,6 @@ export function RegistrarsPage() {
         items={domains}
         isLoading={isLoading}
         pageSize={pageSize}
-        selectedDomainId={resolvedSelectedDomainId}
-        onSelect={setSelectedDomainId}
       />
       <PaginationControls
         page={page}
@@ -181,14 +162,6 @@ export function RegistrarsPage() {
       showTableEmptyState={shouldShowEmptyState}
       tableEmptyMessage={EMPTY_DATA_MESSAGE}
       tableContent={tableContent}
-      tableDetailsContent={(
-        <DomainDetailsModal
-          isOpen={resolvedSelectedDomainId !== null}
-          isLoading={false}
-          details={selectedDomainDetails}
-          onClose={() => setSelectedDomainId(null)}
-        />
-      )}
       actionContent={renderRegistrarsActionContent(activeAction as RegistrarsAction, {
         profile: resolvedProfile,
         registrar: resolvedProvider,

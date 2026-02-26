@@ -22,13 +22,12 @@ import {
 import { PaginationControls } from "@shared/ui/pagination-controls";
 import { METRICS_ACTION_SECTIONS, MetricsAction, renderMetricsActionContent } from "../lib/actions";
 import { CountersTable } from "./actions/counters-table";
-import { CounterDetailsModal } from "./actions/counter-details-modal";
+
 export function MetricsPage() {
   const { showToast } = useToast();
   const { page, pageSize, pageSizeOptions, setPage, setPageSize } = usePagination();
   const [activeProvider, setActiveProvider] = useState<MetricsProviderType | null>(null);
   const [activeProfile, setActiveProfile] = useState<string | null>(null);
-  const [selectedCounterId, setSelectedCounterId] = useState<number | null>(null);
   const [selectedAction, setSelectedAction] = useState<MetricsAction | null>(null);
 
   const metricaProfilesQuery = useGetMetricsProfilesQuery();
@@ -88,29 +87,6 @@ export function MetricsPage() {
   const shouldShowEmptyState = !isLoading && counters.length === 0;
   const shouldShowProfilesEmptyState = !isProfilesFetching && allProfiles.length === 0;
 
-  const resolvedSelectedCounterId = useMemo(() => {
-    if (!selectedCounterId) {
-      return null;
-    }
-    const exists = counters.some((item) => item.id === selectedCounterId);
-    return exists ? selectedCounterId : null;
-  }, [counters, selectedCounterId]);
-
-  const selectedCounterDetails = useMemo(() => {
-    if (!resolvedSelectedCounterId) {
-      return undefined;
-    }
-    const selected = counters.find((item) => item.id === resolvedSelectedCounterId);
-    if (!selected) {
-      return undefined;
-    }
-    return {
-      ...selected,
-      createdAt: selected.createdAt ?? selected.updatedAt,
-      additionalInfoJson: selected.additionalInfoJson ?? null,
-    };
-  }, [counters, resolvedSelectedCounterId]);
-
   const loadErrorMessage = useMemo(() => {
     if (!loadError) return null;
     if (typeof loadError === "object" && "status" in loadError) {
@@ -148,8 +124,6 @@ export function MetricsPage() {
         items={counters}
         isLoading={isLoading}
         pageSize={pageSize}
-        selectedCounterId={resolvedSelectedCounterId}
-        onSelect={setSelectedCounterId}
       />
       <PaginationControls
         page={page}
@@ -188,14 +162,6 @@ export function MetricsPage() {
       showTableEmptyState={shouldShowEmptyState}
       tableEmptyMessage={EMPTY_DATA_MESSAGE}
       tableContent={tableContent}
-      tableDetailsContent={(
-        <CounterDetailsModal
-          isOpen={resolvedSelectedCounterId !== null}
-          isLoading={false}
-          details={selectedCounterDetails}
-          onClose={() => setSelectedCounterId(null)}
-        />
-      )}
       actionContent={renderMetricsActionContent(activeAction as MetricsAction, {
         profile: resolvedProfile,
       })}

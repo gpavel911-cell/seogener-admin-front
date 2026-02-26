@@ -21,7 +21,6 @@ import {
   WebmasterAction,
   renderWebmasterActionContent,
 } from "../lib/actions";
-import { WebmasterHostDetailsModal } from "./actions/webmaster-host-details-modal";
 import { WebmasterHostsTable } from "./actions/webmaster-hosts-table";
 
 export function WebmasterPage() {
@@ -29,7 +28,6 @@ export function WebmasterPage() {
   const { page, pageSize, pageSizeOptions, setPage, setPageSize } = usePagination();
   const [activeProvider, setActiveProvider] = useState<WebmasterProviderType | null>(null);
   const [activeProfile, setActiveProfile] = useState<string | null>(null);
-  const [selectedHostId, setSelectedHostId] = useState<number | null>(null);
   const [selectedAction, setSelectedAction] = useState<WebmasterAction | null>(null);
 
   const webmasterProfilesQuery = useGetWebmasterProfilesQuery();
@@ -89,29 +87,6 @@ export function WebmasterPage() {
   const shouldShowEmptyState = !isLoading && hosts.length === 0;
   const shouldShowProfilesEmptyState = !isProfilesFetching && allProfiles.length === 0;
 
-  const resolvedSelectedHostId = useMemo(() => {
-    if (!selectedHostId) {
-      return null;
-    }
-    const exists = hosts.some((item) => item.id === selectedHostId);
-    return exists ? selectedHostId : null;
-  }, [hosts, selectedHostId]);
-
-  const selectedHostDetails = useMemo(() => {
-    if (!resolvedSelectedHostId) {
-      return undefined;
-    }
-    const selected = hosts.find((item) => item.id === resolvedSelectedHostId);
-    if (!selected) {
-      return undefined;
-    }
-    return {
-      ...selected,
-      createdAt: selected.createdAt ?? selected.updatedAt,
-      additionalInfoJson: selected.additionalInfoJson ?? null,
-    };
-  }, [hosts, resolvedSelectedHostId]);
-
   const loadErrorMessage = useMemo(() => {
     if (!loadError) return null;
     if (typeof loadError === "object" && "status" in loadError) {
@@ -149,8 +124,6 @@ export function WebmasterPage() {
         items={hosts}
         isLoading={isLoading}
         pageSize={pageSize}
-        selectedHostId={resolvedSelectedHostId}
-        onSelect={setSelectedHostId}
       />
       <PaginationControls
         page={page}
@@ -189,14 +162,6 @@ export function WebmasterPage() {
       showTableEmptyState={shouldShowEmptyState}
       tableEmptyMessage={EMPTY_DATA_MESSAGE}
       tableContent={tableContent}
-      tableDetailsContent={(
-        <WebmasterHostDetailsModal
-          isOpen={resolvedSelectedHostId !== null}
-          isLoading={false}
-          details={selectedHostDetails}
-          onClose={() => setSelectedHostId(null)}
-        />
-      )}
       actionContent={renderWebmasterActionContent(activeAction as WebmasterAction, {
         profile: resolvedProfile,
       })}

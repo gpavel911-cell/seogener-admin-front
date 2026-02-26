@@ -17,13 +17,11 @@ type DomainTableProps = {
   items: RegistrarDomainDto[];
   isLoading: boolean;
   pageSize: number;
-  selectedDomainId: number | null;
-  onSelect: (id: number) => void;
 };
 
 const COLUMN_COUNT = 5;
 
-export function DomainTable({ items, isLoading, pageSize, selectedDomainId, onSelect }: DomainTableProps) {
+export function DomainTable({ items, isLoading, pageSize }: DomainTableProps) {
   if (isLoading) {
     return <ResultLoader label="Загрузка доменов..." />;
   }
@@ -49,12 +47,7 @@ export function DomainTable({ items, isLoading, pageSize, selectedDomainId, onSe
             </TableRow>
           ) : (
             items.map((domain) => (
-              <DomainRow
-                key={domain.id}
-                domain={domain}
-                isSelected={domain.id === selectedDomainId}
-                onSelect={onSelect}
-              />
+              <DomainRow key={domain.id} domain={domain} />
             ))
           )}
           {!isLoading &&
@@ -72,15 +65,11 @@ export function DomainTable({ items, isLoading, pageSize, selectedDomainId, onSe
 
 function DomainRow({
   domain,
-  isSelected,
-  onSelect,
 }: {
   domain: RegistrarDomainDto;
-  isSelected: boolean;
-  onSelect: (id: number) => void;
 }) {
   return (
-    <ClickableRow data-active={isSelected} onClick={() => onSelect(domain.id)}>
+    <TableRow>
       <TableCell>{domain.domainName ?? "—"}</TableCell>
       <TableCell>{formatDateValue(domain.expirationDate)}</TableCell>
       <TableCell>
@@ -94,21 +83,9 @@ function DomainRow({
         </Badge>
       </TableCell>
       <TableCell>{formatDateTime(domain.lastSeenAt)}</TableCell>
-    </ClickableRow>
+    </TableRow>
   );
 }
-
-const ClickableRow = styled(TableRow)`
-  cursor: pointer;
-
-  &[data-active="true"] {
-    background: #edf4ff;
-  }
-
-  &:hover {
-    background: #f8fbff;
-  }
-`;
 
 const PlaceholderRow = styled(TableRow)`
   pointer-events: none;

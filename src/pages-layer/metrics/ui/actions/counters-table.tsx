@@ -7,13 +7,11 @@ type CountersTableProps = {
   items: MetricsCounterDto[];
   isLoading: boolean;
   pageSize: number;
-  selectedCounterId: number | null;
-  onSelect: (id: number) => void;
 };
 
 const COLUMN_COUNT = 6;
 
-export const CountersTable = ({ items, isLoading, pageSize, selectedCounterId, onSelect }: CountersTableProps) => {
+export const CountersTable = ({ items, isLoading, pageSize }: CountersTableProps) => {
   if (isLoading) {
     return <ResultLoader label="Загрузка счетчиков..." />;
   }
@@ -42,7 +40,7 @@ export const CountersTable = ({ items, isLoading, pageSize, selectedCounterId, o
           {!isLoading &&
             items.length > 0 &&
             items.map((item) => (
-              <ClickableRow key={item.id} data-active={item.id === selectedCounterId} onClick={() => onSelect(item.id)}>
+              <TableRow key={item.id}>
                 <TableCell>{item.counterId}</TableCell>
                 <TableCell>{item.counterName ?? "—"}</TableCell>
                 <TableCell>{item.siteUrl ?? "—"}</TableCell>
@@ -53,7 +51,7 @@ export const CountersTable = ({ items, isLoading, pageSize, selectedCounterId, o
                   <Badge data-variant={item.presence ?? "UNKNOWN"}>{formatPresence(item.presence)}</Badge>
                 </TableCell>
                 <TableCell>{formatDateTime(item.updatedAt)}</TableCell>
-              </ClickableRow>
+              </TableRow>
             ))}
           {!isLoading &&
             fillerCount > 0 &&
@@ -98,18 +96,6 @@ const Badge = styled.span`
   &[data-variant="DELETED"] {
     background: #fef3f2;
     color: #b42318;
-  }
-`;
-
-const ClickableRow = styled(TableRow)`
-  cursor: pointer;
-
-  &[data-active="true"] {
-    background: #edf4ff;
-  }
-
-  &:hover {
-    background: #f8fbff;
   }
 `;
 
