@@ -1,0 +1,7 @@
+.git
+.idea
+.next
+node_modules
+.env
+*.iml
+npm-debug.log*
