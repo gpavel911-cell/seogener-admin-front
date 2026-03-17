@@ -1,10 +1,19 @@
 import { API_ROUTES } from "@shared/config/api-routes";
+import type { Page } from "@shared/api";
 import { baseApi } from "@shared/store";
 import type {
   CreateARecordRequest,
   CreateARecordResponse,
   CreateTxtRecordRequest,
   CreateTxtRecordResponse,
+  CreateDomainMatrixImportPayload,
+  DeleteDomainMatrixImportPayload,
+  DomainMatrixImportDto,
+  DomainMatrixImportRowDto,
+  DomainMatrixStartResponse,
+  DomainMatrixStatusResponse,
+  GenerateDomainMatrixImportPayload,
+  GetDomainMatrixImportRowsPayload,
   RegistrarDomainListRequest,
   RegistrarDomainListResponse,
   RegistrarDomainOptionDto,
@@ -12,6 +21,8 @@ import type {
   RegistrarProviderType,
   ListDnsRecordsRequest,
   ListDnsRecordsResponse,
+  RegenerateDomainMatrixRowPayload,
+  UpdateDomainMatrixImportPayload,
 } from "./types";
 
 export const domainsApi = baseApi.injectEndpoints({
@@ -68,6 +79,62 @@ export const domainsApi = baseApi.injectEndpoints({
         body: payload,
       }),
     }),
+    getDomainMatrixJobStatus: builder.query<DomainMatrixStatusResponse, { jobId: string }>({
+      query: ({ jobId }) => ({
+        url: API_ROUTES.REGISTRARS.GET_DOMAIN_MATRIX_JOB_STATUS(jobId),
+      }),
+    }),
+    createDomainMatrixImport: builder.mutation<DomainMatrixImportDto, CreateDomainMatrixImportPayload>({
+      query: ({ file, profileId, name }) => {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("profileId", profileId);
+        if (name && name.trim()) {
+          formData.append("name", name.trim());
+        }
+        return {
+          url: API_ROUTES.REGISTRARS.CREATE_DOMAIN_MATRIX_IMPORT,
+          method: "POST",
+          body: formData,
+        };
+      },
+    }),
+    getDomainMatrixImports: builder.query<DomainMatrixImportDto[], void>({
+      query: () => ({
+        url: API_ROUTES.REGISTRARS.GET_DOMAIN_MATRIX_IMPORTS,
+      }),
+    }),
+    updateDomainMatrixImport: builder.mutation<DomainMatrixImportDto, UpdateDomainMatrixImportPayload>({
+      query: ({ importId, name }) => ({
+        url: API_ROUTES.REGISTRARS.UPDATE_DOMAIN_MATRIX_IMPORT(importId),
+        method: "PATCH",
+        body: { name },
+      }),
+    }),
+    deleteDomainMatrixImport: builder.mutation<void, DeleteDomainMatrixImportPayload>({
+      query: ({ importId }) => ({
+        url: API_ROUTES.REGISTRARS.DELETE_DOMAIN_MATRIX_IMPORT(importId),
+        method: "DELETE",
+      }),
+    }),
+    generateDomainMatrixImport: builder.mutation<DomainMatrixStartResponse, GenerateDomainMatrixImportPayload>({
+      query: ({ importId }) => ({
+        url: API_ROUTES.REGISTRARS.GENERATE_DOMAIN_MATRIX_IMPORT(importId),
+        method: "POST",
+      }),
+    }),
+    getDomainMatrixImportRows: builder.query<Page<DomainMatrixImportRowDto>, GetDomainMatrixImportRowsPayload>({
+      query: ({ importId, pageNumber, pageSize }) => ({
+        url: API_ROUTES.REGISTRARS.GET_DOMAIN_MATRIX_IMPORT_ROWS(importId),
+        params: { pageNumber, pageSize },
+      }),
+    }),
+    regenerateDomainMatrixRow: builder.mutation<DomainMatrixImportRowDto, RegenerateDomainMatrixRowPayload>({
+      query: ({ rowId }) => ({
+        url: API_ROUTES.REGISTRARS.REGENERATE_DOMAIN_MATRIX_ROW(rowId),
+        method: "POST",
+      }),
+    }),
   }),
 });
 
@@ -80,4 +147,12 @@ export const {
   useLazyGetRegistrarDnsRecordsQuery,
   useCreateRegistrarARecordMutation,
   useCreateRegistrarTxtRecordMutation,
+  useGetDomainMatrixJobStatusQuery,
+  useCreateDomainMatrixImportMutation,
+  useGetDomainMatrixImportsQuery,
+  useUpdateDomainMatrixImportMutation,
+  useDeleteDomainMatrixImportMutation,
+  useGenerateDomainMatrixImportMutation,
+  useGetDomainMatrixImportRowsQuery,
+  useRegenerateDomainMatrixRowMutation,
 } = domainsApi;

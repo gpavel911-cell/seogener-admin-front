@@ -117,3 +117,87 @@ export type ListDnsRecordsResponse = {
   groups: DnsRecordGroup[];
   soa?: DnsSoa | null;
 };
+
+export enum DomainMatrixJobStatus {
+  QUEUED = "QUEUED",
+  RUNNING = "RUNNING",
+  COMPLETED = "COMPLETED",
+  FAILED = "FAILED",
+}
+
+export enum DomainMatrixJobStage {
+  VALIDATING = "VALIDATING",
+  PROCESSING = "PROCESSING",
+  WRITING = "WRITING",
+  FINALIZING = "FINALIZING",
+}
+
+export type DomainMatrixStartResponse = {
+  jobId: string;
+  status: DomainMatrixJobStatus;
+};
+
+export type DomainMatrixStatusResponse = {
+  jobId: string;
+  status: DomainMatrixJobStatus;
+  stage: DomainMatrixJobStage;
+  progressPercent: number;
+  totalCells: number;
+  processedCells: number;
+  successCells: number;
+  failedCells: number;
+  latestError?: string | null;
+  updatedAt: string;
+};
+
+export type DomainMatrixImportDto = {
+  id: string;
+  name: string;
+  registrar: RegistrarProviderType;
+  profile: string;
+  rowsTotal: number;
+  rowsWithDomain: number;
+  totalPrice: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type DomainMatrixImportRowDto = {
+  id: number;
+  phrase1: string;
+  phrase2: string;
+  domain?: string | null;
+  price?: number | null;
+  isPurchased: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreateDomainMatrixImportPayload = {
+  file: File;
+  profileId: string;
+  name?: string;
+};
+
+export type UpdateDomainMatrixImportPayload = {
+  importId: string;
+  name: string;
+};
+
+export type DeleteDomainMatrixImportPayload = {
+  importId: string;
+};
+
+export type GenerateDomainMatrixImportPayload = {
+  importId: string;
+};
+
+export type GetDomainMatrixImportRowsPayload = {
+  importId: string;
+  pageNumber: number;
+  pageSize: number;
+};
+
+export type RegenerateDomainMatrixRowPayload = {
+  rowId: number;
+};

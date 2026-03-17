@@ -48,14 +48,15 @@ type ModalDialogProps = {
   title: string;
   actions?: ReactNode;
   children: ReactNode;
+  contentWidth?: string;
 };
 
-export function ModalDialog({ open, onOpenChange, title, actions, children }: ModalDialogProps) {
+export function ModalDialog({ open, onOpenChange, title, actions, children, contentWidth }: ModalDialogProps) {
   return (
     <RadixDialog.Root open={open} onOpenChange={onOpenChange}>
       <RadixDialog.Portal>
         <Overlay />
-        <Content onOpenAutoFocus={(event) => event.preventDefault()}>
+        <Content $contentWidth={contentWidth} onOpenAutoFocus={(event) => event.preventDefault()}>
           <Header>
             <Title>{title}</Title>
             <HeaderActions>
@@ -87,13 +88,13 @@ const Overlay = styled(RadixDialog.Overlay)`
   }
 `;
 
-const Content = styled(RadixDialog.Content)`
+const Content = styled(RadixDialog.Content)<{ $contentWidth?: string }>`
   position: fixed;
   z-index: 51;
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  width: min(960px, calc(100vw - 48px));
+  width: ${({ $contentWidth }) => `min(${$contentWidth ?? "960px"}, calc(100vw - 48px))`};
   max-height: 85vh;
   overflow: auto;
   border-radius: 16px;
