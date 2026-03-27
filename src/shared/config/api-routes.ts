@@ -27,8 +27,10 @@ export const API_ROUTES = {
     UPDATE_DOMAIN_MATRIX_IMPORT: (importId: string) => `/api/v1/registrars/domain-matrix/imports/${importId}`,
     DELETE_DOMAIN_MATRIX_IMPORT: (importId: string) => `/api/v1/registrars/domain-matrix/imports/${importId}`,
     GENERATE_DOMAIN_MATRIX_IMPORT: (importId: string) => `/api/v1/registrars/domain-matrix/imports/${importId}/generate`,
+    PURCHASE_DOMAIN_MATRIX_IMPORT: (importId: string) => `/api/v1/registrars/domain-matrix/imports/${importId}/purchase`,
     GET_DOMAIN_MATRIX_IMPORT_ROWS: (importId: string) => `/api/v1/registrars/domain-matrix/imports/${importId}/rows`,
     REGENERATE_DOMAIN_MATRIX_ROW: (rowId: number) => `/api/v1/registrars/domain-matrix/rows/${rowId}/regenerate`,
+    PURCHASE_DOMAIN_MATRIX_ROW: (rowId: number) => `/api/v1/registrars/domain-matrix/rows/${rowId}/purchase`,
   },
   WEBMASTER: {
     GET_WEBMASTER_PROFILES: "/api/v1/webmaster/profiles",

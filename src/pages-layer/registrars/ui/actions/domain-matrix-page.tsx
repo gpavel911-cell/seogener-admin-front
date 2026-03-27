@@ -1,8 +1,8 @@
 "use client";
 
-import { type ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { skipToken } from "@reduxjs/toolkit/query";
-import { FaArrowsRotate } from "react-icons/fa6";
+import { FaArrowsRotate, FaCartPlus } from "react-icons/fa6";
 import styled from "styled-components";
 import { formatDateTime } from "@pages/registrars/lib/formatters";
 import {
@@ -13,10 +13,17 @@ import {
   useGetDomainMatrixImportsQuery,
   useGetDomainMatrixJobStatusQuery,
   useGetRegistrarProfilesQuery,
+  usePurchaseDomainMatrixImportMutation,
+  usePurchaseDomainMatrixRowMutation,
   useRegenerateDomainMatrixRowMutation,
   useUpdateDomainMatrixImportMutation,
 } from "@entities/registrars/api";
-import { DomainMatrixJobStage, DomainMatrixJobStatus, RegistrarProviderType } from "@entities/registrars/types";
+import {
+  DomainMatrixJobStage,
+  DomainMatrixJobStatus,
+  DomainMatrixPurchaseItemStatus,
+  RegistrarProviderType,
+} from "@entities/registrars/types";
 import { usePagination } from "@shared/lib/use-pagination";
 import { PaginationControls } from "@shared/ui/pagination-controls";
 import { ModalDialog } from "@shared/ui-kit/modal-dialog";
@@ -99,11 +106,15 @@ export function DomainMatrixPage({ fixedProfileId = null, hideTitle = false }: D
   const [selectedImportId, setSelectedImportId] = useState("");
   const [jobId, setJobId] = useState<string | null>(() => readActiveGeneration()?.jobId ?? null);
   const [generationImportId, setGenerationImportId] = useState<string | null>(() => readActiveGeneration()?.importId ?? null);
+  const [purchaseJobId, setPurchaseJobId] = useState<string | null>(null);
+  const [purchaseImportId, setPurchaseImportId] = useState<string | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editImportName, setEditImportName] = useState("");
   const [regeneratingRowIds, setRegeneratingRowIds] = useState<number[]>([]);
+  const [purchasingRowIds, setPurchasingRowIds] = useState<number[]>([]);
   const finishedJobRef = useRef<string | null>(null);
+  const finishedPurchaseJobRef = useRef<string | null>(null);
   const addImportFileInputRef = useRef<HTMLInputElement>(null);
   const { showToast } = useToast();
 
@@ -116,9 +127,11 @@ export function DomainMatrixPage({ fixedProfileId = null, hideTitle = false }: D
 
   const [createImport, { isLoading: isUploading }] = useCreateDomainMatrixImportMutation();
   const [generateImport, { isLoading: isGenerating }] = useGenerateDomainMatrixImportMutation();
+  const [purchaseImport, { isLoading: isPurchasingImport }] = usePurchaseDomainMatrixImportMutation();
   const [updateImport, { isLoading: isRenaming }] = useUpdateDomainMatrixImportMutation();
   const [deleteImport, { isLoading: isDeleting }] = useDeleteDomainMatrixImportMutation();
   const [regenerateRow] = useRegenerateDomainMatrixRowMutation();
+  const [purchaseRow] = usePurchaseDomainMatrixRowMutation();
 
   const statusQuery = useGetDomainMatrixJobStatusQuery(jobId ? { jobId } : skipToken, {
     pollingInterval: jobId ? 4000 : 0,
@@ -126,6 +139,12 @@ export function DomainMatrixPage({ fixedProfileId = null, hideTitle = false }: D
   });
   const status = statusQuery.data;
   const isJobActive = isJobInProgress(status?.status);
+  const purchaseStatusQuery = useGetDomainMatrixJobStatusQuery(purchaseJobId ? { jobId: purchaseJobId } : skipToken, {
+    pollingInterval: purchaseJobId ? 4000 : 0,
+    refetchOnMountOrArgChange: true,
+  });
+  const purchaseStatus = purchaseStatusQuery.data;
+  const isPurchaseJobActive = isJobInProgress(purchaseStatus?.status);
 
   const profileOptions = useMemo(
     () =>
@@ -174,9 +193,10 @@ export function DomainMatrixPage({ fixedProfileId = null, hideTitle = false }: D
     isFetching: isRowsFetching,
     refetch: refetchRows,
   } = useGetDomainMatrixImportRowsQuery(rowsQueryArgs);
-  const rows = rowsData?.content ?? [];
+  const rows = useMemo(() => rowsData?.content ?? [], [rowsData?.content]);
   const totalPages = rowsData?.totalPages ?? 0;
   const regeneratingRowIdSet = useMemo(() => new Set(regeneratingRowIds), [regeneratingRowIds]);
+  const purchasingRowIdSet = useMemo(() => new Set(purchasingRowIds), [purchasingRowIds]);
   const resolvedAvailableCount = selectedImport?.rowsWithDomain ?? rows.filter((row) => Boolean(row.domain?.trim())).length;
   const totalCount = selectedImport?.rowsTotal ?? rows.length;
   const totalPrice = useMemo(
@@ -186,17 +206,27 @@ export function DomainMatrixPage({ fixedProfileId = null, hideTitle = false }: D
   const isProgressVisible = Boolean(
     status && generationImportId && generationImportId === effectiveSelectedImportId && isJobInProgress(status.status),
   );
+  const isPurchaseProgressVisible = Boolean(
+    purchaseStatus &&
+      purchaseImportId &&
+      purchaseImportId === effectiveSelectedImportId &&
+      isJobInProgress(purchaseStatus.status),
+  );
 
   const clearActiveGenerationState = () => {
     setGenerationImportId(null);
     setJobId(null);
     writeActiveGeneration(null);
   };
+  const clearActivePurchaseState = () => {
+    setPurchaseImportId(null);
+    setPurchaseJobId(null);
+  };
 
-  const refreshTableData = async () => {
+  const refreshTableData = useCallback(async () => {
     await refetchImports();
     await refetchRows();
-  };
+  }, [refetchImports, refetchRows]);
 
   useEffect(() => {
     if (!jobId || !status || finishedJobRef.current === jobId) return;
@@ -212,7 +242,7 @@ export function DomainMatrixPage({ fixedProfileId = null, hideTitle = false }: D
       clearActiveGenerationState();
       showToast({ variant: "error", message: status.latestError ?? "Ошибка генерации доменов." });
     }
-  }, [jobId, showToast, status]);
+  }, [jobId, refreshTableData, showToast, status]);
 
   useEffect(() => {
     if (!jobId || !statusQuery.error) {
@@ -220,6 +250,30 @@ export function DomainMatrixPage({ fixedProfileId = null, hideTitle = false }: D
     }
     clearActiveGenerationState();
   }, [jobId, statusQuery.error]);
+
+  useEffect(() => {
+    if (!purchaseJobId || !purchaseStatus || finishedPurchaseJobRef.current === purchaseJobId) return;
+    if (purchaseStatus.status === DomainMatrixJobStatus.COMPLETED) {
+      finishedPurchaseJobRef.current = purchaseJobId;
+      clearActivePurchaseState();
+      showToast({ variant: "success", message: "Покупка завершена." });
+      void refreshTableData();
+      return;
+    }
+    if (purchaseStatus.status === DomainMatrixJobStatus.FAILED) {
+      finishedPurchaseJobRef.current = purchaseJobId;
+      clearActivePurchaseState();
+      showToast({ variant: "error", message: purchaseStatus.latestError ?? "Ошибка покупки доменов." });
+      void refreshTableData();
+    }
+  }, [purchaseJobId, purchaseStatus, refreshTableData, showToast]);
+
+  useEffect(() => {
+    if (!purchaseJobId || !purchaseStatusQuery.error) {
+      return;
+    }
+    clearActivePurchaseState();
+  }, [purchaseJobId, purchaseStatusQuery.error]);
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const nextFile = event.target.files?.[0];
@@ -274,6 +328,22 @@ export function DomainMatrixPage({ fixedProfileId = null, hideTitle = false }: D
       showToast({ variant: "success", message: "Генерация запущена." });
     } catch {
       showToast({ variant: "error", message: "Не удалось запустить генерацию." });
+    }
+  };
+
+  const handlePurchaseAll = async () => {
+    if (!effectiveSelectedImportId) {
+      showToast({ variant: "error", message: "Выберите импорт." });
+      return;
+    }
+    try {
+      const response = await purchaseImport({ importId: effectiveSelectedImportId }).unwrap();
+      setPurchaseJobId(response.jobId);
+      setPurchaseImportId(effectiveSelectedImportId);
+      finishedPurchaseJobRef.current = null;
+      showToast({ variant: "success", message: "Покупка запущена." });
+    } catch {
+      showToast({ variant: "error", message: "Не удалось запустить покупку доменов." });
     }
   };
 
@@ -336,6 +406,26 @@ export function DomainMatrixPage({ fixedProfileId = null, hideTitle = false }: D
     }
   };
 
+  const handlePurchaseRow = async (rowId: number) => {
+    if (purchasingRowIdSet.has(rowId)) return;
+    setPurchasingRowIds((prev) => [...prev, rowId]);
+    try {
+      const response = await purchaseRow({ rowId }).unwrap();
+      await refreshTableData();
+      if (response.status === DomainMatrixPurchaseItemStatus.SUCCESS) {
+        showToast({ variant: "success", message: "Домен куплен." });
+      } else if (response.status === DomainMatrixPurchaseItemStatus.SKIPPED) {
+        showToast({ variant: "success", message: "Покупка пропущена: домен уже куплен или не готов." });
+      } else {
+        showToast({ variant: "error", message: "Не удалось купить домен." });
+      }
+    } catch {
+      showToast({ variant: "error", message: "Не удалось купить домен." });
+    } finally {
+      setPurchasingRowIds((prev) => prev.filter((item) => item !== rowId));
+    }
+  };
+
   return (
     <PageRoot>
       {!hideTitle ? <PageTitle>Генерация доменов</PageTitle> : null}
@@ -376,9 +466,17 @@ export function DomainMatrixPage({ fixedProfileId = null, hideTitle = false }: D
                 type="button"
                 variant="primary"
                 onClick={handleGenerate}
-                disabled={!effectiveSelectedImportId || isGenerating || isJobActive}
+                disabled={!effectiveSelectedImportId || isGenerating || isJobActive || isPurchaseJobActive}
               >
                 {isGenerating ? "Запуск..." : "Сгенерировать недостающие домены"}
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                onClick={handlePurchaseAll}
+                disabled={!effectiveSelectedImportId || isPurchasingImport || isJobActive || isPurchaseJobActive}
+              >
+                {isPurchasingImport ? "Запуск..." : "Купить некупленные домены"}
               </Button>
             </RightControls>
           </ControlsRow>
@@ -396,6 +494,23 @@ export function DomainMatrixPage({ fixedProfileId = null, hideTitle = false }: D
               </ProgressLine>
               <ProgressBarTrack>
                 <ProgressBarValue $progress={status.progressPercent} />
+              </ProgressBarTrack>
+            </ProgressBlock>
+          </ProgressCard>
+        ) : null}
+
+        {isPurchaseProgressVisible && purchaseStatus ? (
+          <ProgressCard>
+            <ProgressBlock>
+              <ProgressLine>
+                <strong>Покупка:</strong> {purchaseStatus.status === DomainMatrixJobStatus.RUNNING ? "В обработке" : "В очереди"}
+                {" · "}
+                <strong>Этап:</strong> {STAGE_LABELS[purchaseStatus.stage] ?? purchaseStatus.stage}
+                {" · "}
+                <strong>Прогресс:</strong> {purchaseStatus.progressPercent}% ({purchaseStatus.processedCells}/{purchaseStatus.totalCells})
+              </ProgressLine>
+              <ProgressBarTrack>
+                <ProgressBarValue $progress={purchaseStatus.progressPercent} />
               </ProgressBarTrack>
             </ProgressBlock>
           </ProgressCard>
@@ -427,6 +542,7 @@ export function DomainMatrixPage({ fixedProfileId = null, hideTitle = false }: D
                   ) : (
                     rows.map((row) => {
                       const isRowRegenerating = regeneratingRowIdSet.has(row.id);
+                      const isRowPurchasing = purchasingRowIdSet.has(row.id);
                       const hasResolvedDomain = Boolean(row.domain?.trim());
                       return (
                         <DomainDataRow key={row.id} data-unresolved={hasResolvedDomain ? "false" : "true"}>
@@ -440,16 +556,28 @@ export function DomainMatrixPage({ fixedProfileId = null, hideTitle = false }: D
                             </PurchaseStatusBadge>
                           </TableCell>
                           <TableCell>
-                            <RegenerateButton
-                              type="button"
-                              onClick={() => handleRegenerate(row.id)}
-                              disabled={isRowRegenerating}
-                              title="Перегенерировать домен"
-                              aria-label="Перегенерировать домен"
-                              data-loading={isRowRegenerating}
-                            >
-                              <FaArrowsRotate />
-                            </RegenerateButton>
+                            <ActionButtonsRow>
+                              <ActionIconButton
+                                type="button"
+                                onClick={() => handleRegenerate(row.id)}
+                                disabled={isRowRegenerating || isPurchaseJobActive || isJobActive}
+                                title="Перегенерировать домен"
+                                aria-label="Перегенерировать домен"
+                                data-loading={isRowRegenerating}
+                              >
+                                <FaArrowsRotate />
+                              </ActionIconButton>
+                              <ActionIconButton
+                                type="button"
+                                onClick={() => handlePurchaseRow(row.id)}
+                                disabled={isRowPurchasing || row.isPurchased || !hasResolvedDomain || isPurchaseJobActive || isJobActive}
+                                title="Купить домен"
+                                aria-label="Купить домен"
+                                data-loading={isRowPurchasing}
+                              >
+                                <FaCartPlus />
+                              </ActionIconButton>
+                            </ActionButtonsRow>
                           </TableCell>
                         </DomainDataRow>
                       );
@@ -740,7 +868,12 @@ const PurchaseStatusBadge = styled.span`
   }
 `;
 
-const RegenerateButton = styled(Button)`
+const ActionButtonsRow = styled.div`
+  display: inline-flex;
+  gap: 6px;
+`;
+
+const ActionIconButton = styled(Button)`
   width: 34px;
   height: 34px;
   padding: 0;

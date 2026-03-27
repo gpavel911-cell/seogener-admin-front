@@ -10,6 +10,7 @@ import type {
   DeleteDomainMatrixImportPayload,
   DomainMatrixImportDto,
   DomainMatrixImportRowDto,
+  DomainMatrixRowPurchaseResponse,
   DomainMatrixStartResponse,
   DomainMatrixStatusResponse,
   GenerateDomainMatrixImportPayload,
@@ -22,6 +23,8 @@ import type {
   ListDnsRecordsRequest,
   ListDnsRecordsResponse,
   RegenerateDomainMatrixRowPayload,
+  PurchaseDomainMatrixImportPayload,
+  PurchaseDomainMatrixRowPayload,
   UpdateDomainMatrixImportPayload,
 } from "./types";
 
@@ -123,6 +126,12 @@ export const domainsApi = baseApi.injectEndpoints({
         method: "POST",
       }),
     }),
+    purchaseDomainMatrixImport: builder.mutation<DomainMatrixStartResponse, PurchaseDomainMatrixImportPayload>({
+      query: ({ importId }) => ({
+        url: API_ROUTES.REGISTRARS.PURCHASE_DOMAIN_MATRIX_IMPORT(importId),
+        method: "POST",
+      }),
+    }),
     getDomainMatrixImportRows: builder.query<Page<DomainMatrixImportRowDto>, GetDomainMatrixImportRowsPayload>({
       query: ({ importId, pageNumber, pageSize }) => ({
         url: API_ROUTES.REGISTRARS.GET_DOMAIN_MATRIX_IMPORT_ROWS(importId),
@@ -132,6 +141,12 @@ export const domainsApi = baseApi.injectEndpoints({
     regenerateDomainMatrixRow: builder.mutation<DomainMatrixImportRowDto, RegenerateDomainMatrixRowPayload>({
       query: ({ rowId }) => ({
         url: API_ROUTES.REGISTRARS.REGENERATE_DOMAIN_MATRIX_ROW(rowId),
+        method: "POST",
+      }),
+    }),
+    purchaseDomainMatrixRow: builder.mutation<DomainMatrixRowPurchaseResponse, PurchaseDomainMatrixRowPayload>({
+      query: ({ rowId }) => ({
+        url: API_ROUTES.REGISTRARS.PURCHASE_DOMAIN_MATRIX_ROW(rowId),
         method: "POST",
       }),
     }),
@@ -153,6 +168,8 @@ export const {
   useUpdateDomainMatrixImportMutation,
   useDeleteDomainMatrixImportMutation,
   useGenerateDomainMatrixImportMutation,
+  usePurchaseDomainMatrixImportMutation,
   useGetDomainMatrixImportRowsQuery,
   useRegenerateDomainMatrixRowMutation,
+  usePurchaseDomainMatrixRowMutation,
 } = domainsApi;

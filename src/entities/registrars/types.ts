@@ -146,6 +146,7 @@ export type DomainMatrixStatusResponse = {
   processedCells: number;
   successCells: number;
   failedCells: number;
+  skippedCells: number;
   latestError?: string | null;
   updatedAt: string;
 };
@@ -200,4 +201,30 @@ export type GetDomainMatrixImportRowsPayload = {
 
 export type RegenerateDomainMatrixRowPayload = {
   rowId: number;
+};
+
+export enum Environment {
+  TEST = "TEST",
+  PROD = "PROD",
+}
+
+export enum DomainMatrixPurchaseItemStatus {
+  SUCCESS = "SUCCESS",
+  FAILED = "FAILED",
+  SKIPPED = "SKIPPED",
+}
+
+export type PurchaseDomainMatrixImportPayload = {
+  importId: string;
+};
+
+export type PurchaseDomainMatrixRowPayload = {
+  rowId: number;
+};
+
+export type DomainMatrixRowPurchaseResponse = {
+  rowId: number;
+  status: DomainMatrixPurchaseItemStatus;
+  environment: Environment;
+  row: DomainMatrixImportRowDto;
 };
