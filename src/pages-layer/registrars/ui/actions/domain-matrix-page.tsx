@@ -22,6 +22,7 @@ import {
   DomainMatrixJobStage,
   DomainMatrixJobStatus,
   DomainMatrixPurchaseItemStatus,
+  DomainMatrixRowStatus,
   RegistrarProviderType,
 } from "@entities/registrars/types";
 import { usePagination } from "@shared/lib/use-pagination";
@@ -92,6 +93,32 @@ const writeActiveGeneration = (payload: ActiveGenerationPayload | null) => {
     return;
   }
   window.localStorage.setItem(ACTIVE_GENERATION_STORAGE_KEY, JSON.stringify(payload));
+};
+
+const getRowStatusLabel = (status?: DomainMatrixRowStatus): string => {
+  switch (status) {
+    case DomainMatrixRowStatus.UNRESOLVED:
+      return "Не сгенерирован";
+    case DomainMatrixRowStatus.AVAILABLE:
+      return "Не куплен";
+    case DomainMatrixRowStatus.UNAVAILABLE:
+      return "Недоступен";
+    case DomainMatrixRowStatus.PURCHASED:
+      return "Куплен";
+    default:
+      return "Не куплен";
+  }
+};
+
+const getRowStatusVariant = (status?: DomainMatrixRowStatus): "neutral" | "success" | "danger" => {
+  switch (status) {
+    case DomainMatrixRowStatus.PURCHASED:
+      return "success";
+    case DomainMatrixRowStatus.UNAVAILABLE:
+      return "danger";
+    default:
+      return "danger";
+  }
 };
 
 type DomainMatrixPageProps = {
@@ -544,6 +571,8 @@ export function DomainMatrixPage({ fixedProfileId = null, hideTitle = false }: D
                       const isRowRegenerating = regeneratingRowIdSet.has(row.id);
                       const isRowPurchasing = purchasingRowIdSet.has(row.id);
                       const hasResolvedDomain = Boolean(row.domain?.trim());
+                      const isRowPurchased = row.rowStatus === DomainMatrixRowStatus.PURCHASED;
+                      const isRowUnavailable = row.rowStatus === DomainMatrixRowStatus.UNAVAILABLE;
                       return (
                         <DomainDataRow key={row.id} data-unresolved={hasResolvedDomain ? "false" : "true"}>
                           <TableCell>{row.phrase1}</TableCell>
@@ -551,9 +580,9 @@ export function DomainMatrixPage({ fixedProfileId = null, hideTitle = false }: D
                           <TableCell>{hasResolvedDomain ? row.domain : "—"}</TableCell>
                           <TableCell>{row.price == null ? "—" : formatMoney(row.price)}</TableCell>
                           <TableCell>
-                            <PurchaseStatusBadge data-purchased={row.isPurchased ? "true" : "false"}>
-                              {row.isPurchased ? "Куплен" : "Не куплен"}
-                            </PurchaseStatusBadge>
+                            <RowStatusBadge data-variant={getRowStatusVariant(row.rowStatus)}>
+                              {getRowStatusLabel(row.rowStatus)}
+                            </RowStatusBadge>
                           </TableCell>
                           <TableCell>
                             <ActionButtonsRow>
@@ -570,7 +599,7 @@ export function DomainMatrixPage({ fixedProfileId = null, hideTitle = false }: D
                               <ActionIconButton
                                 type="button"
                                 onClick={() => handlePurchaseRow(row.id)}
-                                disabled={isRowPurchasing || row.isPurchased || !hasResolvedDomain || isPurchaseJobActive || isJobActive}
+                                disabled={isRowPurchasing || isRowPurchased || isRowUnavailable || !hasResolvedDomain || isPurchaseJobActive || isJobActive}
                                 title="Купить домен"
                                 aria-label="Купить домен"
                                 data-loading={isRowPurchasing}
@@ -850,21 +879,26 @@ const DomainDataRow = styled(TableRow)`
   }
 `;
 
-const PurchaseStatusBadge = styled.span`
+const RowStatusBadge = styled.span`
   display: inline-flex;
   padding: 4px 8px;
   border-radius: 999px;
   font-size: 12px;
   line-height: 1;
 
-  &[data-purchased="true"] {
+  &[data-variant="success"] {
     background: #ecfdf3;
     color: #027a48;
   }
 
-  &[data-purchased="false"] {
+  &[data-variant="danger"] {
     background: #fef3f2;
     color: #b42318;
+  }
+
+  &[data-variant="neutral"] {
+    background: #f2f4f7;
+    color: #667085;
   }
 `;
 

@@ -118,6 +118,121 @@ export type ListDnsRecordsResponse = {
   soa?: DnsSoa | null;
 };
 
+export enum DnsBulkRecordType {
+  A = "A",
+  TXT = "TXT",
+}
+
+export enum DnsBulkRowStatus {
+  PENDING = "PENDING",
+  SUCCESS = "SUCCESS",
+  FAILED = "FAILED",
+  SKIPPED = "SKIPPED",
+}
+
+export enum DnsBulkJobStatus {
+  QUEUED = "QUEUED",
+  RUNNING = "RUNNING",
+  COMPLETED = "COMPLETED",
+  FAILED = "FAILED",
+}
+
+export enum DnsBulkJobStage {
+  VALIDATING = "VALIDATING",
+  PROCESSING = "PROCESSING",
+  WRITING = "WRITING",
+  FINALIZING = "FINALIZING",
+}
+
+export type DnsBulkImportDto = {
+  id: string;
+  name: string;
+  registrar: RegistrarProviderType;
+  profile: string;
+  recordType: DnsBulkRecordType;
+  rowsTotal: number;
+  rowsSuccess: number;
+  rowsFailed: number;
+  rowsSkipped: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type DnsBulkImportRowDto = {
+  id: number;
+  domain: string;
+  host: string;
+  recordType: DnsBulkRecordType;
+  ipv4?: string | null;
+  status: DnsBulkRowStatus;
+  lastError?: string | null;
+  attempts: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreateDnsBulkImportPayload = {
+  file: File;
+  registrar: RegistrarProviderType;
+  profileId: string;
+  recordType: DnsBulkRecordType;
+  name?: string;
+};
+
+export type GetDnsBulkImportsPayload = {
+  registrar: RegistrarProviderType;
+  profileId: string;
+  recordType: DnsBulkRecordType;
+};
+
+export type UpdateDnsBulkImportPayload = {
+  importId: string;
+  name: string;
+};
+
+export type DeleteDnsBulkImportPayload = {
+  importId: string;
+};
+
+export type GetDnsBulkImportRowsPayload = {
+  importId: string;
+  pageNumber: number;
+  pageSize: number;
+};
+
+export type GenerateDnsBulkImportPayload = {
+  importId: string;
+};
+
+export type DnsBulkStartResponse = {
+  jobId: string;
+  status: DnsBulkJobStatus;
+};
+
+export type DnsBulkJobStatusResponse = {
+  jobId: string;
+  status: DnsBulkJobStatus;
+  stage: DnsBulkJobStage;
+  progressPercent: number;
+  totalRows: number;
+  processedRows: number;
+  successRows: number;
+  failedRows: number;
+  skippedRows: number;
+  latestError?: string | null;
+  updatedAt: string;
+};
+
+export type CreateDnsBulkRowPayload = {
+  rowId: number;
+};
+
+export type DnsBulkRowActionResponse = {
+  rowId: number;
+  status: DnsBulkRowStatus;
+  row: DnsBulkImportRowDto;
+};
+
 export enum DomainMatrixJobStatus {
   QUEUED = "QUEUED",
   RUNNING = "RUNNING",
@@ -169,10 +284,17 @@ export type DomainMatrixImportRowDto = {
   phrase2: string;
   domain?: string | null;
   price?: number | null;
-  isPurchased: boolean;
+  rowStatus: DomainMatrixRowStatus;
   createdAt: string;
   updatedAt: string;
 };
+
+export enum DomainMatrixRowStatus {
+  UNRESOLVED = "UNRESOLVED",
+  AVAILABLE = "AVAILABLE",
+  UNAVAILABLE = "UNAVAILABLE",
+  PURCHASED = "PURCHASED",
+}
 
 export type CreateDomainMatrixImportPayload = {
   file: File;
