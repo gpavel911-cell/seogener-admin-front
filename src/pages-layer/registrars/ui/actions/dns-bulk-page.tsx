@@ -5,11 +5,14 @@ import { skipToken } from "@reduxjs/toolkit/query";
 import { FaPlus } from "react-icons/fa6";
 import styled from "styled-components";
 import {
+  useCheckDnsBulkImportAMutation,
+  useCheckDnsBulkImportNsMutation,
+  useCheckDnsBulkImportTxtMutation,
+  useCreateDnsBulkRecordsMutation,
   useCreateDnsBulkImportMutation,
-  useCreateDnsBulkRowAMutation,
-  useCreateDnsBulkRowTxtMutation,
   useDeleteDnsBulkImportMutation,
   useGenerateDnsBulkImportAMutation,
+  useGenerateDnsBulkImportNsMutation,
   useGenerateDnsBulkImportTxtMutation,
   useGetDnsBulkImportRowsQuery,
   useGetDnsBulkImportsQuery,
@@ -67,6 +70,7 @@ export function DnsBulkPage({ recordType, fixedRegistrar = null, fixedProfile = 
   const [importName, setImportName] = useState("");
   const [jobId, setJobId] = useState<string | null>(null);
   const [jobImportId, setJobImportId] = useState<string | null>(null);
+  const [jobOperationType, setJobOperationType] = useState<"generate" | "check">("generate");
   const [activeRowIds, setActiveRowIds] = useState<number[]>([]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -126,10 +130,13 @@ export function DnsBulkPage({ recordType, fixedRegistrar = null, fixedProfile = 
   const activeRowIdSet = useMemo(() => new Set(activeRowIds), [activeRowIds]);
 
   const [createImport, { isLoading: isCreateImportLoading }] = useCreateDnsBulkImportMutation();
+  const [createDnsBulkRecords] = useCreateDnsBulkRecordsMutation();
   const [generateA, { isLoading: isGenerateALoading }] = useGenerateDnsBulkImportAMutation();
+  const [generateNs, { isLoading: isGenerateNsLoading }] = useGenerateDnsBulkImportNsMutation();
   const [generateTxt, { isLoading: isGenerateTxtLoading }] = useGenerateDnsBulkImportTxtMutation();
-  const [createRowA] = useCreateDnsBulkRowAMutation();
-  const [createRowTxt] = useCreateDnsBulkRowTxtMutation();
+  const [checkA, { isLoading: isCheckALoading }] = useCheckDnsBulkImportAMutation();
+  const [checkNs, { isLoading: isCheckNsLoading }] = useCheckDnsBulkImportNsMutation();
+  const [checkTxt, { isLoading: isCheckTxtLoading }] = useCheckDnsBulkImportTxtMutation();
   const [updateImport, { isLoading: isUpdateImportLoading }] = useUpdateDnsBulkImportMutation();
   const [deleteImport, { isLoading: isDeleteImportLoading }] = useDeleteDnsBulkImportMutation();
 
@@ -138,33 +145,44 @@ export function DnsBulkPage({ recordType, fixedRegistrar = null, fixedProfile = 
     refetchOnMountOrArgChange: true,
   });
   const status = statusQuery.data;
-  const isJobActive = isJobInProgress(status?.status);
+  const currentStatus = status && jobId && status.jobId === jobId ? status : undefined;
+  const isJobActive = isJobInProgress(currentStatus?.status);
 
   useEffect(() => {
-    if (!status || !jobId) return;
+    if (!status || !jobId || status.jobId !== jobId) return;
     if (status.status === DnsBulkJobStatus.COMPLETED) {
-      setJobId(null);
-      setJobImportId(null);
+      const timer = setTimeout(() => {
+        setJobId(null);
+        setJobImportId(null);
+      }, 0);
+      const completedLabel = jobOperationType === "check" ? "Массовая проверка" : "Массовое создание";
       if (status.failedRows > 0) {
         showToast({
           variant: "error",
-          message: `Массовое создание завершено с ошибками. Не создано: ${status.failedRows}.`,
+          message: `${completedLabel} завершена с ошибками. Ошибок: ${status.failedRows}.`,
         });
       } else {
-        showToast({ variant: "success", message: "Массовое создание завершено." });
+        showToast({ variant: "success", message: `${completedLabel} завершена.` });
       }
       void refetchImports();
       void refetchRows();
-      return;
+      return () => clearTimeout(timer);
     }
     if (status.status === DnsBulkJobStatus.FAILED) {
-      setJobId(null);
-      setJobImportId(null);
-      showToast({ variant: "error", message: status.latestError ?? "Ошибка массового создания." });
+      const timer = setTimeout(() => {
+        setJobId(null);
+        setJobImportId(null);
+      }, 0);
+      showToast({
+        variant: "error",
+        message: status.latestError ?? (jobOperationType === "check" ? "Ошибка массовой проверки." : "Ошибка массового создания."),
+      });
       void refetchImports();
       void refetchRows();
+      return () => clearTimeout(timer);
     }
-  }, [jobId, refetchImports, refetchRows, showToast, status]);
+    return undefined;
+  }, [jobId, jobOperationType, refetchImports, refetchRows, showToast, status]);
 
   useEffect(() => {
     setPage(0);
@@ -235,14 +253,37 @@ export function DnsBulkPage({ recordType, fixedRegistrar = null, fixedProfile = 
       return;
     }
     try {
+      setJobOperationType("generate");
       const response = recordType === DnsBulkRecordType.A
         ? await generateA({ importId: effectiveSelectedImportId }).unwrap()
-        : await generateTxt({ importId: effectiveSelectedImportId }).unwrap();
+        : recordType === DnsBulkRecordType.TXT
+          ? await generateTxt({ importId: effectiveSelectedImportId }).unwrap()
+          : await generateNs({ importId: effectiveSelectedImportId }).unwrap();
       setJobId(response.jobId);
       setJobImportId(effectiveSelectedImportId);
       showToast({ variant: "success", message: "Массовое создание запущено." });
     } catch {
       showToast({ variant: "error", message: "Не удалось запустить массовое создание." });
+    }
+  };
+
+  const handleCheck = async () => {
+    if (!effectiveSelectedImportId) {
+      showToast({ variant: "error", message: "Выберите импорт." });
+      return;
+    }
+    try {
+      setJobOperationType("check");
+      const response = recordType === DnsBulkRecordType.A
+        ? await checkA({ importId: effectiveSelectedImportId }).unwrap()
+        : recordType === DnsBulkRecordType.TXT
+          ? await checkTxt({ importId: effectiveSelectedImportId }).unwrap()
+          : await checkNs({ importId: effectiveSelectedImportId }).unwrap();
+      setJobId(response.jobId);
+      setJobImportId(effectiveSelectedImportId);
+      showToast({ variant: "success", message: "Массовая проверка запущена." });
+    } catch {
+      showToast({ variant: "error", message: "Не удалось запустить массовую проверку." });
     }
   };
 
@@ -290,16 +331,40 @@ export function DnsBulkPage({ recordType, fixedRegistrar = null, fixedProfile = 
 
   const handleCreateRow = async (rowId: number) => {
     if (activeRowIdSet.has(rowId)) return;
+    if (!resolvedRegistrar || !resolvedProfile) {
+      showToast({ variant: "error", message: "Выберите регистратора и профиль." });
+      return;
+    }
+    const row = rows.find((item) => item.id === rowId);
+    if (!row) {
+      showToast({ variant: "error", message: "Строка не найдена." });
+      return;
+    }
     setActiveRowIds((prev) => [...prev, rowId]);
     try {
-      if (recordType === DnsBulkRecordType.A) {
-        await createRowA({ rowId }).unwrap();
+      const response = await createDnsBulkRecords({
+        registrar: resolvedRegistrar,
+        profileId: resolvedProfile,
+        recordType,
+        rows: [
+          {
+            domain: row.domain,
+            host: recordType === DnsBulkRecordType.NS ? undefined : row.host,
+            ipv4: recordType === DnsBulkRecordType.A ? (row.ipv4 ?? undefined) : undefined,
+            text: recordType === DnsBulkRecordType.TXT ? "" : undefined,
+          },
+        ],
+      }).unwrap();
+      const first = response.rows[0];
+      if (!first || first.status === DnsBulkRowStatus.FAILED) {
+        showToast({ variant: "error", message: first?.error ?? "Не удалось обработать запись." });
+      } else if (first.status === DnsBulkRowStatus.SKIPPED) {
+        showToast({ variant: "success", message: "Запись уже существует." });
       } else {
-        await createRowTxt({ rowId }).unwrap();
+        showToast({ variant: "success", message: "Запись успешно обработана." });
       }
       await refetchRows();
       await refetchImports();
-      showToast({ variant: "success", message: "Запись успешно обработана." });
     } catch {
       showToast({ variant: "error", message: "Не удалось обработать запись." });
     } finally {
@@ -307,14 +372,42 @@ export function DnsBulkPage({ recordType, fixedRegistrar = null, fixedProfile = 
     }
   };
 
-  const isProgressVisible = Boolean(status && jobImportId === effectiveSelectedImportId && isJobInProgress(status.status));
-  const isGenerateLoading = isGenerateALoading || isGenerateTxtLoading;
-  const actionTitle = recordType === DnsBulkRecordType.A ? "Создать А-записи" : "Создать TXT-записи";
-  const generateButtonLabel =
-    recordType === DnsBulkRecordType.A ? "Создать недостающие А-записи" : "Создать недостающие TXT-записи";
-  const rowActionLabel = recordType === DnsBulkRecordType.A ? "Создать A" : "Создать TXT";
+  const isProgressVisible = Boolean(
+    jobId && jobImportId === effectiveSelectedImportId && (!currentStatus || isJobInProgress(currentStatus.status)),
+  );
+  const isGenerateLoading = isGenerateALoading || isGenerateTxtLoading || isGenerateNsLoading;
+  const isCheckLoading = isCheckALoading || isCheckTxtLoading || isCheckNsLoading;
+  const actionTitle = recordType === DnsBulkRecordType.A
+    ? "Создать А-записи"
+    : recordType === DnsBulkRecordType.TXT
+      ? "Создать TXT-записи"
+      : "Создать NS-записи";
+  const checkButtonLabel = recordType === DnsBulkRecordType.A
+    ? "Проверить А-записи"
+    : recordType === DnsBulkRecordType.TXT
+      ? "Проверить TXT-записи"
+      : "Проверить NS-записи";
+  const generateButtonLabel = recordType === DnsBulkRecordType.A
+    ? "Создать недостающие А-записи"
+    : recordType === DnsBulkRecordType.TXT
+      ? "Создать недостающие TXT-записи"
+      : "Создать недостающие NS-записи";
   const supportsIpv4 = recordType === DnsBulkRecordType.A;
+  const hostHeaderLabel = recordType === DnsBulkRecordType.NS ? "NS-серверы" : "Хост (поддомен)";
   const selectedImport = imports.find((item) => item.id === effectiveSelectedImportId) ?? null;
+  const allRowsCreated = Boolean(
+    selectedImport &&
+      selectedImport.rowsTotal > 0 &&
+      selectedImport.rowsSuccess + selectedImport.rowsSkipped >= selectedImport.rowsTotal,
+  );
+  const isAddImportLoading = isCreateImportLoading;
+  const isAddImportValid = Boolean(file);
+
+  const handleCloseAddImportDialog = () => {
+    setIsAddDialogOpen(false);
+    setFile(null);
+    setImportName("");
+  };
 
   return (
     <PageRoot>
@@ -374,9 +467,16 @@ export function DnsBulkPage({ recordType, fixedRegistrar = null, fixedProfile = 
             <RightControls>
               <Button
                 type="button"
+                onClick={handleCheck}
+                disabled={!effectiveSelectedImportId || isCheckLoading || isJobActive}
+              >
+                {isCheckLoading ? "Запуск..." : checkButtonLabel}
+              </Button>
+              <Button
+                type="button"
                 variant="primary"
                 onClick={handleGenerate}
-                disabled={!effectiveSelectedImportId || isGenerateLoading || isJobActive}
+                disabled={!effectiveSelectedImportId || isGenerateLoading || isJobActive || allRowsCreated}
               >
                 {isGenerateLoading ? "Запуск..." : generateButtonLabel}
               </Button>
@@ -384,17 +484,17 @@ export function DnsBulkPage({ recordType, fixedRegistrar = null, fixedProfile = 
           </ControlsRow>
         </FormCard>
 
-        {isProgressVisible && status ? (
+        {isProgressVisible ? (
           <ProgressCard>
             <ProgressLine>
-              <strong>Статус:</strong> {status.status === DnsBulkJobStatus.RUNNING ? "В обработке" : "В очереди"}
+              <strong>Статус:</strong> {currentStatus?.status === DnsBulkJobStatus.RUNNING ? "В обработке" : "В очереди"}
               {" · "}
-              <strong>Этап:</strong> {STAGE_LABELS[status.stage] ?? status.stage}
+              <strong>Этап:</strong> {currentStatus ? (STAGE_LABELS[currentStatus.stage] ?? currentStatus.stage) : "Валидация"}
               {" · "}
-              <strong>Прогресс:</strong> {status.progressPercent}% ({status.processedRows}/{status.totalRows})
+              <strong>Прогресс:</strong> {currentStatus ? `${currentStatus.progressPercent}% (${currentStatus.processedRows}/${currentStatus.totalRows})` : "0% (0/0)"}
             </ProgressLine>
             <ProgressBarTrack>
-              <ProgressBarValue $progress={status.progressPercent} />
+              <ProgressBarValue $progress={currentStatus?.progressPercent ?? 0} />
             </ProgressBarTrack>
           </ProgressCard>
         ) : null}
@@ -411,7 +511,7 @@ export function DnsBulkPage({ recordType, fixedRegistrar = null, fixedProfile = 
                   <TableRow>
                     <TableHeaderCell>Домен</TableHeaderCell>
                     {supportsIpv4 ? <TableHeaderCell>IPv4</TableHeaderCell> : null}
-                    <TableHeaderCell>Хост (поддомен)</TableHeaderCell>
+                    <TableHeaderCell>{hostHeaderLabel}</TableHeaderCell>
                     <TableHeaderCell>Статус</TableHeaderCell>
                     <TableHeaderCell>Действие</TableHeaderCell>
                   </TableRow>
@@ -435,7 +535,7 @@ export function DnsBulkPage({ recordType, fixedRegistrar = null, fixedProfile = 
                         <TableRow key={row.id}>
                           <TableCell>{row.domain}</TableCell>
                           {supportsIpv4 ? <TableCell>{row.ipv4 ?? "—"}</TableCell> : null}
-                          <TableCell>{row.host}</TableCell>
+                          <TableCell>{recordType === DnsBulkRecordType.NS ? "ns1.reg.ru, ns2.reg.ru" : row.host}</TableCell>
                           <TableCell>
                             <StatusBadge data-created={isRecordCreated ? "true" : "false"} title={row.lastError ?? undefined}>
                               {rowStatusLabel}
@@ -445,10 +545,10 @@ export function DnsBulkPage({ recordType, fixedRegistrar = null, fixedProfile = 
                             <RowActionIconButton
                               type="button"
                               onClick={() => handleCreateRow(row.id)}
-                              disabled={isRowLoading || isJobActive}
-                              title={rowActionLabel}
-                              aria-label={rowActionLabel}
+                              disabled={isRowLoading || isJobActive || isRecordCreated}
                               data-loading={isRowLoading}
+                              title="Обработать строку"
+                              aria-label="Обработать строку"
                             >
                               <FaPlus />
                             </RowActionIconButton>
@@ -480,20 +580,20 @@ export function DnsBulkPage({ recordType, fixedRegistrar = null, fixedProfile = 
         contentWidth="480px"
       >
         <AddModalBody>
-          <HiddenFileInput ref={fileInputRef} type="file" accept=".xlsx" onChange={handleFileChange} disabled={isCreateImportLoading} />
+          <HiddenFileInput ref={fileInputRef} type="file" accept=".xlsx" onChange={handleFileChange} disabled={isAddImportLoading} />
           <AddModalField>
             <FieldLabel>Название импорта (опционально)</FieldLabel>
             <AddModalNameInput
               value={importName}
               onChange={(event) => setImportName(event.target.value)}
               placeholder="По умолчанию: UTC timestamp"
-              disabled={isCreateImportLoading}
+              disabled={isAddImportLoading}
             />
           </AddModalField>
           <AddModalField>
             <FieldLabel>Excel-файл</FieldLabel>
             <AddModalFilePickerRow>
-              <Button type="button" onClick={() => fileInputRef.current?.click()} disabled={isCreateImportLoading}>
+              <Button type="button" onClick={() => fileInputRef.current?.click()} disabled={isAddImportLoading}>
                 Выбрать .xlsx
               </Button>
               <AddModalHint>{file ? file.name : "Файл не выбран"}</AddModalHint>
@@ -502,12 +602,8 @@ export function DnsBulkPage({ recordType, fixedRegistrar = null, fixedProfile = 
           <DialogActions>
             <Button
               type="button"
-              onClick={() => {
-                setIsAddDialogOpen(false);
-                setFile(null);
-                setImportName("");
-              }}
-              disabled={isCreateImportLoading}
+              onClick={handleCloseAddImportDialog}
+              disabled={isAddImportLoading}
             >
               Отмена
             </Button>
@@ -515,9 +611,9 @@ export function DnsBulkPage({ recordType, fixedRegistrar = null, fixedProfile = 
               type="button"
               variant="primary"
               onClick={handleCreateImport}
-              disabled={isCreateImportLoading || !file}
+              disabled={isAddImportLoading || !isAddImportValid}
             >
-              {isCreateImportLoading ? "Добавление..." : "Добавить импорт"}
+              {isAddImportLoading ? "Добавление..." : "Добавить импорт"}
             </Button>
           </DialogActions>
         </AddModalBody>
@@ -731,3 +827,4 @@ const RowActionIconButton = styled(Button)`
     }
   }
 `;
+

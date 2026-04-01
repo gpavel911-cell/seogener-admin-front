@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useCreateRegistrarTxtRecordMutation } from "@entities/registrars/api";
+import { useCreateRegistrarNsRecordMutation } from "@entities/registrars/api";
 import type { RegistrarProviderType } from "@entities/registrars/types";
 import { useRegistrarSelectOptions } from "@entities/registrars/select-options";
 import {
@@ -18,19 +18,16 @@ import {
   PlaceholderText,
   ResultCard,
   SelectControl,
-  StyledInput,
   useToast,
 } from "@shared/ui";
 
-type CreateTxtRecordProps = {
+type CreateNsRecordProps = {
   fixedRegistrar?: RegistrarProviderType | null;
   fixedProfile?: string | null;
 };
 
-export const CreateTxtRecord = ({ fixedRegistrar, fixedProfile }: CreateTxtRecordProps = {}) => {
+export const CreateNsRecord = ({ fixedRegistrar, fixedProfile }: CreateNsRecordProps = {}) => {
   const [selectedDomain, setSelectedDomain] = useState("");
-  const [subdomain, setSubdomain] = useState("@");
-  const [text, setText] = useState("");
   const [activeRegistrar, setActiveRegistrar] = useState<RegistrarProviderType | null>(null);
   const [activeProfile, setActiveProfile] = useState<string | null>(null);
   const [resultMessage, setResultMessage] = useState("");
@@ -51,7 +48,7 @@ export const CreateTxtRecord = ({ fixedRegistrar, fixedProfile }: CreateTxtRecor
     fixedProfile: fixedProfile ?? null,
   });
 
-  const [createTxtRecord, { isLoading: isCreateLoading }] = useCreateRegistrarTxtRecordMutation();
+  const [createNsRecord, { isLoading: isCreateLoading }] = useCreateRegistrarNsRecordMutation();
 
   const handleRegistrarChange = (value: RegistrarProviderType | "") => {
     if (!value) {
@@ -84,15 +81,13 @@ export const CreateTxtRecord = ({ fixedRegistrar, fixedProfile }: CreateTxtRecor
       return;
     }
     try {
-      const response = await createTxtRecord({
+      const response = await createNsRecord({
         registrar: resolvedRegistrar,
         profileId: resolvedProfile,
         domain: selectedDomain,
-        subdomain: subdomain.trim() || "@",
-        text: text.trim(),
       }).unwrap();
       const note = response.note ? ` (${response.note})` : "";
-      const message = `TXT-запись создана${note}.`;
+      const message = `NS-запись создана${note}.`;
       setResultMessage(message);
       showToast({ variant: "success", message });
     } catch (error) {
@@ -100,7 +95,7 @@ export const CreateTxtRecord = ({ fixedRegistrar, fixedProfile }: CreateTxtRecor
         typeof error === "object" && error !== null && "data" in error
           ? (error as { data?: { message?: string } }).data?.message
           : undefined;
-      showToast({ variant: "error", message: message || "Не удалось создать TXT-запись." });
+      showToast({ variant: "error", message: message || "Не удалось создать NS-запись." });
     }
   };
 
@@ -142,18 +137,10 @@ export const CreateTxtRecord = ({ fixedRegistrar, fixedProfile }: CreateTxtRecor
                 placeholder="Выберите домен"
               />
             </FormField>
-            <FormField>
-              <FieldLabel>Хост (поддомен)</FieldLabel>
-              <StyledInput value={subdomain} onChange={(event) => setSubdomain(event.target.value)} placeholder="@" />
-            </FormField>
-            <FormField>
-              <FieldLabel>TXT значение</FieldLabel>
-              <StyledInput value={text} onChange={(event) => setText(event.target.value)} placeholder="text" />
-            </FormField>
           </FormFields>
           <FormActions>
             <Button type="button" variant="primary" onClick={handleCreate} disabled={isCreateLoading}>
-              {isCreateLoading ? "Создание..." : "Создать TXT-запись"}
+              {isCreateLoading ? "Создание..." : "Создать NS-запись"}
             </Button>
           </FormActions>
         </FormRow>

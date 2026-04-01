@@ -3,16 +3,18 @@ import type { Page } from "@shared/api";
 import { baseApi } from "@shared/store";
 import type {
   CreateDnsBulkImportPayload,
-  CreateDnsBulkRowPayload,
+  DnsBulkCreateRecordsPayload,
+  DnsBulkCreateRecordsResponse,
   DeleteDnsBulkImportPayload,
   CreateARecordRequest,
   CreateARecordResponse,
+  CreateNsRecordRequest,
+  CreateNsRecordResponse,
   CreateTxtRecordRequest,
   CreateTxtRecordResponse,
   DnsBulkImportDto,
   DnsBulkImportRowDto,
   DnsBulkJobStatusResponse,
-  DnsBulkRowActionResponse,
   DnsBulkStartResponse,
   CreateDomainMatrixImportPayload,
   DeleteDomainMatrixImportPayload,
@@ -22,6 +24,7 @@ import type {
   DomainMatrixStartResponse,
   DomainMatrixStatusResponse,
   GenerateDomainMatrixImportPayload,
+  CheckDomainMatrixImportAvailabilityPayload,
   GenerateDnsBulkImportPayload,
   GetDnsBulkImportRowsPayload,
   GetDnsBulkImportsPayload,
@@ -94,6 +97,13 @@ export const domainsApi = baseApi.injectEndpoints({
         body: payload,
       }),
     }),
+    createRegistrarNsRecord: builder.mutation<CreateNsRecordResponse, CreateNsRecordRequest>({
+      query: (payload) => ({
+        url: API_ROUTES.REGISTRARS.CREATE_REGISTRAR_NS_RECORD,
+        method: "POST",
+        body: payload,
+      }),
+    }),
     getDnsBulkJobStatus: builder.query<DnsBulkJobStatusResponse, { jobId: string }>({
       query: ({ jobId }) => ({
         url: API_ROUTES.REGISTRARS.GET_DNS_BULK_JOB_STATUS(jobId),
@@ -115,6 +125,13 @@ export const domainsApi = baseApi.injectEndpoints({
           body: formData,
         };
       },
+    }),
+    createDnsBulkRecords: builder.mutation<DnsBulkCreateRecordsResponse, DnsBulkCreateRecordsPayload>({
+      query: (payload) => ({
+        url: API_ROUTES.REGISTRARS.CREATE_DNS_BULK_RECORDS,
+        method: "POST",
+        body: payload,
+      }),
     }),
     getDnsBulkImports: builder.query<DnsBulkImportDto[], GetDnsBulkImportsPayload>({
       query: ({ registrar, profileId, recordType }) => ({
@@ -153,15 +170,27 @@ export const domainsApi = baseApi.injectEndpoints({
         method: "POST",
       }),
     }),
-    createDnsBulkRowA: builder.mutation<DnsBulkRowActionResponse, CreateDnsBulkRowPayload>({
-      query: ({ rowId }) => ({
-        url: API_ROUTES.REGISTRARS.CREATE_DNS_BULK_ROW_A(rowId),
+    generateDnsBulkImportNs: builder.mutation<DnsBulkStartResponse, GenerateDnsBulkImportPayload>({
+      query: ({ importId }) => ({
+        url: API_ROUTES.REGISTRARS.GENERATE_DNS_BULK_IMPORT_NS(importId),
         method: "POST",
       }),
     }),
-    createDnsBulkRowTxt: builder.mutation<DnsBulkRowActionResponse, CreateDnsBulkRowPayload>({
-      query: ({ rowId }) => ({
-        url: API_ROUTES.REGISTRARS.CREATE_DNS_BULK_ROW_TXT(rowId),
+    checkDnsBulkImportA: builder.mutation<DnsBulkStartResponse, GenerateDnsBulkImportPayload>({
+      query: ({ importId }) => ({
+        url: API_ROUTES.REGISTRARS.CHECK_DNS_BULK_IMPORT_A(importId),
+        method: "POST",
+      }),
+    }),
+    checkDnsBulkImportTxt: builder.mutation<DnsBulkStartResponse, GenerateDnsBulkImportPayload>({
+      query: ({ importId }) => ({
+        url: API_ROUTES.REGISTRARS.CHECK_DNS_BULK_IMPORT_TXT(importId),
+        method: "POST",
+      }),
+    }),
+    checkDnsBulkImportNs: builder.mutation<DnsBulkStartResponse, GenerateDnsBulkImportPayload>({
+      query: ({ importId }) => ({
+        url: API_ROUTES.REGISTRARS.CHECK_DNS_BULK_IMPORT_NS(importId),
         method: "POST",
       }),
     }),
@@ -209,6 +238,12 @@ export const domainsApi = baseApi.injectEndpoints({
         method: "POST",
       }),
     }),
+    checkDomainMatrixImportAvailability: builder.mutation<DomainMatrixStartResponse, CheckDomainMatrixImportAvailabilityPayload>({
+      query: ({ importId }) => ({
+        url: API_ROUTES.REGISTRARS.CHECK_DOMAIN_MATRIX_IMPORT_AVAILABILITY(importId),
+        method: "POST",
+      }),
+    }),
     purchaseDomainMatrixImport: builder.mutation<DomainMatrixStartResponse, PurchaseDomainMatrixImportPayload>({
       query: ({ importId }) => ({
         url: API_ROUTES.REGISTRARS.PURCHASE_DOMAIN_MATRIX_IMPORT(importId),
@@ -245,22 +280,27 @@ export const {
   useLazyGetRegistrarDnsRecordsQuery,
   useCreateRegistrarARecordMutation,
   useCreateRegistrarTxtRecordMutation,
+  useCreateRegistrarNsRecordMutation,
   useGetDnsBulkJobStatusQuery,
   useCreateDnsBulkImportMutation,
+  useCreateDnsBulkRecordsMutation,
   useGetDnsBulkImportsQuery,
   useUpdateDnsBulkImportMutation,
   useDeleteDnsBulkImportMutation,
   useGetDnsBulkImportRowsQuery,
   useGenerateDnsBulkImportAMutation,
   useGenerateDnsBulkImportTxtMutation,
-  useCreateDnsBulkRowAMutation,
-  useCreateDnsBulkRowTxtMutation,
+  useGenerateDnsBulkImportNsMutation,
+  useCheckDnsBulkImportAMutation,
+  useCheckDnsBulkImportTxtMutation,
+  useCheckDnsBulkImportNsMutation,
   useGetDomainMatrixJobStatusQuery,
   useCreateDomainMatrixImportMutation,
   useGetDomainMatrixImportsQuery,
   useUpdateDomainMatrixImportMutation,
   useDeleteDomainMatrixImportMutation,
   useGenerateDomainMatrixImportMutation,
+  useCheckDomainMatrixImportAvailabilityMutation,
   usePurchaseDomainMatrixImportMutation,
   useGetDomainMatrixImportRowsQuery,
   useRegenerateDomainMatrixRowMutation,

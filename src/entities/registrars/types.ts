@@ -58,36 +58,6 @@ export type RegistrarDomainProfileDto = {
   profile: string;
 };
 
-export type CreateARecordRequest = {
-  registrar: RegistrarProviderType;
-  profileId: string;
-  domain: string;
-  subdomain?: string;
-  ipv4: string;
-};
-
-export type CreateARecordResponse = {
-  result: string;
-  errorCode?: string | null;
-  errorText?: string | null;
-  note?: string | null;
-};
-
-export type CreateTxtRecordRequest = {
-  registrar: RegistrarProviderType;
-  profileId: string;
-  domain: string;
-  subdomain?: string;
-  text: string;
-};
-
-export type CreateTxtRecordResponse = {
-  result: string;
-  errorCode?: string | null;
-  errorText?: string | null;
-  note?: string | null;
-};
-
 export type ListDnsRecordsRequest = {
   registrar: RegistrarProviderType;
   profileId: string;
@@ -118,9 +88,53 @@ export type ListDnsRecordsResponse = {
   soa?: DnsSoa | null;
 };
 
+export type CreateARecordRequest = {
+  registrar: RegistrarProviderType;
+  profileId: string;
+  domain: string;
+  subdomain?: string;
+  ipv4: string;
+};
+
+export type CreateARecordResponse = {
+  result: string;
+  errorCode?: string | null;
+  errorText?: string | null;
+  note?: string | null;
+};
+
+export type CreateTxtRecordRequest = {
+  registrar: RegistrarProviderType;
+  profileId: string;
+  domain: string;
+  subdomain?: string;
+  text: string;
+};
+
+export type CreateTxtRecordResponse = {
+  result: string;
+  errorCode?: string | null;
+  errorText?: string | null;
+  note?: string | null;
+};
+
+export type CreateNsRecordRequest = {
+  registrar: RegistrarProviderType;
+  profileId: string;
+  domain: string;
+};
+
+export type CreateNsRecordResponse = {
+  result: string;
+  errorCode?: string | null;
+  errorText?: string | null;
+  note?: string | null;
+};
+
 export enum DnsBulkRecordType {
   A = "A",
   TXT = "TXT",
+  NS = "NS",
 }
 
 export enum DnsBulkRowStatus {
@@ -179,6 +193,28 @@ export type CreateDnsBulkImportPayload = {
   name?: string;
 };
 
+export type DnsBulkCreateRecordsPayload = {
+  registrar: RegistrarProviderType;
+  profileId: string;
+  recordType: DnsBulkRecordType;
+  rows: Array<{
+    domain: string;
+    host?: string;
+    text?: string;
+    ipv4?: string;
+  }>;
+};
+
+export type DnsBulkCreateRecordsResponse = {
+  rows: Array<{
+    domain: string;
+    host?: string | null;
+    ipv4?: string | null;
+    status: DnsBulkRowStatus;
+    error?: string | null;
+  }>;
+};
+
 export type GetDnsBulkImportsPayload = {
   registrar: RegistrarProviderType;
   profileId: string;
@@ -221,16 +257,6 @@ export type DnsBulkJobStatusResponse = {
   skippedRows: number;
   latestError?: string | null;
   updatedAt: string;
-};
-
-export type CreateDnsBulkRowPayload = {
-  rowId: number;
-};
-
-export type DnsBulkRowActionResponse = {
-  rowId: number;
-  status: DnsBulkRowStatus;
-  row: DnsBulkImportRowDto;
 };
 
 export enum DomainMatrixJobStatus {
@@ -312,6 +338,10 @@ export type DeleteDomainMatrixImportPayload = {
 };
 
 export type GenerateDomainMatrixImportPayload = {
+  importId: string;
+};
+
+export type CheckDomainMatrixImportAvailabilityPayload = {
   importId: string;
 };
 

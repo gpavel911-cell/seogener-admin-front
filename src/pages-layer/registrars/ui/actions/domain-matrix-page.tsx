@@ -7,6 +7,7 @@ import styled from "styled-components";
 import { formatDateTime } from "@pages/registrars/lib/formatters";
 import {
   useCreateDomainMatrixImportMutation,
+  useCheckDomainMatrixImportAvailabilityMutation,
   useDeleteDomainMatrixImportMutation,
   useGenerateDomainMatrixImportMutation,
   useGetDomainMatrixImportRowsQuery,
@@ -154,6 +155,7 @@ export function DomainMatrixPage({ fixedProfileId = null, hideTitle = false }: D
 
   const [createImport, { isLoading: isUploading }] = useCreateDomainMatrixImportMutation();
   const [generateImport, { isLoading: isGenerating }] = useGenerateDomainMatrixImportMutation();
+  const [checkAvailability, { isLoading: isCheckingAvailability }] = useCheckDomainMatrixImportAvailabilityMutation();
   const [purchaseImport, { isLoading: isPurchasingImport }] = usePurchaseDomainMatrixImportMutation();
   const [updateImport, { isLoading: isRenaming }] = useUpdateDomainMatrixImportMutation();
   const [deleteImport, { isLoading: isDeleting }] = useDeleteDomainMatrixImportMutation();
@@ -165,13 +167,15 @@ export function DomainMatrixPage({ fixedProfileId = null, hideTitle = false }: D
     refetchOnMountOrArgChange: true,
   });
   const status = statusQuery.data;
-  const isJobActive = isJobInProgress(status?.status);
+  const currentStatus = status && jobId && status.jobId === jobId ? status : undefined;
+  const isJobActive = isJobInProgress(currentStatus?.status);
   const purchaseStatusQuery = useGetDomainMatrixJobStatusQuery(purchaseJobId ? { jobId: purchaseJobId } : skipToken, {
     pollingInterval: purchaseJobId ? 4000 : 0,
     refetchOnMountOrArgChange: true,
   });
   const purchaseStatus = purchaseStatusQuery.data;
-  const isPurchaseJobActive = isJobInProgress(purchaseStatus?.status);
+  const currentPurchaseStatus = purchaseStatus && purchaseJobId && purchaseStatus.jobId === purchaseJobId ? purchaseStatus : undefined;
+  const isPurchaseJobActive = isJobInProgress(currentPurchaseStatus?.status);
 
   const profileOptions = useMemo(
     () =>
@@ -231,13 +235,16 @@ export function DomainMatrixPage({ fixedProfileId = null, hideTitle = false }: D
     [rows, selectedImport?.totalPrice],
   );
   const isProgressVisible = Boolean(
-    status && generationImportId && generationImportId === effectiveSelectedImportId && isJobInProgress(status.status),
+    jobId &&
+      generationImportId &&
+      generationImportId === effectiveSelectedImportId &&
+      (!currentStatus || isJobInProgress(currentStatus.status)),
   );
   const isPurchaseProgressVisible = Boolean(
-    purchaseStatus &&
+    purchaseJobId &&
       purchaseImportId &&
       purchaseImportId === effectiveSelectedImportId &&
-      isJobInProgress(purchaseStatus.status),
+      (!currentPurchaseStatus || isJobInProgress(currentPurchaseStatus.status)),
   );
 
   const clearActiveGenerationState = () => {
@@ -256,7 +263,7 @@ export function DomainMatrixPage({ fixedProfileId = null, hideTitle = false }: D
   }, [refetchImports, refetchRows]);
 
   useEffect(() => {
-    if (!jobId || !status || finishedJobRef.current === jobId) return;
+    if (!jobId || !status || status.jobId !== jobId || finishedJobRef.current === jobId) return;
     if (status.status === DomainMatrixJobStatus.COMPLETED) {
       finishedJobRef.current = jobId;
       clearActiveGenerationState();
@@ -279,7 +286,7 @@ export function DomainMatrixPage({ fixedProfileId = null, hideTitle = false }: D
   }, [jobId, statusQuery.error]);
 
   useEffect(() => {
-    if (!purchaseJobId || !purchaseStatus || finishedPurchaseJobRef.current === purchaseJobId) return;
+    if (!purchaseJobId || !purchaseStatus || purchaseStatus.jobId !== purchaseJobId || finishedPurchaseJobRef.current === purchaseJobId) return;
     if (purchaseStatus.status === DomainMatrixJobStatus.COMPLETED) {
       finishedPurchaseJobRef.current = purchaseJobId;
       clearActivePurchaseState();
@@ -355,6 +362,23 @@ export function DomainMatrixPage({ fixedProfileId = null, hideTitle = false }: D
       showToast({ variant: "success", message: "Генерация запущена." });
     } catch {
       showToast({ variant: "error", message: "Не удалось запустить генерацию." });
+    }
+  };
+
+  const handleCheckAvailability = async () => {
+    if (!effectiveSelectedImportId) {
+      showToast({ variant: "error", message: "Выберите импорт." });
+      return;
+    }
+    try {
+      const response = await checkAvailability({ importId: effectiveSelectedImportId }).unwrap();
+      setJobId(response.jobId);
+      setGenerationImportId(effectiveSelectedImportId);
+      writeActiveGeneration({ jobId: response.jobId, importId: effectiveSelectedImportId });
+      finishedJobRef.current = null;
+      showToast({ variant: "success", message: "Проверка доступности и цен запущена." });
+    } catch {
+      showToast({ variant: "error", message: "Не удалось запустить проверку доступности и цен." });
     }
   };
 
@@ -492,8 +516,16 @@ export function DomainMatrixPage({ fixedProfileId = null, hideTitle = false }: D
               <Button
                 type="button"
                 variant="primary"
+                onClick={handleCheckAvailability}
+                disabled={!effectiveSelectedImportId || isGenerating || isCheckingAvailability || isJobActive || isPurchaseJobActive}
+              >
+                {isCheckingAvailability ? "Запуск..." : "Проверить доступность и цены"}
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
                 onClick={handleGenerate}
-                disabled={!effectiveSelectedImportId || isGenerating || isJobActive || isPurchaseJobActive}
+                disabled={!effectiveSelectedImportId || isGenerating || isCheckingAvailability || isJobActive || isPurchaseJobActive}
               >
                 {isGenerating ? "Запуск..." : "Сгенерировать недостающие домены"}
               </Button>
@@ -509,35 +541,35 @@ export function DomainMatrixPage({ fixedProfileId = null, hideTitle = false }: D
           </ControlsRow>
         </FormCard>
 
-        {isProgressVisible && status ? (
+        {isProgressVisible ? (
           <ProgressCard>
             <ProgressBlock>
               <ProgressLine>
-                <strong>Статус:</strong> {status.status === DomainMatrixJobStatus.RUNNING ? "В обработке" : "В очереди"}
+                <strong>Статус:</strong> {currentStatus?.status === DomainMatrixJobStatus.RUNNING ? "В обработке" : "В очереди"}
                 {" · "}
-                <strong>Этап:</strong> {STAGE_LABELS[status.stage] ?? status.stage}
+                <strong>Этап:</strong> {currentStatus ? (STAGE_LABELS[currentStatus.stage] ?? currentStatus.stage) : "Валидация"}
                 {" · "}
-                <strong>Прогресс:</strong> {status.progressPercent}% ({status.processedCells}/{status.totalCells})
+                <strong>Прогресс:</strong> {currentStatus ? `${currentStatus.progressPercent}% (${currentStatus.processedCells}/${currentStatus.totalCells})` : "0% (0/0)"}
               </ProgressLine>
               <ProgressBarTrack>
-                <ProgressBarValue $progress={status.progressPercent} />
+                <ProgressBarValue $progress={currentStatus?.progressPercent ?? 0} />
               </ProgressBarTrack>
             </ProgressBlock>
           </ProgressCard>
         ) : null}
 
-        {isPurchaseProgressVisible && purchaseStatus ? (
+        {isPurchaseProgressVisible ? (
           <ProgressCard>
             <ProgressBlock>
               <ProgressLine>
-                <strong>Покупка:</strong> {purchaseStatus.status === DomainMatrixJobStatus.RUNNING ? "В обработке" : "В очереди"}
+                <strong>Покупка:</strong> {currentPurchaseStatus?.status === DomainMatrixJobStatus.RUNNING ? "В обработке" : "В очереди"}
                 {" · "}
-                <strong>Этап:</strong> {STAGE_LABELS[purchaseStatus.stage] ?? purchaseStatus.stage}
+                <strong>Этап:</strong> {currentPurchaseStatus ? (STAGE_LABELS[currentPurchaseStatus.stage] ?? currentPurchaseStatus.stage) : "Валидация"}
                 {" · "}
-                <strong>Прогресс:</strong> {purchaseStatus.progressPercent}% ({purchaseStatus.processedCells}/{purchaseStatus.totalCells})
+                <strong>Прогресс:</strong> {currentPurchaseStatus ? `${currentPurchaseStatus.progressPercent}% (${currentPurchaseStatus.processedCells}/${currentPurchaseStatus.totalCells})` : "0% (0/0)"}
               </ProgressLine>
               <ProgressBarTrack>
-                <ProgressBarValue $progress={purchaseStatus.progressPercent} />
+                <ProgressBarValue $progress={currentPurchaseStatus?.progressPercent ?? 0} />
               </ProgressBarTrack>
             </ProgressBlock>
           </ProgressCard>

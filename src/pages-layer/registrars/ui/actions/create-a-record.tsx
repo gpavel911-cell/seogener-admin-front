@@ -1,9 +1,12 @@
+"use client";
+
 import { useState } from "react";
 import { useCreateRegistrarARecordMutation } from "@entities/registrars/api";
 import type { RegistrarProviderType } from "@entities/registrars/types";
 import { useRegistrarSelectOptions } from "@entities/registrars/select-options";
 import {
   Button,
+  CenteredState,
   FieldLabel,
   FormActions,
   FormCard,
@@ -12,26 +15,27 @@ import {
   FormRow,
   FormStack,
   InlineHint,
+  PlaceholderText,
+  ResultCard,
   SelectControl,
-  TextInput,
+  StyledInput,
   useToast,
 } from "@shared/ui";
 
-const IPV4_REGEX = /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/;
-
-type ActionsSectionCreateARecordProps = {
+type CreateARecordProps = {
   fixedRegistrar?: RegistrarProviderType | null;
   fixedProfile?: string | null;
 };
 
-export const CreateARecord = ({ fixedRegistrar, fixedProfile }: ActionsSectionCreateARecordProps = {}) => {
-  const [host, setHost] = useState("");
-  const [ipv4, setIpv4] = useState("");
+export const CreateARecord = ({ fixedRegistrar, fixedProfile }: CreateARecordProps = {}) => {
   const [selectedDomain, setSelectedDomain] = useState("");
+  const [subdomain, setSubdomain] = useState("@");
+  const [ipv4, setIpv4] = useState("");
   const [activeRegistrar, setActiveRegistrar] = useState<RegistrarProviderType | null>(null);
   const [activeProfile, setActiveProfile] = useState<string | null>(null);
-
+  const [resultMessage, setResultMessage] = useState("");
   const { showToast } = useToast();
+
   const {
     registrarGroups,
     resolvedRegistrar,
@@ -54,60 +58,55 @@ export const CreateARecord = ({ fixedRegistrar, fixedProfile }: ActionsSectionCr
       setActiveRegistrar(null);
       setActiveProfile(null);
       setSelectedDomain("");
+      setResultMessage("");
       return;
     }
     const nextGroup = registrarGroups.find((group) => group.registrar === value);
     setActiveRegistrar(value);
     setActiveProfile(nextGroup?.profiles[0] ?? null);
     setSelectedDomain("");
+    setResultMessage("");
   };
 
   const handleProfileChange = (value: string) => {
     setActiveProfile(value || null);
     setSelectedDomain("");
+    setResultMessage("");
   };
 
-  const handleSubmit = async () => {
-    const trimmedHost = host.trim();
-    const normalizedHost = trimmedHost === "" ? "@" : trimmedHost;
-    const trimmedIpv4 = ipv4.trim();
-
-    if (!selectedDomain) {
-      showToast({ variant: "error", message: "Выберите домен." });
-      return;
-    }
-    if (!trimmedIpv4) {
-      showToast({ variant: "error", message: "Введите IPv4-адрес." });
-      return;
-    }
-    if (!IPV4_REGEX.test(trimmedIpv4)) {
-      showToast({ variant: "error", message: "Некорректный IPv4-адрес." });
-      return;
-    }
+  const handleCreate = async () => {
     if (!resolvedRegistrar || !resolvedProfile) {
       showToast({ variant: "error", message: "Выберите регистратора и профиль." });
       return;
     }
-
+    if (!selectedDomain) {
+      showToast({ variant: "error", message: "Выберите домен." });
+      return;
+    }
+    if (!ipv4.trim()) {
+      showToast({ variant: "error", message: "Укажите IPv4." });
+      return;
+    }
     try {
       const response = await createARecord({
         registrar: resolvedRegistrar,
         profileId: resolvedProfile,
         domain: selectedDomain,
-        subdomain: normalizedHost,
-        ipv4: trimmedIpv4,
+        subdomain: subdomain.trim() || "@",
+        ipv4: ipv4.trim(),
       }).unwrap();
-      setHost("");
-      setIpv4("");
       const note = response.note ? ` (${response.note})` : "";
-      showToast({ variant: "success", message: `A-запись создана${note}.` });
-    } catch {
-      showToast({ variant: "error", message: "Ошибка создания A-записи." });
+      const message = `A-запись создана${note}.`;
+      setResultMessage(message);
+      showToast({ variant: "success", message });
+    } catch (error) {
+      const message =
+        typeof error === "object" && error !== null && "data" in error
+          ? (error as { data?: { message?: string } }).data?.message
+          : undefined;
+      showToast({ variant: "error", message: message || "Не удалось создать A-запись." });
     }
   };
-
-  const showDomainsEmptyHint = resolvedRegistrar && resolvedProfile && domainOptions.length === 0;
-  const showProfilesEmptyHint = registrarGroups.length === 0;
 
   return (
     <FormStack>
@@ -149,31 +148,31 @@ export const CreateARecord = ({ fixedRegistrar, fixedProfile }: ActionsSectionCr
             </FormField>
             <FormField>
               <FieldLabel>Хост (поддомен)</FieldLabel>
-              <TextInput
-                value={host}
-                onChange={(event) => setHost(event.target.value)}
-                placeholder="@ или www"
-              />
+              <StyledInput value={subdomain} onChange={(event) => setSubdomain(event.target.value)} placeholder="@" />
             </FormField>
             <FormField>
               <FieldLabel>IPv4</FieldLabel>
-              <TextInput
-                value={ipv4}
-                onChange={(event) => setIpv4(event.target.value)}
-                placeholder="111.222.111.222"
-              />
+              <StyledInput value={ipv4} onChange={(event) => setIpv4(event.target.value)} placeholder="0.0.0.0" />
             </FormField>
           </FormFields>
           <FormActions>
-            <Button type="button" variant="primary" onClick={handleSubmit} disabled={isCreateLoading}>
-              {isCreateLoading ? "Создание..." : "Создать"}
+            <Button type="button" variant="primary" onClick={handleCreate} disabled={isCreateLoading}>
+              {isCreateLoading ? "Создание..." : "Создать A-запись"}
             </Button>
           </FormActions>
         </FormRow>
       </FormCard>
-      {showDomainsEmptyHint && <InlineHint>Нет доменов для выбранного профиля.</InlineHint>}
-      {showProfilesEmptyHint && <InlineHint>Сначала синхронизируйте домены.</InlineHint>}
+      <ResultCard>
+        {resultMessage ? (
+          <CenteredState>
+            <PlaceholderText>{resultMessage}</PlaceholderText>
+          </CenteredState>
+        ) : (
+          <CenteredState>
+            <PlaceholderText>Нет данных для отображения.</PlaceholderText>
+          </CenteredState>
+        )}
+      </ResultCard>
     </FormStack>
   );
 };
-
