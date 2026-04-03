@@ -3,10 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import styled from "styled-components";
 import {
-  useCreateRegistrarTxtRecordMutation,
+  useCreateDnsBulkRecordsMutation,
   useLazyGetRegistrarDnsRecordsQuery,
 } from "@entities/registrars/api";
 import {
+  DnsBulkRecordType,
+  DnsBulkRowStatus,
   RegistrarProviderType,
 } from "@entities/registrars/types";
 import {
@@ -101,7 +103,7 @@ export const VerifyHostDns = ({ fixedProfile }: ActionsSectionVerifyHostDnsProps
   }, [resolvedHostId, resolvedProfile, resultBySelection]);
 
   const [verifyHostDns, { isLoading: isVerifying }] = useVerifyWebmasterHostDnsMutation();
-  const [createRegistrarTxtRecord, { isLoading: isTxtCreating }] = useCreateRegistrarTxtRecordMutation();
+  const [createDnsBulkRecords, { isLoading: isTxtCreating }] = useCreateDnsBulkRecordsMutation();
   const [loadRegistrarDnsRecords, { isFetching: isTxtChecking }] = useLazyGetRegistrarDnsRecordsQuery();
   const shouldShowTxtSection = Boolean(result && result.verified !== true);
   const isVerified = result?.verified === true || result?.verificationState === VERIFIED_STATE;
@@ -251,15 +253,25 @@ export const VerifyHostDns = ({ fixedProfile }: ActionsSectionVerifyHostDnsProps
     }
     const txtValue = `yandex-verification: ${result.verificationUin}`;
     try {
-      const response = await createRegistrarTxtRecord({
+      const response = await createDnsBulkRecords({
         registrar: resolvedRegistrar,
         profileId: resolvedRegistrarProfile,
-        domain: resolvedDomain,
-        subdomain: ROOT_SUBDOMAIN,
-        text: txtValue,
+        recordType: DnsBulkRecordType.TXT,
+        rows: [
+          {
+            domain: resolvedDomain,
+            host: ROOT_SUBDOMAIN,
+            text: txtValue,
+          },
+        ],
       }).unwrap();
-      const note = response.note ? ` (${response.note})` : "";
-      showToast({ variant: "success", message: `TXT-запись создана${note}.` });
+      const firstRow = response.rows[0];
+      if (!firstRow || firstRow.status === DnsBulkRowStatus.FAILED) {
+        const message = firstRow?.error ? `Ошибка создания TXT-записи: ${firstRow.error}` : "Ошибка создания TXT-записи.";
+        showToast({ variant: "error", message });
+        return;
+      }
+      showToast({ variant: "success", message: "TXT-запись создана." });
       setIsTxtPresent(true);
     } catch {
       showToast({ variant: "error", message: "Ошибка создания TXT-записи." });

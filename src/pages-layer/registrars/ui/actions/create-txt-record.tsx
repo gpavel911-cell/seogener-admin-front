@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useCreateRegistrarARecordMutation } from "@entities/registrars/api";
+import { useCreateRegistrarTxtRecordMutation } from "@entities/registrars/api";
 import type { RegistrarProviderType } from "@entities/registrars/types";
 import { useRegistrarSelectOptions } from "@entities/registrars/select-options";
 import {
@@ -22,15 +22,15 @@ import {
   useToast,
 } from "@shared/ui";
 
-type CreateARecordProps = {
+type CreateTxtRecordProps = {
   fixedRegistrar?: RegistrarProviderType | null;
   fixedProfile?: string | null;
 };
 
-export const CreateARecord = ({ fixedRegistrar, fixedProfile }: CreateARecordProps = {}) => {
+export const CreateTxtRecord = ({ fixedRegistrar, fixedProfile }: CreateTxtRecordProps = {}) => {
   const [selectedDomain, setSelectedDomain] = useState("");
   const [subdomain, setSubdomain] = useState("@");
-  const [ipv4, setIpv4] = useState("");
+  const [text, setText] = useState("");
   const [activeRegistrar, setActiveRegistrar] = useState<RegistrarProviderType | null>(null);
   const [activeProfile, setActiveProfile] = useState<string | null>(null);
   const [resultMessage, setResultMessage] = useState("");
@@ -51,7 +51,7 @@ export const CreateARecord = ({ fixedRegistrar, fixedProfile }: CreateARecordPro
     fixedProfile: fixedProfile ?? null,
   });
 
-  const [createARecord, { isLoading: isCreateLoading }] = useCreateRegistrarARecordMutation();
+  const [createTxtRecord, { isLoading: isCreateLoading }] = useCreateRegistrarTxtRecordMutation();
 
   const handleRegistrarChange = (value: RegistrarProviderType | "") => {
     if (!value) {
@@ -83,20 +83,16 @@ export const CreateARecord = ({ fixedRegistrar, fixedProfile }: CreateARecordPro
       showToast({ variant: "error", message: "Выберите домен." });
       return;
     }
-    if (!ipv4.trim()) {
-      showToast({ variant: "error", message: "Укажите IPv4." });
-      return;
-    }
     try {
-      const response = await createARecord({
+      const response = await createTxtRecord({
         registrar: resolvedRegistrar,
         profileId: resolvedProfile,
         domain: selectedDomain,
         subdomain: subdomain.trim() || "@",
-        ipv4: ipv4.trim(),
+        text: text.trim(),
       }).unwrap();
       const note = response.note ? ` (${response.note})` : "";
-      const message = `A-запись создана${note}.`;
+      const message = `TXT-запись создана${note}.`;
       setResultMessage(message);
       showToast({ variant: "success", message });
     } catch (error) {
@@ -104,7 +100,7 @@ export const CreateARecord = ({ fixedRegistrar, fixedProfile }: CreateARecordPro
         typeof error === "object" && error !== null && "data" in error
           ? (error as { data?: { message?: string } }).data?.message
           : undefined;
-      showToast({ variant: "error", message: message || "Не удалось создать A-запись." });
+      showToast({ variant: "error", message: message || "Не удалось создать TXT-запись." });
     }
   };
 
@@ -151,17 +147,18 @@ export const CreateARecord = ({ fixedRegistrar, fixedProfile }: CreateARecordPro
               <StyledInput value={subdomain} onChange={(event) => setSubdomain(event.target.value)} placeholder="@" />
             </FormField>
             <FormField>
-              <FieldLabel>IPv4</FieldLabel>
-              <StyledInput value={ipv4} onChange={(event) => setIpv4(event.target.value)} placeholder="0.0.0.0" />
+              <FieldLabel>TXT значение</FieldLabel>
+              <StyledInput value={text} onChange={(event) => setText(event.target.value)} placeholder="text" />
             </FormField>
           </FormFields>
           <FormActions>
             <Button type="button" variant="primary" onClick={handleCreate} disabled={isCreateLoading}>
-              {isCreateLoading ? "Создание..." : "Создать A-запись"}
+              {isCreateLoading ? "Создание..." : "Создать TXT-запись"}
             </Button>
           </FormActions>
         </FormRow>
       </FormCard>
+
       <ResultCard>
         {resultMessage ? (
           <CenteredState>

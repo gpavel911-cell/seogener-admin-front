@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import styled from "styled-components";
-import { FaChartBar, FaChevronLeft, FaChevronRight, FaCompass, FaGlobe, FaServer } from "react-icons/fa";
+import { FaChartBar, FaChevronLeft, FaChevronRight, FaCompass, FaGlobe, FaServer, FaUpload } from "react-icons/fa";
 import { SIDEBAR_ITEMS } from "@shared/config/navigation";
 
 type SidebarProps = {
