@@ -351,7 +351,7 @@ export function DnsBulkPage({ recordType, fixedRegistrar = null, fixedProfile = 
             domain: row.domain,
             host: recordType === DnsBulkRecordType.NS ? undefined : row.host,
             ipv4: recordType === DnsBulkRecordType.A ? (row.ipv4 ?? undefined) : undefined,
-            text: recordType === DnsBulkRecordType.TXT ? "" : undefined,
+            text: recordType === DnsBulkRecordType.TXT ? (row.text ?? undefined) : undefined,
           },
         ],
       }).unwrap();
@@ -393,6 +393,7 @@ export function DnsBulkPage({ recordType, fixedRegistrar = null, fixedProfile = 
       ? "Создать недостающие TXT-записи"
       : "Создать недостающие NS-записи";
   const supportsIpv4 = recordType === DnsBulkRecordType.A;
+  const supportsText = recordType === DnsBulkRecordType.TXT;
   const hostHeaderLabel = recordType === DnsBulkRecordType.NS ? "NS-серверы" : "Хост (поддомен)";
   const selectedImport = imports.find((item) => item.id === effectiveSelectedImportId) ?? null;
   const allRowsCreated = Boolean(
@@ -511,6 +512,7 @@ export function DnsBulkPage({ recordType, fixedRegistrar = null, fixedProfile = 
                   <TableRow>
                     <TableHeaderCell>Домен</TableHeaderCell>
                     {supportsIpv4 ? <TableHeaderCell>IPv4</TableHeaderCell> : null}
+                    {supportsText ? <TableHeaderCell>TXT</TableHeaderCell> : null}
                     <TableHeaderCell>{hostHeaderLabel}</TableHeaderCell>
                     <TableHeaderCell>Статус</TableHeaderCell>
                     <TableHeaderCell>Действие</TableHeaderCell>
@@ -519,7 +521,7 @@ export function DnsBulkPage({ recordType, fixedRegistrar = null, fixedProfile = 
                 <TableBody>
                   {rows.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={supportsIpv4 ? 5 : 4}>Нет данных для отображения.</TableCell>
+                      <TableCell colSpan={supportsIpv4 ? 5 : supportsText ? 5 : 4}>Нет данных для отображения.</TableCell>
                     </TableRow>
                   ) : (
                     rows.map((row) => {
@@ -535,6 +537,7 @@ export function DnsBulkPage({ recordType, fixedRegistrar = null, fixedProfile = 
                         <TableRow key={row.id}>
                           <TableCell>{row.domain}</TableCell>
                           {supportsIpv4 ? <TableCell>{row.ipv4 ?? "—"}</TableCell> : null}
+                          {supportsText ? <TableCell>{row.text ?? "—"}</TableCell> : null}
                           <TableCell>{recordType === DnsBulkRecordType.NS ? "ns1.reg.ru, ns2.reg.ru" : row.host}</TableCell>
                           <TableCell>
                             <StatusBadge data-created={isRecordCreated ? "true" : "false"} title={row.lastError ?? undefined}>

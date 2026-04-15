@@ -14,7 +14,6 @@ import {
   FormFields,
   FormRow,
   FormStack,
-  InlineHint,
   PlaceholderText,
   ResultCard,
   SelectControl,
@@ -83,13 +82,22 @@ export const CreateTxtRecord = ({ fixedRegistrar, fixedProfile }: CreateTxtRecor
       showToast({ variant: "error", message: "Выберите домен." });
       return;
     }
+    const normalizedText = text.trim();
+    if (!normalizedText) {
+      showToast({ variant: "error", message: "Введите TXT-значение." });
+      return;
+    }
+    if (normalizedText.length > 1000) {
+      showToast({ variant: "error", message: "TXT-значение не должно превышать 1000 символов." });
+      return;
+    }
     try {
       const response = await createTxtRecord({
         registrar: resolvedRegistrar,
         profileId: resolvedProfile,
         domain: selectedDomain,
         subdomain: subdomain.trim() || "@",
-        text: text.trim(),
+        text: normalizedText,
       }).unwrap();
       const note = response.note ? ` (${response.note})` : "";
       const message = `TXT-запись создана${note}.`;
@@ -148,7 +156,12 @@ export const CreateTxtRecord = ({ fixedRegistrar, fixedProfile }: CreateTxtRecor
             </FormField>
             <FormField>
               <FieldLabel>TXT значение</FieldLabel>
-              <StyledInput value={text} onChange={(event) => setText(event.target.value)} placeholder="text" />
+              <StyledInput
+                value={text}
+                onChange={(event) => setText(event.target.value)}
+                placeholder="text"
+                maxLength={1000}
+              />
             </FormField>
           </FormFields>
           <FormActions>

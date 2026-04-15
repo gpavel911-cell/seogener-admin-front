@@ -178,6 +178,7 @@ export type DnsBulkImportRowDto = {
   host: string;
   recordType: DnsBulkRecordType;
   ipv4?: string | null;
+  text?: string | null;
   status: DnsBulkRowStatus;
   lastError?: string | null;
   attempts: number;
