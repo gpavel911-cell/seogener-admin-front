@@ -72,6 +72,116 @@ export type MetricsCounterCreateRequest = {
   siteUrl: string;
 };
 
+export enum MetricsCounterImportRowStatus {
+  PENDING = "PENDING",
+  CREATED = "CREATED",
+  ALREADY_EXISTS = "ALREADY_EXISTS",
+  FAILED = "FAILED",
+}
+
+export enum MetricsCounterBulkJobStatus {
+  QUEUED = "QUEUED",
+  RUNNING = "RUNNING",
+  COMPLETED = "COMPLETED",
+  FAILED = "FAILED",
+}
+
+export enum MetricsCounterBulkJobStage {
+  VALIDATING = "VALIDATING",
+  PROCESSING = "PROCESSING",
+  WRITING = "WRITING",
+  FINALIZING = "FINALIZING",
+}
+
+export type MetricsCounterImportDto = {
+  id: string;
+  name: string;
+  provider: MetricsProviderType;
+  profile: string;
+  rowsTotal: number;
+  rowsCreated: number;
+  rowsAlreadyExists: number;
+  rowsFailed: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type MetricsCounterImportRowDto = {
+  id: number;
+  counterName: string;
+  provider: MetricsProviderType;
+  profile: string;
+  domain: string;
+  status: MetricsCounterImportRowStatus;
+  counterId?: string | null;
+  errorMessage?: string | null;
+  attempts: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreateMetricsCounterImportPayload = {
+  file: File;
+  provider: MetricsProviderType;
+  profile: string;
+  name?: string;
+};
+
+export type GetMetricsCounterImportsPayload = {
+  provider: MetricsProviderType;
+  profile: string;
+};
+
+export type UpdateMetricsCounterImportPayload = {
+  importId: string;
+  name: string;
+};
+
+export type DeleteMetricsCounterImportPayload = {
+  importId: string;
+};
+
+export type GetMetricsCounterImportRowsPayload = {
+  importId: string;
+  pageNumber: number;
+  pageSize: number;
+};
+
+export type StartMetricsCounterImportCreateMissingPayload = {
+  importId: string;
+};
+
+export type CreateMetricsCounterImportRowPayload = {
+  importId: string;
+  rowId: number;
+};
+
+export type MetricsCounterBulkStartResponse = {
+  jobId: string;
+  status: MetricsCounterBulkJobStatus;
+};
+
+export type MetricsCounterBulkJobStatusResponse = {
+  jobId: string;
+  status: MetricsCounterBulkJobStatus;
+  stage: MetricsCounterBulkJobStage;
+  progressPercent: number;
+  totalRows: number;
+  processedRows: number;
+  createdRows: number;
+  alreadyExistsRows: number;
+  failedRows: number;
+  latestError?: string | null;
+  updatedAt: string;
+};
+
+export type MetricsCounterSingleCreateResponse = {
+  rowId: number;
+  status: MetricsCounterImportRowStatus;
+  counterId?: string | null;
+  errorMessage?: string | null;
+};
+
 export type MetricsCounterStatisticsRow = {
   dimensionValues: string[];
   metricValues: number[];

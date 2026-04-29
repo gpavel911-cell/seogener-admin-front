@@ -1,4 +1,5 @@
 import { type ReactNode } from "react";
+import { CreateCountersBulk } from "@pages/metrics/ui/actions/create-counters-bulk";
 import { CreateCounter } from "@pages/metrics/ui/actions/create-counter";
 import { ViewCounterGoals } from "@pages/metrics/ui/actions/view-counter-goals";
 import { ViewCounterStatistics } from "@pages/metrics/ui/actions/view-counter-statistics";
@@ -6,6 +7,7 @@ import { ViewCounterStatistics } from "@pages/metrics/ui/actions/view-counter-st
 export enum MetricsAction {
   SYNC_METRICS_COUNTERS = "SYNC_METRICS_COUNTERS",
   CREATE_METRICS_COUNTER = "CREATE_METRICS_COUNTER",
+  CREATE_METRICS_COUNTERS_BULK = "CREATE_METRICS_COUNTERS_BULK",
   GET_METRICS_STATISTICS = "GET_METRICS_STATISTICS",
   GET_METRICS_GOALS = "GET_METRICS_GOALS",
 }
@@ -26,6 +28,7 @@ export const METRICS_ACTION_SECTIONS: MetricsActionSection[] = [
     actions: [
       { id: MetricsAction.SYNC_METRICS_COUNTERS, label: "Счетчики" },
       { id: MetricsAction.CREATE_METRICS_COUNTER, label: "Создать счетчик" },
+      { id: MetricsAction.CREATE_METRICS_COUNTERS_BULK, label: "Создать счетчики" },
       { id: MetricsAction.GET_METRICS_STATISTICS, label: "Посмотреть статистику" },
       { id: MetricsAction.GET_METRICS_GOALS, label: "Посмотреть цели" },
     ],
@@ -34,6 +37,7 @@ export const METRICS_ACTION_SECTIONS: MetricsActionSection[] = [
 
 export type MetricsActionRenderContext = {
   profile?: string | null;
+  onRefreshCounters?: () => Promise<unknown> | void;
 };
 
 export const renderMetricsActionContent = (
@@ -42,6 +46,9 @@ export const renderMetricsActionContent = (
 ): ReactNode => {
   if (action === MetricsAction.GET_METRICS_STATISTICS) {
     return <ViewCounterStatistics fixedProfile={context?.profile} />;
+  }
+  if (action === MetricsAction.CREATE_METRICS_COUNTERS_BULK) {
+    return <CreateCountersBulk fixedProfile={context?.profile} onRefreshCounters={context?.onRefreshCounters} />;
   }
   if (action === MetricsAction.CREATE_METRICS_COUNTER) {
     return <CreateCounter fixedProfile={context?.profile} />;

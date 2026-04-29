@@ -31,6 +31,8 @@ export function SelectControl({
   const [thumbHeight, setThumbHeight] = useState(28);
   const [showScrollbar, setShowScrollbar] = useState(false);
   const viewportRef = useRef<HTMLDivElement | null>(null);
+  const controlledValue = value.trim() === "" ? undefined : value;
+  const optionsSignature = options.map((option) => option.value).join("|");
 
   useEffect(() => {
     if (!open) {
@@ -45,11 +47,11 @@ export function SelectControl({
     const updateScrollbar = () => {
       const { scrollTop, scrollHeight, clientHeight } = viewport;
       const hasOverflow = scrollHeight > clientHeight + 1;
-      setShowScrollbar(hasOverflow);
+      setShowScrollbar((prev) => (prev === hasOverflow ? prev : hasOverflow));
 
       if (!hasOverflow) {
-        setThumbTop(0);
-        setThumbHeight(28);
+        setThumbTop((prev) => (prev === 0 ? prev : 0));
+        setThumbHeight((prev) => (prev === 28 ? prev : 28));
         return;
       }
 
@@ -58,8 +60,8 @@ export function SelectControl({
       const thumbRange = clientHeight - nextThumbHeight;
       const nextThumbTop = scrollRange > 0 ? (scrollTop / scrollRange) * thumbRange : 0;
 
-      setThumbHeight(nextThumbHeight);
-      setThumbTop(nextThumbTop);
+      setThumbHeight((prev) => (Math.abs(prev - nextThumbHeight) < 0.5 ? prev : nextThumbHeight));
+      setThumbTop((prev) => (Math.abs(prev - nextThumbTop) < 0.5 ? prev : nextThumbTop));
     };
 
     updateScrollbar();
@@ -70,10 +72,10 @@ export function SelectControl({
       viewport.removeEventListener("scroll", updateScrollbar);
       window.removeEventListener("resize", updateScrollbar);
     };
-  }, [open, options]);
+  }, [open, optionsSignature]);
 
   return (
-    <RadixSelect.Root value={value} onValueChange={onValueChange} disabled={disabled} onOpenChange={setOpen}>
+    <RadixSelect.Root value={controlledValue} onValueChange={onValueChange} disabled={disabled} onOpenChange={setOpen}>
       <Trigger $invalid={invalid}>
         <Value placeholder={placeholder} />
         <SelectIcon aria-hidden="true">

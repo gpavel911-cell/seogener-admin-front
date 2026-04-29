@@ -118,6 +118,18 @@ export function MetricsPage() {
     }
   };
 
+  const refreshCountersAfterBulk = async () => {
+    if (!resolvedProvider || !resolvedProfile) {
+      return;
+    }
+    try {
+      await syncCounters({ provider: resolvedProvider, profile: resolvedProfile }).unwrap();
+      await refetch();
+    } catch {
+      showToast({ variant: "error", message: "Ошибка синхронизации счетчиков после массового создания." });
+    }
+  };
+
   const tableContent = (
     <>
       <CountersTable
@@ -164,6 +176,7 @@ export function MetricsPage() {
       tableContent={tableContent}
       actionContent={renderMetricsActionContent(activeAction as MetricsAction, {
         profile: resolvedProfile,
+        onRefreshCounters: refreshCountersAfterBulk,
       })}
     />
   );
