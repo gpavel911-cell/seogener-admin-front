@@ -1,5 +1,6 @@
 import { type ReactNode } from "react";
 import { AddHost } from "@pages/webmaster/ui/actions/add-host";
+import { CreateHostsBulk } from "@pages/webmaster/ui/actions/create-hosts-bulk";
 import { PopularQueries } from "@pages/webmaster/ui/actions/popular-queries";
 import { QueriesHistory } from "@pages/webmaster/ui/actions/queries-history";
 import { SearchUrls } from "@pages/webmaster/ui/actions/search-urls";
@@ -8,6 +9,7 @@ import { VerifyHostDns } from "@pages/webmaster/ui/actions/verify-host-dns";
 export enum WebmasterAction {
   SYNC_WEBMASTER_HOSTS = "SYNC_WEBMASTER_HOSTS",
   CREATE_WEBMASTER_HOST = "CREATE_WEBMASTER_HOST",
+  CREATE_WEBMASTER_HOSTS_BULK = "CREATE_WEBMASTER_HOSTS_BULK",
   VERIFY_WEBMASTER_HOST_DNS = "VERIFY_WEBMASTER_HOST_DNS",
   GET_WEBMASTER_POPULAR_QUERIES = "GET_WEBMASTER_POPULAR_QUERIES",
   GET_WEBMASTER_SEARCH_QUERIES_HISTORY = "GET_WEBMASTER_SEARCH_QUERIES_HISTORY",
@@ -30,6 +32,7 @@ export const WEBMASTER_ACTION_SECTIONS: WebmasterActionSection[] = [
     actions: [
       { id: WebmasterAction.SYNC_WEBMASTER_HOSTS, label: "Сайты" },
       { id: WebmasterAction.CREATE_WEBMASTER_HOST, label: "Добавить сайт" },
+      { id: WebmasterAction.CREATE_WEBMASTER_HOSTS_BULK, label: "Добавить сайты" },
       { id: WebmasterAction.VERIFY_WEBMASTER_HOST_DNS, label: "Проверить права DNS" },
       { id: WebmasterAction.GET_WEBMASTER_POPULAR_QUERIES, label: "Популярные запросы" },
       { id: WebmasterAction.GET_WEBMASTER_SEARCH_URLS_IN_SEARCH_SAMPLES, label: "Страницы в поиске" },
@@ -48,6 +51,9 @@ export const renderWebmasterActionContent = (
 ): ReactNode => {
   if (action === WebmasterAction.CREATE_WEBMASTER_HOST) {
     return <AddHost fixedProfile={context?.profile} />;
+  }
+  if (action === WebmasterAction.CREATE_WEBMASTER_HOSTS_BULK) {
+    return <CreateHostsBulk fixedProfile={context?.profile} />;
   }
   if (action === WebmasterAction.VERIFY_WEBMASTER_HOST_DNS) {
     return <VerifyHostDns fixedProfile={context?.profile} />;
