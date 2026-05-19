@@ -63,6 +63,7 @@ const ICONS_BY_ITEM: Record<string, typeof FaCompass> = {
   registrars: FaServer,
   metrics: FaCompass,
   webmaster: FaGlobe,
+  topvisor: FaUpload,
 };
 
 const SidebarContainer = styled.aside<{ $collapsed: boolean }>`

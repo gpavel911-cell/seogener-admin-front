@@ -75,4 +75,7 @@ export const API_ROUTES = {
     GET_WEBMASTER_SEARCH_EVENTS_HISTORY: (hostId: string) => `/api/v1/webmaster/${hostId}/search-events-history`,
     GET_WEBMASTER_SEARCH_QUERIES_HISTORY: (hostId: string) => `/api/v1/webmaster/${hostId}/search-queries-history`,
   },
+  TOPVISOR: {
+    SYNC_TOPVISOR_POSITIONS: "/api/v1/topvisor/positions/sync",
+  },
 } as const;

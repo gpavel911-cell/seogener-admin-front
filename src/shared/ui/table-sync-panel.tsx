@@ -1,4 +1,5 @@
 import { FaArrowsRotate } from "react-icons/fa6";
+import type { ReactNode } from "react";
 import styled, { keyframes } from "styled-components";
 import { Button } from "./button";
 
@@ -7,6 +8,7 @@ type TableSyncPanelProps = {
   isLoading?: boolean;
   disabled?: boolean;
   label?: string;
+  leftSlot?: ReactNode;
 };
 
 export function TableSyncPanel({
@@ -14,20 +16,25 @@ export function TableSyncPanel({
   isLoading = false,
   disabled = false,
   label = "Синхронизировать",
+  leftSlot,
 }: TableSyncPanelProps) {
   return (
     <Panel>
-      <SyncButton
-        type="button"
-        onClick={onSync}
-        disabled={disabled || isLoading}
-        aria-label={label}
-        title={label}
-        data-loading={isLoading}
-      >
-        <FaArrowsRotate aria-hidden="true" />
-        <span>{label}</span>
-      </SyncButton>
+      <Slot>{leftSlot}</Slot>
+      <CenterSlot>
+        <SyncButton
+          type="button"
+          onClick={onSync}
+          disabled={disabled || isLoading}
+          aria-label={label}
+          title={label}
+          data-loading={isLoading}
+        >
+          <FaArrowsRotate aria-hidden="true" />
+          <span>{label}</span>
+        </SyncButton>
+      </CenterSlot>
+      <Slot aria-hidden="true" />
     </Panel>
   );
 }
@@ -46,6 +53,19 @@ const Panel = styled.div`
   border-radius: 12px;
   background: #ffffff;
   padding: 12px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+`;
+
+const Slot = styled.div`
+  min-width: 0;
+  display: flex;
+  align-items: center;
+`;
+
+const CenterSlot = styled.div`
   display: flex;
   justify-content: center;
   align-items: center;

@@ -4,4 +4,5 @@ export const ROUTES = {
   DOMAINS: "/registrars",
   COUNTERS: "/metrics",
   WEBMASTER: "/webmaster",
+  TOPVISOR: "/topvisor",
 } as const;
