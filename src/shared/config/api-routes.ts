@@ -78,4 +78,14 @@ export const API_ROUTES = {
   TOPVISOR: {
     SYNC_TOPVISOR_POSITIONS: "/api/v1/topvisor/positions/sync",
   },
+  PROJECTS: {
+    GET_PROJECTS: "/api/v1/projects",
+    CREATE_PROJECT: "/api/v1/projects",
+    UPDATE_PROJECT: (projectId: string) => `/api/v1/projects/${projectId}`,
+    DELETE_PROJECT: (projectId: string) => `/api/v1/projects/${projectId}`,
+    GET_PROJECT_SITES: "/api/v1/projects/sites",
+    ASSIGN_PROJECT_SITES: (projectId: string) => `/api/v1/projects/${projectId}/sites/assign`,
+    UNASSIGN_PROJECT_SITES: (projectId: string) => `/api/v1/projects/${projectId}/sites/unassign`,
+    GET_PROJECT_OPTIONS: "/api/v1/projects/options",
+  },
 } as const;
