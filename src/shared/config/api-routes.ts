@@ -4,6 +4,9 @@ export const API_ROUTES = {
     REFRESH: "/api/v1/auth/refresh",
     LOGOUT: "/api/v1/auth/logout",
   },
+  DASHBOARD: {
+    GET_DASHBOARD: "/api/v1/dashboard",
+  },
   METRICS: {
     GET_METRICS_PROFILES: "/api/v1/metrics/profiles",
     SYNC_METRICS_COUNTERS: "/api/v1/metrics/metrics-counters/sync",
