@@ -16,6 +16,21 @@ export type ProjectSiteDto = {
   siteUrl: string;
   projectId?: number | null;
   projectName?: string | null;
+  pageCount: number;
+  pagesLastRefreshedAt?: string | null;
+};
+
+export type ProjectSitePageDto = {
+  pageUrl: string;
+  status: "ACTIVE" | "DELETED";
+};
+
+export type ProjectSiteRefreshResultDto = {
+  siteId: number;
+  success: boolean;
+  message?: string | null;
+  pageCount: number;
+  pagesLastRefreshedAt?: string | null;
 };
 
 export type ProjectSitesListRequest = {

@@ -9,6 +9,7 @@ type PaginationControlsProps = {
   pageSize: number;
   pageSizeOptions: number[];
   isFetching?: boolean;
+  disabled?: boolean;
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
 };
@@ -19,6 +20,7 @@ export function PaginationControls({
   pageSize,
   pageSizeOptions,
   isFetching = false,
+  disabled = false,
   onPageChange,
   onPageSizeChange,
 }: PaginationControlsProps) {
@@ -32,7 +34,7 @@ export function PaginationControls({
   return (
     <Container>
       <Controls>
-        <NavButton type="button" onClick={() => onPageChange(page - 1)} disabled={!canPrev}>
+        <NavButton type="button" onClick={() => onPageChange(page - 1)} disabled={disabled || !canPrev}>
           <FaChevronLeft aria-hidden="true" />
           Назад
         </NavButton>
@@ -40,7 +42,7 @@ export function PaginationControls({
           Стр. {page + 1} из {Math.max(totalPages, 1)}
           {isFetching && " (обновление...)"}
         </PageInfo>
-        <NavButton type="button" onClick={() => onPageChange(page + 1)} disabled={!canNext}>
+        <NavButton type="button" onClick={() => onPageChange(page + 1)} disabled={disabled || !canNext}>
           Далее
           <FaChevronRight aria-hidden="true" />
         </NavButton>
@@ -51,6 +53,7 @@ export function PaginationControls({
           onValueChange={(value) => onPageSizeChange(Number(value))}
           options={pageSizeSelectOptions}
           placeholder="Размер страницы"
+          disabled={disabled}
         />
       </PageSizeControl>
     </Container>

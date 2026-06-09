@@ -29,8 +29,11 @@ export {
   TableHead,
   TableBody,
   TableRow,
+  ExpandedTableRow,
   TableHeaderCell,
   TableCell,
+  ExpandedTableCell,
+  RowToggleButton,
 } from "./table";
 export { ProfilesSidebar, type ProfileSidebarGroup } from "./profiles-sidebar";
 export { TableSyncPanel } from "./table-sync-panel";

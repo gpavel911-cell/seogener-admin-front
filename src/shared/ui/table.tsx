@@ -25,6 +25,10 @@ export const TableRow = styled.tr`
   transition: background-color 0.14s ease;
 `;
 
+export const ExpandedTableRow = styled(TableRow)`
+  background: #f8fbff;
+`;
+
 export const TableHeaderCell = styled.th`
   padding: 11px 14px;
   height: 46px;
@@ -66,5 +70,37 @@ export const TableCell = styled.td`
 
   &:last-child {
     padding-right: 20px;
+  }
+`;
+
+export const ExpandedTableCell = styled(TableCell)`
+  white-space: normal;
+  background: #f8fbff;
+  padding-top: 14px;
+  padding-bottom: 14px;
+`;
+
+export const RowToggleButton = styled.button`
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid #dbe5f3;
+  background: #ffffff;
+  color: #334155;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+
+  &:hover:not(:disabled) {
+    background: #eff6ff;
+    border-color: #bfdbfe;
+    color: #1d4ed8;
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.6;
   }
 `;

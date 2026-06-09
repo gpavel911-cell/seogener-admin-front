@@ -6,11 +6,27 @@ import type {
   ProjectCreateRequest,
   ProjectDeleteRequest,
   ProjectOptionDto,
+  ProjectSitePageDto,
+  ProjectSiteRefreshResultDto,
   ProjectRenameRequest,
   ProjectSitesListRequest,
   ProjectSitesListResponse,
   ProjectUnassignSitesRequest,
 } from "./types";
+
+const buildProjectSitesParams = ({ pageNumber, pageSize, projectId, unassigned, siteQuery }: ProjectSitesListRequest) => {
+  const params: Record<string, number | boolean | string> = { pageNumber, pageSize };
+  if (projectId !== undefined) {
+    params.projectId = projectId;
+  }
+  if (unassigned !== undefined) {
+    params.unassigned = unassigned;
+  }
+  if (siteQuery !== undefined) {
+    params.siteQuery = siteQuery;
+  }
+  return params;
+};
 
 export const projectsApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
@@ -50,23 +66,47 @@ export const projectsApi = baseApi.injectEndpoints({
       invalidatesTags: ["Projects", "ProjectSites", "ProjectOptions"],
     }),
     getProjectSites: builder.query<ProjectSitesListResponse, ProjectSitesListRequest>({
-      query: ({ pageNumber, pageSize, projectId, unassigned, siteQuery }) => {
-        const params: Record<string, number | boolean | string> = { pageNumber, pageSize };
-        if (projectId !== undefined) {
-          params.projectId = projectId;
-        }
-        if (unassigned !== undefined) {
-          params.unassigned = unassigned;
-        }
-        if (siteQuery !== undefined) {
-          params.siteQuery = siteQuery;
-        }
-        return {
-          url: API_ROUTES.PROJECTS.GET_PROJECT_SITES,
-          params,
-        };
-      },
-      providesTags: ["ProjectSites"],
+      query: (request) => ({
+        url: API_ROUTES.PROJECTS.GET_PROJECT_SITES,
+        params: buildProjectSitesParams(request),
+      }),
+      providesTags: (result) => [
+        { type: "ProjectSites", id: "LIST" },
+        ...(result?.content.map((site) => ({ type: "ProjectSites" as const, id: site.siteId })) ?? []),
+      ],
+    }),
+    getProjectSitePages: builder.query<ProjectSitePageDto[], number>({
+      query: (siteId) => ({
+        url: API_ROUTES.PROJECTS.GET_PROJECT_SITE_PAGES(String(siteId)),
+      }),
+      providesTags: (_result, _error, siteId) => [
+        { type: "ProjectSitePages", id: "LIST" },
+        { type: "ProjectSitePages", id: siteId },
+      ],
+    }),
+    refreshProjectSitePages: builder.mutation<ProjectSiteRefreshResultDto, number>({
+      query: (siteId) => ({
+        url: API_ROUTES.PROJECTS.REFRESH_PROJECT_SITE_PAGES(String(siteId)),
+        method: "POST",
+      }),
+      invalidatesTags: (_result, _error, siteId) => [
+        { type: "ProjectSitePages", id: siteId },
+      ],
+    }),
+    refreshProjectSitesPages: builder.mutation<ProjectSiteRefreshResultDto[], ProjectSitesListRequest>({
+      query: (request) => ({
+        url: API_ROUTES.PROJECTS.REFRESH_PROJECT_SITES_PAGES,
+        method: "POST",
+        params: buildProjectSitesParams(request),
+      }),
+      invalidatesTags: (result) => [
+        { type: "ProjectSites", id: "LIST" },
+        { type: "ProjectSitePages", id: "LIST" },
+        ...(result?.flatMap((item) => [
+          { type: "ProjectSites" as const, id: item.siteId },
+          { type: "ProjectSitePages" as const, id: item.siteId },
+        ]) ?? []),
+      ],
     }),
     assignProjectSites: builder.mutation<void, ProjectAssignSitesRequest>({
       query: ({ projectId, siteIds }) => ({
@@ -74,7 +114,7 @@ export const projectsApi = baseApi.injectEndpoints({
         method: "POST",
         body: { siteIds },
       }),
-      invalidatesTags: ["Projects", "ProjectSites"],
+      invalidatesTags: [{ type: "Projects", id: "LIST" }, { type: "ProjectSites", id: "LIST" }],
     }),
     unassignProjectSites: builder.mutation<void, ProjectUnassignSitesRequest>({
       query: ({ projectId, siteIds }) => ({
@@ -82,7 +122,7 @@ export const projectsApi = baseApi.injectEndpoints({
         method: "POST",
         body: { siteIds },
       }),
-      invalidatesTags: ["Projects", "ProjectSites"],
+      invalidatesTags: [{ type: "Projects", id: "LIST" }, { type: "ProjectSites", id: "LIST" }],
     }),
   }),
 });
@@ -94,6 +134,9 @@ export const {
   useUpdateProjectMutation,
   useDeleteProjectMutation,
   useGetProjectSitesQuery,
+  useGetProjectSitePagesQuery,
+  useRefreshProjectSitePagesMutation,
+  useRefreshProjectSitesPagesMutation,
   useAssignProjectSitesMutation,
   useUnassignProjectSitesMutation,
 } = projectsApi;
