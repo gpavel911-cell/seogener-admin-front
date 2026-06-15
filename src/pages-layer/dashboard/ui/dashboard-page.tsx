@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { ChangeEvent } from "react";
 import { skipToken } from "@reduxjs/toolkit/query";
-import { FaSyncAlt } from "react-icons/fa";
+import { FaInfoCircle, FaSyncAlt } from "react-icons/fa";
 import styled, { css, keyframes } from "styled-components";
 import { shouldShowBulkRecrawlButton } from "../lib/dashboard-action-visibility";
+import { DashboardDetailsModalContent } from "./dashboard-detail-page";
 import { useGetDashboardQuery, useRecrawlDashboardSiteMutation, useRecrawlDashboardSitesMutation } from "@entities/dashboard/api";
 import type { DashboardListRequest, DashboardRecrawlReportDto, DashboardRowDto } from "@entities/dashboard/types";
 import { useGetProjectOptionsQuery } from "@entities/projects/api";
@@ -51,6 +53,7 @@ export function DashboardPage() {
   const [activeRecrawlSiteId, setActiveRecrawlSiteId] = useState<number | null>(null);
   const [selectedSiteIds, setSelectedSiteIds] = useState<number[]>([]);
   const [isBulkRecrawling, setIsBulkRecrawling] = useState(false);
+  const [detailRow, setDetailRow] = useState<DashboardRowDto | null>(null);
 
   const { data: projectOptions = [] } = useGetProjectOptionsQuery();
   const [recrawlDashboardSite] = useRecrawlDashboardSiteMutation();
@@ -80,6 +83,9 @@ export function DashboardPage() {
     () => rows.filter((row) => selectedSiteIds.includes(row.siteId)),
     [rows, selectedSiteIds],
   );
+  const visibleSiteIds = useMemo(() => rows.map((row) => row.siteId), [rows]);
+  const allVisibleRowsSelected = rows.length > 0 && rows.every((row) => selectedSiteIds.includes(row.siteId));
+  const someVisibleRowsSelected = rows.some((row) => selectedSiteIds.includes(row.siteId));
 
   useEffect(() => {
     if (!error) return;
@@ -149,6 +155,16 @@ export function DashboardPage() {
     setAppliedFilters({
       projectId: selectedProjectId,
       query: search.trim(),
+    });
+  };
+
+  const handleOpenDetails = (row: DashboardRowDto) => setDetailRow(row);
+  const handleToggleVisibleRows = (checked: boolean) => {
+    setSelectedSiteIds((prev) => {
+      if (checked) {
+        return Array.from(new Set([...prev, ...visibleSiteIds]));
+      }
+      return prev.filter((siteId) => !visibleSiteIds.includes(siteId));
     });
   };
 
@@ -223,7 +239,11 @@ export function DashboardPage() {
                     return prev.filter((value) => value !== siteId);
                   });
                 }}
+                allVisibleRowsSelected={allVisibleRowsSelected}
+                someVisibleRowsSelected={someVisibleRowsSelected}
+                onToggleVisibleRows={handleToggleVisibleRows}
                 onRecrawl={handleRecrawl}
+                onOpenDetails={handleOpenDetails}
               />
               <PaginationControls
                 page={page}
@@ -268,6 +288,18 @@ export function DashboardPage() {
           </ReportContent>
         ) : null}
       </ModalDialog>
+      <ModalDialog
+        open={detailRow !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDetailRow(null);
+          }
+        }}
+        title={detailRow?.domain ?? "Детали"}
+        contentWidth="1180px"
+      >
+        {detailRow ? <DashboardDetailsModalContent siteId={detailRow.siteId} /> : null}
+      </ModalDialog>
     </Root>
   );
 }
@@ -278,7 +310,11 @@ type DashboardTableProps = {
   isBulkRecrawling: boolean;
   selectedSiteIds: number[];
   onToggleSelect: (siteId: number, checked: boolean) => void;
+  allVisibleRowsSelected: boolean;
+  someVisibleRowsSelected: boolean;
+  onToggleVisibleRows: (checked: boolean) => void;
   onRecrawl: (row: DashboardRowDto) => void;
+  onOpenDetails: (row: DashboardRowDto) => void;
 };
 
 function DashboardTable({
@@ -287,7 +323,11 @@ function DashboardTable({
   isBulkRecrawling,
   selectedSiteIds,
   onToggleSelect,
+  allVisibleRowsSelected,
+  someVisibleRowsSelected,
+  onToggleVisibleRows,
   onRecrawl,
+  onOpenDetails,
 }: DashboardTableProps) {
   if (rows.length === 0) {
     return <PlaceholderCard>{EMPTY_DATA_MESSAGE}</PlaceholderCard>;
@@ -298,13 +338,21 @@ function DashboardTable({
       <DashboardListTable>
         <TableHead>
           <TableRow>
-            <TableHeaderCell>&nbsp;</TableHeaderCell>
+            <TableHeaderCell>
+              <HeaderCheckbox
+                checked={allVisibleRowsSelected}
+                indeterminate={someVisibleRowsSelected && !allVisibleRowsSelected}
+                disabled={isBulkRecrawling}
+                onChange={(event) => onToggleVisibleRows(event.target.checked)}
+              />
+            </TableHeaderCell>
             <TableHeaderCell>Проект</TableHeaderCell>
             <TableHeaderCell>Домен</TableHeaderCell>
             <TableHeaderCell>Всего</TableHeaderCell>
             <TableHeaderCell>В индексе</TableHeaderCell>
             <TableHeaderCell>На переобходе</TableHeaderCell>
             <TableHeaderCell>Вне индекса</TableHeaderCell>
+            <TableHeaderCell>Не в поиске</TableHeaderCell>
             <TableHeaderCell />
           </TableRow>
         </TableHead>
@@ -325,6 +373,7 @@ function DashboardTable({
               <TableCell>{formatNumber(row.inSearchCount)}</TableCell>
               <TableCell>{formatNumber(row.recrawlCount)}</TableCell>
               <TableCell>{formatNumber(row.outOfIndexCount)}</TableCell>
+              <TableCell>{formatNumber(row.notInSearchCount)}</TableCell>
               <TableCell>
                 <ActionsCell>
                   <IconButton
@@ -336,6 +385,14 @@ function DashboardTable({
                   >
                     <RecrawlIcon $spinning={activeRecrawlSiteId === row.siteId} />
                   </IconButton>
+                  <IconButton
+                    type="button"
+                    onClick={() => onOpenDetails(row)}
+                    data-tooltip="Детали"
+                    aria-label={`Детали для ${row.domain}`}
+                  >
+                    <FaInfoCircle />
+                  </IconButton>
                 </ActionsCell>
               </TableCell>
             </TableRow>
@@ -344,6 +401,25 @@ function DashboardTable({
       </DashboardListTable>
     </TableWrapper>
   );
+}
+
+type HeaderCheckboxProps = {
+  checked: boolean;
+  indeterminate: boolean;
+  disabled: boolean;
+  onChange: (event: ChangeEvent<HTMLInputElement>) => void;
+};
+
+function HeaderCheckbox({ checked, indeterminate, disabled, onChange }: HeaderCheckboxProps) {
+  const checkboxRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (checkboxRef.current) {
+      checkboxRef.current.indeterminate = indeterminate;
+    }
+  }, [indeterminate]);
+
+  return <Checkbox ref={checkboxRef} type="checkbox" checked={checked} disabled={disabled} onChange={onChange} />;
 }
 
 const formatNumber = (value?: number | null) =>
@@ -478,8 +554,8 @@ const DashboardListTable = styled(Table)`
     text-align: center;
   }
 
-  ${TableHeaderCell}:nth-child(8),
-  ${TableCell}:nth-child(8) {
+  ${TableHeaderCell}:nth-child(9),
+  ${TableCell}:nth-child(9) {
     width: 88px;
   }
 `;

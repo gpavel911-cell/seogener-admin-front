@@ -3,6 +3,7 @@ import { baseApi } from "@shared/store";
 import type {
   DashboardBulkRecrawlRequestDto,
   DashboardBulkRecrawlResponseDto,
+  DashboardDetailShellDto,
   DashboardListRequest,
   DashboardListResponse,
   DashboardRecrawlReportDto,
@@ -25,6 +26,12 @@ export const dashboardApi = baseApi.injectEndpoints({
           params,
         };
       },
+      providesTags: ["Dashboard"],
+    }),
+    getDashboardDetails: builder.query<DashboardDetailShellDto, number>({
+      query: (siteId) => ({
+        url: API_ROUTES.DASHBOARD.GET_DASHBOARD_DETAILS(siteId.toString()),
+      }),
       providesTags: ["Dashboard"],
     }),
     recrawlDashboardSite: builder.mutation<DashboardRecrawlReportDto, number>({
@@ -55,6 +62,7 @@ export const dashboardApi = baseApi.injectEndpoints({
 
 export const {
   useGetDashboardQuery,
+  useGetDashboardDetailsQuery,
   useRecrawlDashboardSiteMutation,
   useRecrawlDashboardSitesMutation,
   useRecrawlDashboardUrlsMutation,
