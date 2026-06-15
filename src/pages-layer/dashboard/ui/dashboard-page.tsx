@@ -2,19 +2,19 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { skipToken } from "@reduxjs/toolkit/query";
-import styled from "styled-components";
-import { useGetDashboardQuery } from "@entities/dashboard/api";
-import { DashboardStatus, getDashboardStatusLabel, type DashboardListRequest, type DashboardRowDto } from "@entities/dashboard/types";
+import { FaSyncAlt } from "react-icons/fa";
+import styled, { css, keyframes } from "styled-components";
+import { shouldShowBulkRecrawlButton } from "../lib/dashboard-action-visibility";
+import { useGetDashboardQuery, useRecrawlDashboardSiteMutation, useRecrawlDashboardSitesMutation } from "@entities/dashboard/api";
+import type { DashboardListRequest, DashboardRecrawlReportDto, DashboardRowDto } from "@entities/dashboard/types";
 import { useGetProjectOptionsQuery } from "@entities/projects/api";
 import { usePagination } from "@shared/lib/use-pagination";
 import { PaginationControls } from "@shared/ui/pagination-controls";
 import {
   Button,
-  DateInput,
   EMPTY_DATA_MESSAGE,
   PageHeader,
   PlaceholderText,
-  ResultLoader,
   SelectControl,
   StyledInput,
   Table,
@@ -26,47 +26,38 @@ import {
   TableWrapper,
   useToast,
 } from "@shared/ui";
+import { ModalDialog } from "@shared/ui-kit/modal-dialog";
 
 const ALL_PROJECTS_VALUE = "__all_projects__";
-const ALL_STATUSES_VALUE = "__all_statuses__";
-const MAX_DASHBOARD_PERIOD_DAYS = 30;
-const DAY_MS = 24 * 60 * 60 * 1000;
+const DASHBOARD_VIEW_LABEL = "Индексация";
+const UNAVAILABLE_PLACEHOLDER = "—";
 
-type AppliedRange = {
-  dateFrom: string;
-  dateTo: string;
-};
+type ApiError = { data?: { message?: string } };
 
-type AppliedFilters = AppliedRange & {
+type AppliedFilters = {
   projectId: string;
-  status: string;
   query: string;
 };
 
 export function DashboardPage() {
   const { showToast } = useToast();
-  const { page, pageSize, pageSizeOptions, setPage, setPageSize } = usePagination();
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const { page, pageSize, pageSizeOptions, setPage, setPageSize } = usePagination({ initialPageSize: 5 });
   const [selectedProjectId, setSelectedProjectId] = useState(ALL_PROJECTS_VALUE);
-  const [selectedStatus, setSelectedStatus] = useState(ALL_STATUSES_VALUE);
   const [search, setSearch] = useState("");
   const [appliedFilters, setAppliedFilters] = useState<AppliedFilters | null>(null);
+  const [reportDomains, setReportDomains] = useState<string[]>([]);
+  const [failedReportDomains, setFailedReportDomains] = useState<string[]>([]);
+  const [report, setReport] = useState<DashboardRecrawlReportDto | null>(null);
+  const [activeRecrawlSiteId, setActiveRecrawlSiteId] = useState<number | null>(null);
+  const [selectedSiteIds, setSelectedSiteIds] = useState<number[]>([]);
+  const [isBulkRecrawling, setIsBulkRecrawling] = useState(false);
 
   const { data: projectOptions = [] } = useGetProjectOptionsQuery();
+  const [recrawlDashboardSite] = useRecrawlDashboardSiteMutation();
+  const [recrawlDashboardSites] = useRecrawlDashboardSitesMutation();
   const projectSelectOptions = useMemo(
     () => [{ value: ALL_PROJECTS_VALUE, label: "Все проекты" }, ...projectOptions],
     [projectOptions],
-  );
-  const statusSelectOptions = useMemo(
-    () => [
-      { value: ALL_STATUSES_VALUE, label: "Все статусы" },
-      { value: DashboardStatus.GROWTH, label: getDashboardStatusLabel(DashboardStatus.GROWTH) },
-      { value: DashboardStatus.DECLINE, label: getDashboardStatusLabel(DashboardStatus.DECLINE) },
-      { value: DashboardStatus.STAGNATION, label: getDashboardStatusLabel(DashboardStatus.STAGNATION) },
-      { value: DashboardStatus.NO_DATA, label: getDashboardStatusLabel(DashboardStatus.NO_DATA) },
-    ],
-    [],
   );
 
   const dashboardQueryArgs = useMemo<DashboardListRequest | typeof skipToken>(() => {
@@ -74,219 +65,356 @@ export function DashboardPage() {
       return skipToken;
     }
     return {
-      dateFrom: appliedFilters.dateFrom,
-      dateTo: appliedFilters.dateTo,
       pageNumber: page,
       pageSize,
       ...(appliedFilters.projectId !== ALL_PROJECTS_VALUE ? { projectId: Number(appliedFilters.projectId) } : {}),
-      ...(appliedFilters.status !== ALL_STATUSES_VALUE ? { status: appliedFilters.status as DashboardStatus } : {}),
       ...(appliedFilters.query.length > 0 ? { query: appliedFilters.query } : {}),
     };
   }, [appliedFilters, page, pageSize]);
 
-  const { data, isFetching, isLoading, error } = useGetDashboardQuery(dashboardQueryArgs);
-  const rows = data?.content ?? [];
+  const { data, isFetching, error } = useGetDashboardQuery(dashboardQueryArgs);
+  const rows = useMemo(() => data?.content ?? [], [data?.content]);
   const totalPages = data?.totalPages ?? 0;
+  const hasLoaded = appliedFilters !== null;
+  const selectedRows = useMemo(
+    () => rows.filter((row) => selectedSiteIds.includes(row.siteId)),
+    [rows, selectedSiteIds],
+  );
 
   useEffect(() => {
     if (!error) return;
-    showToast({ variant: "error", message: "Ошибка загрузки дашборда. Проверьте данные и повторите запрос." });
+    showToast({ variant: "error", message: "Ошибка загрузки данных индексации. Повторите запрос." });
   }, [error, showToast]);
 
-  const handleShow = () => {
-    if (!dateFrom || !dateTo) {
-      showToast({ variant: "error", message: "Укажите дату начала и дату конца." });
-      return;
-    }
-    if (dateFrom > dateTo) {
-      showToast({ variant: "error", message: "Дата начала не может быть позже даты конца." });
-      return;
-    }
-    if (!isDateRangeWithinLimit(dateFrom, dateTo)) {
-      showToast({ variant: "error", message: "Период не может превышать 30 дней." });
-      return;
-    }
-    setPage(0);
-    setAppliedFilters({
-      dateFrom,
-      dateTo,
-      projectId: selectedProjectId,
-      status: selectedStatus,
-      query: search.trim(),
-    });
-  };
+  useEffect(() => {
+    setSelectedSiteIds((prev) => prev.filter((siteId) => rows.some((row) => row.siteId === siteId)));
+  }, [rows]);
 
   const resetDashboard = () => {
     setPage(0);
     setAppliedFilters(null);
+    setSelectedSiteIds([]);
   };
-  const hasLoaded = appliedFilters !== null;
+
+  const executeSiteRecrawl = async (row: DashboardRowDto) => {
+    setActiveRecrawlSiteId(row.siteId);
+    try {
+      return await recrawlDashboardSite(row.siteId).unwrap();
+    } catch (error) {
+      const message = (error as ApiError)?.data?.message ?? "Не удалось запустить переобход.";
+      showToast({ variant: "error", message });
+      throw error;
+    } finally {
+      setActiveRecrawlSiteId(null);
+    }
+  };
+
+  const handleRecrawl = async (row: DashboardRowDto) => {
+    try {
+      const result = await executeSiteRecrawl(row);
+      setReportDomains([row.domain]);
+      setFailedReportDomains([]);
+      setReport(result);
+    } catch {
+      // Error toast is shown in executeSiteRecrawl.
+    }
+  };
+
+  const handleBulkRecrawl = async () => {
+    if (selectedRows.length === 0) {
+      showToast({ variant: "error", message: "Выберите хотя бы один сайт для переобхода." });
+      return;
+    }
+    setIsBulkRecrawling(true);
+    try {
+      const result = await recrawlDashboardSites({ siteIds: selectedRows.map((row) => row.siteId) }).unwrap();
+      setReportDomains(result.domains);
+      setFailedReportDomains(result.failedDomains);
+      setReport({
+        sentCount: result.sentCount,
+        skippedCount: result.skippedCount,
+        quotaLimitedCount: result.quotaLimitedCount,
+      });
+      setSelectedSiteIds([]);
+    } catch (error) {
+      const message = (error as ApiError)?.data?.message ?? "Не удалось запустить переобход.";
+      showToast({ variant: "error", message });
+    } finally {
+      setIsBulkRecrawling(false);
+    }
+  };
+
+  const handleShow = () => {
+    setPage(0);
+    setAppliedFilters({
+      projectId: selectedProjectId,
+      query: search.trim(),
+    });
+  };
 
   return (
-    <PageShell>
+    <Root>
       <PageHeader title="Дашборд" />
-      <Toolbar>
-        <Field>
-          <Label>Дата начала</Label>
-          <DateInput
-            value={dateFrom}
-            onChange={(event) => {
-              setDateFrom(event.target.value);
-              resetDashboard();
-            }}
-          />
-        </Field>
-        <Field>
-          <Label>Дата конца</Label>
-          <DateInput
-            value={dateTo}
-            onChange={(event) => {
-              setDateTo(event.target.value);
-              resetDashboard();
-            }}
-          />
-        </Field>
-        <Field>
-          <Label>Проект</Label>
-          <SelectControl
-            value={selectedProjectId}
-            onValueChange={(value) => {
-              setSelectedProjectId(value);
-              resetDashboard();
-            }}
-            options={projectSelectOptions}
-          />
-        </Field>
-        <SearchField>
-          <Label>Поиск</Label>
-          <StyledInput
-            value={search}
-            onChange={(event) => {
-              setSearch(event.target.value);
-              resetDashboard();
-            }}
-            placeholder="Поиск по домену"
-          />
-        </SearchField>
-        <Field>
-          <LabelWithHelp>
-            Статус
-            <HelpIcon
-              tabIndex={0}
-              aria-label="Использование этого фильтра значительно замедляет запрос."
-              data-tooltip="Использование этого фильтра значительно замедляет запрос."
-            >
-              ?
-            </HelpIcon>
-          </LabelWithHelp>
-          <SelectControl
-            value={selectedStatus}
-            onValueChange={(value) => {
-              setSelectedStatus(value);
-              resetDashboard();
-            }}
-            options={statusSelectOptions}
-          />
-        </Field>
-        <ShowButton type="button" variant="primary" onClick={handleShow} disabled={isFetching}>
-          {isFetching ? "Загрузка..." : "Показать"}
-        </ShowButton>
-      </Toolbar>
+      <Body>
+        <SubSidebar aria-label="Навигация по дашборду">
+          <SubList>
+            <SubItem>
+              <SubButton type="button" $active aria-current="page">
+                {DASHBOARD_VIEW_LABEL}
+              </SubButton>
+            </SubItem>
+          </SubList>
+        </SubSidebar>
+        <Content>
+          <Toolbar>
+            <Field>
+              <Label>Проект</Label>
+              <SelectControl
+                value={selectedProjectId}
+                onValueChange={(value) => {
+                  setSelectedProjectId(value);
+                  resetDashboard();
+                }}
+                options={projectSelectOptions}
+              />
+            </Field>
+            <SearchField>
+              <Label>Поиск по домену</Label>
+              <StyledInput
+                value={search}
+                onChange={(event) => {
+                  setSearch(event.target.value);
+                  resetDashboard();
+                }}
+                placeholder="Введите домен"
+              />
+            </SearchField>
+            <ShowButton type="button" variant="primary" onClick={handleShow} disabled={isFetching}>
+              {isFetching ? "Загрузка..." : "Показать"}
+            </ShowButton>
+          </Toolbar>
 
-      {!hasLoaded ? (
-        <PlaceholderCard>Выберите период и нажмите кнопку Показать.</PlaceholderCard>
-      ) : (
-        <>
-          <DashboardTable rows={rows} isLoading={isLoading || isFetching} />
-          <PaginationControls
-            page={page}
-            totalPages={totalPages}
-            pageSize={pageSize}
-            pageSizeOptions={pageSizeOptions}
-            isFetching={isFetching}
-            onPageChange={setPage}
-            onPageSizeChange={setPageSize}
-          />
-        </>
-      )}
-    </PageShell>
+          {!hasLoaded ? (
+            <PlaceholderCard>Выберите фильтры и нажмите кнопку Показать.</PlaceholderCard>
+          ) : (
+            <>
+              {shouldShowBulkRecrawlButton(selectedRows.length) ? (
+                <TableActions>
+                  <BulkRecrawlButton
+                    type="button"
+                    variant="primary"
+                    onClick={handleBulkRecrawl}
+                    disabled={isBulkRecrawling || isFetching}
+                  >
+                    {isBulkRecrawling ? "Переобход..." : "Запустить переобход"}
+                  </BulkRecrawlButton>
+                </TableActions>
+              ) : null}
+              <DashboardTable
+                rows={rows}
+                activeRecrawlSiteId={activeRecrawlSiteId}
+                isBulkRecrawling={isBulkRecrawling}
+                selectedSiteIds={selectedSiteIds}
+                onToggleSelect={(siteId, checked) => {
+                  setSelectedSiteIds((prev) => {
+                    if (checked) {
+                      return prev.includes(siteId) ? prev : [...prev, siteId];
+                    }
+                    return prev.filter((value) => value !== siteId);
+                  });
+                }}
+                onRecrawl={handleRecrawl}
+              />
+              <PaginationControls
+                page={page}
+                totalPages={totalPages}
+                pageSize={pageSize}
+                pageSizeOptions={pageSizeOptions}
+                isFetching={isFetching}
+                onPageChange={setPage}
+                onPageSizeChange={setPageSize}
+              />
+            </>
+          )}
+        </Content>
+      </Body>
+      <ModalDialog
+        open={report !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setReport(null);
+            setReportDomains([]);
+            setFailedReportDomains([]);
+          }
+        }}
+        title="Отчет по переобходу"
+        contentWidth="420px"
+      >
+        {report ? (
+          <ReportContent>
+            <ReportDomain>
+              {reportDomains.length <= 1
+                ? reportDomains[0] ?? UNAVAILABLE_PLACEHOLDER
+                : `Выбрано доменов: ${reportDomains.length.toLocaleString("ru-RU")}`}
+            </ReportDomain>
+            <ReportLine>Отправлено: {report.sentCount.toLocaleString("ru-RU")}</ReportLine>
+            <ReportLine>Пропущено (уже в очереди): {report.skippedCount.toLocaleString("ru-RU")}</ReportLine>
+            <ReportLine>Не вошло из-за квоты: {report.quotaLimitedCount.toLocaleString("ru-RU")}</ReportLine>
+            {failedReportDomains.length > 0 ? (
+              <ReportLine>
+                Не удалось запустить для: {failedReportDomains.join(", ")}
+              </ReportLine>
+            ) : null}
+          </ReportContent>
+        ) : null}
+      </ModalDialog>
+    </Root>
   );
 }
 
-function DashboardTable({ rows, isLoading }: { rows: DashboardRowDto[]; isLoading: boolean }) {
-  if (isLoading) {
-    return <LoadingCard><ResultLoader label="Загрузка данных..." /></LoadingCard>;
-  }
+type DashboardTableProps = {
+  rows: DashboardRowDto[];
+  activeRecrawlSiteId: number | null;
+  isBulkRecrawling: boolean;
+  selectedSiteIds: number[];
+  onToggleSelect: (siteId: number, checked: boolean) => void;
+  onRecrawl: (row: DashboardRowDto) => void;
+};
 
+function DashboardTable({
+  rows,
+  activeRecrawlSiteId,
+  isBulkRecrawling,
+  selectedSiteIds,
+  onToggleSelect,
+  onRecrawl,
+}: DashboardTableProps) {
   if (rows.length === 0) {
     return <PlaceholderCard>{EMPTY_DATA_MESSAGE}</PlaceholderCard>;
   }
 
   return (
     <TableWrapper>
-      <Table>
+      <DashboardListTable>
         <TableHead>
           <TableRow>
+            <TableHeaderCell>&nbsp;</TableHeaderCell>
             <TableHeaderCell>Проект</TableHeaderCell>
             <TableHeaderCell>Домен</TableHeaderCell>
-            <TableHeaderCell>Статус</TableHeaderCell>
-            <TableHeaderCell>Индексация</TableHeaderCell>
-            <TableHeaderCell>Показы</TableHeaderCell>
-            <TableHeaderCell>Клики</TableHeaderCell>
-            <TableHeaderCell>Позиция</TableHeaderCell>
+            <TableHeaderCell>Всего</TableHeaderCell>
+            <TableHeaderCell>В индексе</TableHeaderCell>
+            <TableHeaderCell>На переобходе</TableHeaderCell>
+            <TableHeaderCell>Вне индекса</TableHeaderCell>
+            <TableHeaderCell />
           </TableRow>
         </TableHead>
         <TableBody>
           {rows.map((row) => (
             <TableRow key={row.siteId}>
-              <TableCell>{row.projectName ?? "—"}</TableCell>
-              <TableCell>{row.domain}</TableCell>
               <TableCell>
-                <StatusBadge data-status={row.status}>{getDashboardStatusLabel(row.status)}</StatusBadge>
+                <Checkbox
+                  type="checkbox"
+                  checked={selectedSiteIds.includes(row.siteId)}
+                  disabled={isBulkRecrawling || activeRecrawlSiteId === row.siteId}
+                  onChange={(event) => onToggleSelect(row.siteId, event.target.checked)}
+                />
               </TableCell>
-              <TableCell>{formatSignedNumber(row.indexing)}</TableCell>
-              <TableCell>{formatNumber(row.impressions)}</TableCell>
-              <TableCell>{formatNumber(row.clicks)}</TableCell>
-              <TableCell>{formatPosition(row.position)}</TableCell>
+              <TableCell>{row.projectName ?? UNAVAILABLE_PLACEHOLDER}</TableCell>
+              <TableCell>{row.domain}</TableCell>
+              <TableCell>{formatNumber(row.totalPages)}</TableCell>
+              <TableCell>{formatNumber(row.inSearchCount)}</TableCell>
+              <TableCell>{formatNumber(row.recrawlCount)}</TableCell>
+              <TableCell>{formatNumber(row.outOfIndexCount)}</TableCell>
+              <TableCell>
+                <ActionsCell>
+                  <IconButton
+                    type="button"
+                    onClick={() => onRecrawl(row)}
+                    disabled={isBulkRecrawling || activeRecrawlSiteId === row.siteId}
+                    data-tooltip="Переобход"
+                    aria-label={`Переобход для ${row.domain}`}
+                  >
+                    <RecrawlIcon $spinning={activeRecrawlSiteId === row.siteId} />
+                  </IconButton>
+                </ActionsCell>
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>
-      </Table>
+      </DashboardListTable>
     </TableWrapper>
   );
 }
 
-const formatNumber = (value?: number | null) => (value === null || value === undefined ? "—" : value.toLocaleString("ru-RU"));
+const formatNumber = (value?: number | null) =>
+  value === null || value === undefined ? UNAVAILABLE_PLACEHOLDER : value.toLocaleString("ru-RU");
 
-const isDateRangeWithinLimit = (dateFrom: string, dateTo: string) => {
-  const fromDate = new Date(dateFrom);
-  const toDate = new Date(dateTo);
-  return Math.floor((toDate.getTime() - fromDate.getTime()) / DAY_MS) + 1 <= MAX_DASHBOARD_PERIOD_DAYS;
-};
-
-const formatSignedNumber = (value?: number | null) => {
-  if (value === null || value === undefined) {
-    return "—";
-  }
-  return value > 0 ? `+${value.toLocaleString("ru-RU")}` : value.toLocaleString("ru-RU");
-};
-
-const formatPosition = (value?: number | null) => {
-  if (value === null || value === undefined) {
-    return "—";
-  }
-  return value.toLocaleString("ru-RU", { maximumFractionDigits: 2 });
-};
-
-const PageShell = styled.div`
+const Root = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 16px;
+  flex: 1;
+  min-height: 0;
+`;
+
+const Body = styled.div`
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+  flex: 1;
+  min-height: 0;
+`;
+
+const SubSidebar = styled.nav`
+  border: 1px solid #dbe5f3;
+  border-radius: 14px;
+  background: #ffffff;
+  padding: 12px;
+  height: fit-content;
+  align-self: start;
+  width: 250px;
+`;
+
+const SubList = styled.ul`
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+`;
+
+const SubItem = styled.li`
+  margin: 0;
+`;
+
+const SubButton = styled.button<{ $active: boolean }>`
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 36px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid ${({ $active }) => ($active ? "rgba(37, 99, 235, 0.36)" : "transparent")};
+  background: ${({ $active }) => ($active ? "rgba(37, 99, 235, 0.14)" : "transparent")};
+  color: ${({ $active }) => ($active ? "#1d4ed8" : "#334155")};
+  font-size: 14px;
+  font-weight: ${({ $active }) => ($active ? 600 : 500)};
+  cursor: default;
+`;
+
+const Content = styled.section`
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+  min-width: 0;
 `;
 
 const Toolbar = styled.div`
   display: grid;
-  grid-template-columns: repeat(2, minmax(150px, 180px)) minmax(170px, 210px) 260px minmax(170px, 210px) 1fr auto;
+  grid-template-columns: minmax(180px, 220px) 260px auto;
   gap: 12px;
   align-items: end;
   padding: 14px;
@@ -303,7 +431,7 @@ const Field = styled.label`
 `;
 
 const SearchField = styled(Field)`
-  width: 100%;
+  width: 260px;
 `;
 
 const Label = styled.span`
@@ -312,61 +440,18 @@ const Label = styled.span`
   color: ${({ theme }) => theme.tokens.color.textSecondary};
 `;
 
-const LabelWithHelp = styled(Label)`
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-`;
-
-const HelpIcon = styled.span`
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  border-radius: 999px;
-  border: 1px solid #cbd7ea;
-  color: #64748b;
-  font-size: 11px;
-  line-height: 1;
-  cursor: help;
-
-  &::after {
-    content: attr(data-tooltip);
-    position: absolute;
-    left: 50%;
-    bottom: calc(100% + 8px);
-    z-index: 20;
-    width: 250px;
-    padding: 8px 10px;
-    border-radius: 8px;
-    background: #111827;
-    color: #ffffff;
-    font-size: 12px;
-    font-weight: 500;
-    line-height: 1.35;
-    white-space: normal;
-    transform: translateX(-50%);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.15s ease;
-  }
-
-  &:hover::after,
-  &:focus-visible::after {
-    opacity: 1;
-  }
-
-  &:focus-visible {
-    outline: 2px solid ${({ theme }) => theme.tokens.color.accent};
-    outline-offset: 2px;
-  }
-`;
-
 const ShowButton = styled(Button)`
   min-width: 110px;
-  grid-column: 7;
+  justify-self: start;
+`;
+
+const TableActions = styled.div`
+  display: flex;
+  justify-content: flex-end;
+`;
+
+const BulkRecrawlButton = styled(Button)`
+  min-width: 180px;
 `;
 
 const PlaceholderCard = styled(PlaceholderText)`
@@ -376,33 +461,106 @@ const PlaceholderCard = styled(PlaceholderText)`
   padding: 24px;
 `;
 
-const LoadingCard = styled.div`
-  border: 1px solid #dbe5f3;
-  background: #ffffff;
-  border-radius: 14px;
-  min-height: 180px;
+const ActionsCell = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
+  align-items: center;
+  gap: 8px;
 `;
 
-const StatusBadge = styled.span`
+const DashboardListTable = styled(Table)`
+  ${TableHeaderCell}:nth-child(1),
+  ${TableCell}:nth-child(1) {
+    width: 48px;
+    padding-left: 12px;
+    padding-right: 8px;
+    text-align: center;
+  }
+
+  ${TableHeaderCell}:nth-child(8),
+  ${TableCell}:nth-child(8) {
+    width: 88px;
+  }
+`;
+
+const Checkbox = styled.input`
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  vertical-align: middle;
+`;
+
+const IconButton = styled(Button)`
+  position: relative;
+  width: 34px;
+  height: 34px;
+  padding: 0;
   display: inline-flex;
-  padding: 4px 8px;
-  border-radius: 999px;
-  font-size: 12px;
-  background: #f3f4f6;
-  color: #374151;
+  align-items: center;
+  justify-content: center;
 
-  &[data-status="${DashboardStatus.GROWTH}"] {
-    background: #ecfdf3;
-    color: #027a48;
+  &::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 8px);
+    transform: translateX(-50%) translateY(4px);
+    background: #0f172a;
+    color: #f8fafc;
+    font-size: 12px;
+    line-height: 1;
+    border-radius: 8px;
+    padding: 6px 8px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition:
+      opacity 0.14s ease,
+      transform 0.14s ease;
+    z-index: 10;
   }
 
-  &[data-status="${DashboardStatus.DECLINE}"] {
-    background: #fef3f2;
-    color: #b42318;
+  &:hover::after,
+  &:focus-visible::after {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+`;
+
+const spin = keyframes`
+  from {
+    transform: rotate(0deg);
   }
 
-  &[data-status="${DashboardStatus.STAGNATION}"] {
-    background: #fffaeb;
-    color: #b54708;
+  to {
+    transform: rotate(360deg);
   }
+`;
+
+const RecrawlIcon = styled(FaSyncAlt)<{ $spinning: boolean }>`
+  font-size: 14px;
+  animation: ${({ $spinning }) =>
+    $spinning
+      ? css`
+          ${spin} 0.9s linear infinite
+        `
+      : "none"};
+`;
+
+const ReportContent = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+`;
+
+const ReportDomain = styled.div`
+  font-size: 16px;
+  font-weight: 600;
+  color: #0f172a;
+`;
+
+const ReportLine = styled.div`
+  font-size: 14px;
+  color: #334155;
 `;

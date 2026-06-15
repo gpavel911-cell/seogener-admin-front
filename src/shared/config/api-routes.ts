@@ -6,6 +6,9 @@ export const API_ROUTES = {
   },
   DASHBOARD: {
     GET_DASHBOARD: "/api/v1/dashboard",
+    RECRAWL_SITE: (siteId: string) => `/api/v1/dashboard/${siteId}/recrawl`,
+    RECRAWL_BULK: "/api/v1/dashboard/recrawl-bulk",
+    RECRAWL_URLS: (siteId: string) => `/api/v1/dashboard/${siteId}/recrawl-urls`,
   },
   METRICS: {
     GET_METRICS_PROFILES: "/api/v1/metrics/profiles",
