@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
-import { FaSyncAlt } from "react-icons/fa";
+import { FaChevronDown, FaSyncAlt } from "react-icons/fa";
 import styled, { css, keyframes } from "styled-components";
+import { canToggleDashboardSection, getVisibleDashboardSectionRows } from "../lib/dashboard-detail-sections";
 import { shouldShowSectionRecrawlButton } from "../lib/dashboard-action-visibility";
 import { useGetDashboardDetailsQuery, useRecrawlDashboardUrlsMutation } from "@entities/dashboard/api";
 import type {
@@ -31,6 +32,7 @@ const ACTIONABLE_SECTION_KEYS: DashboardDetailSectionKey[] = ["out-of-index", "n
 
 type ApiError = { data?: { message?: string } };
 type SelectionState = Record<DashboardDetailSectionKey, string[]>;
+type ExpandedSectionState = Record<DashboardDetailSectionKey, boolean>;
 
 type DashboardDetailsModalContentProps = {
   siteId: number;
@@ -46,6 +48,12 @@ export function DashboardDetailsModalContent({ siteId }: DashboardDetailsModalCo
   });
   const [report, setReport] = useState<DashboardSelectiveRecrawlResponseDto | null>(null);
   const [activeUrls, setActiveUrls] = useState<string[]>([]);
+  const [expandedSections, setExpandedSections] = useState<ExpandedSectionState>({
+    "in-search": false,
+    "recrawl-queue": false,
+    "out-of-index": false,
+    "not-in-search": false,
+  });
 
   const { data: shell, isLoading, error } = useGetDashboardDetailsQuery(siteId);
   const [recrawlDashboardUrls, { isLoading: isRecrawling }] = useRecrawlDashboardUrlsMutation();
@@ -100,12 +108,22 @@ export function DashboardDetailsModalContent({ siteId }: DashboardDetailsModalCo
       <TopBar>
         <QuotaCard>
           <QuotaLabel>Остаток суточной квоты</QuotaLabel>
-          <QuotaValue>{report?.quotaRemainder ?? shell?.quotaRemainder ?? UNAVAILABLE_PLACEHOLDER}</QuotaValue>
+          <QuotaValue>
+            {isLoading ? <QuotaSkeleton aria-hidden="true" /> : report?.quotaRemainder ?? shell?.quotaRemainder ?? UNAVAILABLE_PLACEHOLDER}
+          </QuotaValue>
         </QuotaCard>
       </TopBar>
 
       {isLoading ? (
-        <PlaceholderCard>Загрузка деталей домена...</PlaceholderCard>
+        <DetailsSkeletonLayout aria-hidden="true">
+          {Array.from({ length: 4 }, (_, index) => (
+            <SectionSkeletonCard key={index}>
+              <SkeletonLine $width="32%" $height={18} />
+              <SkeletonTableBlock />
+              <SkeletonChevron />
+            </SectionSkeletonCard>
+          ))}
+        </DetailsSkeletonLayout>
       ) : error || !shell ? (
         <PlaceholderCard>Не удалось загрузить данные домена.</PlaceholderCard>
       ) : (
@@ -129,12 +147,19 @@ export function DashboardDetailsModalContent({ siteId }: DashboardDetailsModalCo
               </SectionHeader>
               <DashboardSection
                 section={section}
+                expanded={expandedSections[section.key]}
                 selectedUrls={selectedUrls}
                 activeUrls={activeUrls}
                 isRecrawling={isRecrawling}
                 onToggle={handleToggle}
                 onToggleAll={handleToggleAll}
                 onRecrawlSingle={(url) => handleRecrawl([url])}
+                onToggleExpanded={() =>
+                  setExpandedSections((prev) => ({
+                    ...prev,
+                    [section.key]: !prev[section.key],
+                  }))
+                }
               />
             </SectionCard>
           );
@@ -167,22 +192,26 @@ export function DashboardDetailsModalContent({ siteId }: DashboardDetailsModalCo
 
 type DashboardSectionProps = {
   section: DashboardDetailSectionDto;
+  expanded: boolean;
   selectedUrls: string[];
   activeUrls: string[];
   isRecrawling: boolean;
   onToggle: (sectionKey: DashboardDetailSectionKey, url: string, checked: boolean) => void;
   onToggleAll: (sectionKey: DashboardDetailSectionKey, urls: string[], checked: boolean) => void;
   onRecrawlSingle: (url: string) => void;
+  onToggleExpanded: () => void;
 };
 
 function DashboardSection({
   section,
+  expanded,
   selectedUrls,
   activeUrls,
   isRecrawling,
   onToggle,
   onToggleAll,
   onRecrawlSingle,
+  onToggleExpanded,
 }: DashboardSectionProps) {
   const selectedSet = useMemo(() => new Set(selectedUrls), [selectedUrls]);
   const activeSet = useMemo(() => new Set(activeUrls), [activeUrls]);
@@ -193,84 +222,99 @@ function DashboardSection({
   }
 
   const rows = section.rows ?? [];
-  const rowUrls = rows.map((row) => row.pageUrl);
-  const allRowsSelected = isActionable && rows.length > 0 && rows.every((row) => selectedSet.has(row.pageUrl));
-  const someRowsSelected = isActionable && rows.some((row) => selectedSet.has(row.pageUrl));
+  const visibleRows = getVisibleDashboardSectionRows(rows, expanded);
+  const rowUrls = visibleRows.map((row) => row.pageUrl);
+  const allRowsSelected = isActionable && visibleRows.length > 0 && visibleRows.every((row) => selectedSet.has(row.pageUrl));
+  const someRowsSelected = isActionable && visibleRows.some((row) => selectedSet.has(row.pageUrl));
   if (rows.length === 0) {
     return <SectionState>{EMPTY_SECTION_MESSAGE}</SectionState>;
   }
 
   return (
-    <TableWrapper>
-      <SectionTable $selectable={isActionable}>
-        <TableHead>
-          <TableRow>
-            {renderHeaderCells(
-              section.key,
-              isActionable ? (
-                <HeaderCheckbox
-                  ariaLabel={`Выбрать все страницы в разделе ${section.title}`}
-                  checked={allRowsSelected}
-                  indeterminate={someRowsSelected && !allRowsSelected}
-                  disabled={isRecrawling}
-                  onChange={(event) => onToggleAll(section.key, rowUrls, event.target.checked)}
-                />
-              ) : null,
-            )}
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {rows.map((row) => (
-            <TableRow key={`${section.key}-${row.pageUrl}`}>
-              {isActionable ? (
-                <TableCell>
-                  <Checkbox
-                    type="checkbox"
-                    checked={selectedSet.has(row.pageUrl)}
+    <SectionContent>
+      <TableWrapper>
+        <SectionTable $selectable={isActionable}>
+          <TableHead>
+            <TableRow>
+              {renderHeaderCells(
+                section.key,
+                isActionable ? (
+                  <HeaderCheckbox
+                    ariaLabel={`Выбрать все страницы в разделе ${section.title}`}
+                    checked={allRowsSelected}
+                    indeterminate={someRowsSelected && !allRowsSelected}
                     disabled={isRecrawling}
-                    onChange={(event) => onToggle(section.key, row.pageUrl, event.target.checked)}
+                    onChange={(event) => onToggleAll(section.key, rowUrls, event.target.checked)}
                   />
-                </TableCell>
-              ) : null}
-              <TableCell>{row.pageUrl}</TableCell>
-              {section.key === "in-search" ? (
-                <>
-                  <TableCell>{formatDateTime(row.lastVisitedAt)}</TableCell>
-                  <TableCell>{row.title ?? UNAVAILABLE_PLACEHOLDER}</TableCell>
-                </>
-              ) : null}
-              {section.key === "recrawl-queue" ? (
-                <>
-                  <TableCell>{mapQueueStatus(row.status)}</TableCell>
-                  <TableCell>{formatDateTime(row.addedAt)}</TableCell>
-                </>
-              ) : null}
-              {section.key === "out-of-index" ? (
-                <>
-                  <TableCell>{row.reason ?? UNAVAILABLE_PLACEHOLDER}</TableCell>
-                  <TableCell>{formatDateTime(row.eventDate)}</TableCell>
-                </>
-              ) : null}
-              {isActionable ? (
-                <TableCell>
-                  <ActionsCell>
-                    <IconButton
-                      type="button"
-                      onClick={() => onRecrawlSingle(row.pageUrl)}
-                      disabled={isRecrawling && activeSet.has(row.pageUrl)}
-                      data-tooltip="Переобход"
-                      aria-label={`Переобход для ${row.pageUrl}`}
-                    >
-                      <RecrawlIcon $spinning={isRecrawling && activeSet.has(row.pageUrl)} />
-                    </IconButton>
-                  </ActionsCell>
-                </TableCell>
-              ) : null}
+                ) : null,
+              )}
             </TableRow>
-          ))}
-        </TableBody>
-      </SectionTable>
-    </TableWrapper>
+          </TableHead>
+          <TableBody>
+            {visibleRows.map((row) => (
+              <TableRow key={`${section.key}-${row.pageUrl}`}>
+                {isActionable ? (
+                  <TableCell>
+                    <Checkbox
+                      type="checkbox"
+                      checked={selectedSet.has(row.pageUrl)}
+                      disabled={isRecrawling}
+                      onChange={(event) => onToggle(section.key, row.pageUrl, event.target.checked)}
+                    />
+                  </TableCell>
+                ) : null}
+                <TableCell>{row.pageUrl}</TableCell>
+                {section.key === "in-search" ? (
+                  <>
+                    <TableCell>{formatDateTime(row.lastVisitedAt)}</TableCell>
+                    <TableCell>{row.title ?? UNAVAILABLE_PLACEHOLDER}</TableCell>
+                  </>
+                ) : null}
+                {section.key === "recrawl-queue" ? (
+                  <>
+                    <TableCell>{mapQueueStatus(row.status)}</TableCell>
+                    <TableCell>{formatDateTime(row.addedAt)}</TableCell>
+                  </>
+                ) : null}
+                {section.key === "out-of-index" ? (
+                  <>
+                    <TableCell>{row.reason ?? UNAVAILABLE_PLACEHOLDER}</TableCell>
+                    <TableCell>{formatDateTime(row.eventDate)}</TableCell>
+                  </>
+                ) : null}
+                {isActionable ? (
+                  <TableCell>
+                    <ActionsCell>
+                      <IconButton
+                        type="button"
+                        onClick={() => onRecrawlSingle(row.pageUrl)}
+                        disabled={isRecrawling && activeSet.has(row.pageUrl)}
+                        data-tooltip="Переобход"
+                        aria-label={`Переобход для ${row.pageUrl}`}
+                      >
+                        <RecrawlIcon $spinning={isRecrawling && activeSet.has(row.pageUrl)} />
+                      </IconButton>
+                    </ActionsCell>
+                  </TableCell>
+                ) : null}
+              </TableRow>
+            ))}
+          </TableBody>
+        </SectionTable>
+      </TableWrapper>
+      {canToggleDashboardSection(rows) ? (
+        <SectionToggleWrap>
+          <SectionToggleButton
+            type="button"
+            variant="secondary"
+            onClick={onToggleExpanded}
+            aria-label={expanded ? `Свернуть раздел ${section.title}` : `Показать весь раздел ${section.title}`}
+          >
+            <ChevronIcon $expanded={expanded} />
+          </SectionToggleButton>
+        </SectionToggleWrap>
+      ) : null}
+    </SectionContent>
   );
 }
 
@@ -376,7 +420,14 @@ const mapRecrawlStatus = (value: DashboardSelectiveRecrawlResponseDto["results"]
 
 const formatSectionTitle = (section: DashboardDetailSectionDto) => {
   const countLabel = section.failed ? UNAVAILABLE_PLACEHOLDER : section.rows.length.toLocaleString("ru-RU");
-  return `${section.title} (${countLabel})`;
+  return (
+    <SectionMeta>
+      <SectionDot $sectionKey={section.key} aria-hidden="true" />
+      <span>
+        {section.title} ({countLabel})
+      </span>
+    </SectionMeta>
+  );
 };
 
 const Content = styled.section`
@@ -434,6 +485,37 @@ const SectionTitle = styled.h2`
   color: #0f172a;
 `;
 
+const SectionContent = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+`;
+
+const SectionMeta = styled.span`
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+`;
+
+const SectionDot = styled.span<{ $sectionKey: DashboardDetailSectionKey }>`
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  flex-shrink: 0;
+  background: ${({ $sectionKey }) => {
+    switch ($sectionKey) {
+      case "in-search":
+        return "#22c55e";
+      case "recrawl-queue":
+        return "#eab308";
+      case "out-of-index":
+        return "#ef4444";
+      case "not-in-search":
+        return "#94a3b8";
+    }
+  }};
+`;
+
 const SectionState = styled(PlaceholderText)`
   border: 1px solid #dbe5f3;
   background: #ffffff;
@@ -469,6 +551,92 @@ const SectionTable = styled(Table)<{ $selectable: boolean }>`
           }
         `
       : ""}
+`;
+
+const SectionToggleWrap = styled.div`
+  display: flex;
+  justify-content: center;
+  margin-top: -6px;
+`;
+
+const SectionToggleButton = styled(Button)`
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08) !important;
+`;
+
+const ChevronIcon = styled(FaChevronDown)<{ $expanded: boolean }>`
+  font-size: 14px;
+  color: #475569;
+  transform: ${({ $expanded }) => ($expanded ? "rotate(180deg)" : "rotate(0deg)")};
+  transition: transform 0.16s ease;
+`;
+
+const pulse = keyframes`
+  0% {
+    opacity: 0.55;
+  }
+
+  50% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0.55;
+  }
+`;
+
+const DetailsSkeletonLayout = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+`;
+
+const SectionSkeletonCard = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+`;
+
+const SkeletonLine = styled.span<{ $width: string; $height?: number }>`
+  display: block;
+  width: ${({ $width }) => $width};
+  height: ${({ $height = 14 }) => `${$height}px`};
+  border-radius: 999px;
+  background: linear-gradient(90deg, #e2e8f0 0%, #f8fafc 50%, #e2e8f0 100%);
+  animation: ${pulse} 1.2s ease-in-out infinite;
+`;
+
+const SkeletonTableBlock = styled.div`
+  height: 156px;
+  border-radius: 14px;
+  border: 1px solid #dbe5f3;
+  background: linear-gradient(90deg, #e2e8f0 0%, #f8fafc 50%, #e2e8f0 100%);
+  animation: ${pulse} 1.2s ease-in-out infinite;
+`;
+
+const SkeletonChevron = styled.div`
+  align-self: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 1px solid #dbe5f3;
+  background: linear-gradient(90deg, #e2e8f0 0%, #f8fafc 50%, #e2e8f0 100%);
+  animation: ${pulse} 1.2s ease-in-out infinite;
+`;
+
+const QuotaSkeleton = styled.span`
+  display: inline-flex;
+  width: 72px;
+  height: 28px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #e2e8f0 0%, #f8fafc 50%, #e2e8f0 100%);
+  animation: ${pulse} 1.2s ease-in-out infinite;
 `;
 
 const Checkbox = styled.input`

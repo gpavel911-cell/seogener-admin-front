@@ -1,6 +1,8 @@
 import { API_ROUTES } from "@shared/config/api-routes";
 import { baseApi } from "@shared/store";
 import type {
+  DashboardAnalyticsRequest,
+  DashboardAnalyticsResponseDto,
   DashboardBulkRecrawlRequestDto,
   DashboardBulkRecrawlResponseDto,
   DashboardDetailShellDto,
@@ -14,15 +16,25 @@ export const dashboardApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     getDashboard: builder.query<DashboardListResponse, DashboardListRequest>({
       query: ({ pageNumber, pageSize, projectId, query }) => {
-        const params: Record<string, number | string> = { pageNumber, pageSize };
-        if (projectId !== undefined) {
-          params.projectId = projectId;
-        }
+        const params: Record<string, number | string> = { pageNumber, pageSize, projectId };
         if (query !== undefined) {
           params.query = query;
         }
         return {
           url: API_ROUTES.DASHBOARD.GET_DASHBOARD,
+          params,
+        };
+      },
+      providesTags: ["Dashboard"],
+    }),
+    getDashboardAnalytics: builder.query<DashboardAnalyticsResponseDto, DashboardAnalyticsRequest>({
+      query: ({ projectId, query, dateFrom, dateTo }) => {
+        const params: Record<string, number | string> = { projectId, dateFrom, dateTo };
+        if (query !== undefined) {
+          params.query = query;
+        }
+        return {
+          url: API_ROUTES.DASHBOARD.GET_DASHBOARD_ANALYTICS,
           params,
         };
       },
@@ -62,6 +74,7 @@ export const dashboardApi = baseApi.injectEndpoints({
 
 export const {
   useGetDashboardQuery,
+  useGetDashboardAnalyticsQuery,
   useGetDashboardDetailsQuery,
   useRecrawlDashboardSiteMutation,
   useRecrawlDashboardSitesMutation,

@@ -3,8 +3,38 @@ import type { Page } from "@shared/api";
 export type DashboardListRequest = {
   pageNumber: number;
   pageSize: number;
-  projectId?: number;
+  projectId: number;
   query?: string;
+};
+
+export type DashboardAnalyticsRequest = {
+  projectId: number;
+  query?: string;
+  dateFrom: string;
+  dateTo: string;
+};
+
+export type DashboardAnalyticsPointDto = {
+  date: string;
+  value: number;
+};
+
+export type DashboardAnalyticsSeriesDto = {
+  key: "added" | "removed";
+  label: string;
+  points: DashboardAnalyticsPointDto[];
+};
+
+export type DashboardSummaryCardDto = {
+  key: "total-pages" | "in-search" | "recrawl-completed" | "out-of-index";
+  label: string;
+  value: number;
+  deltaValue?: number | null;
+};
+
+export type DashboardAnalyticsResponseDto = {
+  series: DashboardAnalyticsSeriesDto[];
+  cards: DashboardSummaryCardDto[];
 };
 
 export type DashboardRowDto = {
