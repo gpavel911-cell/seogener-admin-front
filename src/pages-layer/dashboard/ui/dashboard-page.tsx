@@ -8,6 +8,7 @@ import styled, { css, keyframes } from "styled-components";
 import { getDefaultDashboardDateRange, validateDashboardAnalyticsFilters } from "../lib/dashboard-analytics";
 import { shouldShowBulkRecrawlButton } from "../lib/dashboard-action-visibility";
 import { buildDashboardBarGroups, getNearestDashboardChartIndex } from "../lib/dashboard-chart";
+import { DashboardMetricsSection } from "./dashboard-metrics-section";
 import {
   formatDashboardSummaryDelta,
   getDashboardSummaryCardDotColor,
@@ -51,7 +52,12 @@ import {
 } from "@shared/ui";
 import { ModalDialog } from "@shared/ui-kit/modal-dialog";
 
-const DASHBOARD_VIEW_LABEL = "Индексация";
+type DashboardView = "indexing" | "metrics";
+
+const DASHBOARD_VIEWS: Array<{ id: DashboardView; label: string }> = [
+  { id: "indexing", label: "Индексация" },
+  { id: "metrics", label: "Метрика" },
+];
 const UNAVAILABLE_PLACEHOLDER = "—";
 const CHART_COLORS: Record<DashboardAnalyticsSeriesDto["key"], string> = {
   added: "#22c55e",
@@ -83,17 +89,12 @@ export function DashboardPage() {
   const [selectedSiteIds, setSelectedSiteIds] = useState<number[]>([]);
   const [isBulkRecrawling, setIsBulkRecrawling] = useState(false);
   const [detailRow, setDetailRow] = useState<DashboardRowDto | null>(null);
+  const [activeView, setActiveView] = useState<DashboardView>("indexing");
 
   const { data: projectOptions = [] } = useGetProjectOptionsQuery();
   const [recrawlDashboardSite] = useRecrawlDashboardSiteMutation();
   const [recrawlDashboardSites] = useRecrawlDashboardSitesMutation();
-  const projectSelectOptions = useMemo(() => projectOptions, [projectOptions]);
-
-  useEffect(() => {
-    if (!selectedProjectId && projectSelectOptions.length > 0) {
-      setSelectedProjectId(projectSelectOptions[0].value);
-    }
-  }, [projectSelectOptions, selectedProjectId]);
+  const effectiveProjectId = selectedProjectId || projectOptions[0]?.value || "";
 
   const dashboardQueryArgs = useMemo<DashboardListRequest | typeof skipToken>(() => {
     if (!appliedFilters) {
@@ -207,7 +208,7 @@ export function DashboardPage() {
 
   const handleShow = () => {
     const validationMessage = validateDashboardAnalyticsFilters({
-      projectId: selectedProjectId,
+      projectId: effectiveProjectId,
       dateFrom,
       dateTo,
     });
@@ -217,7 +218,7 @@ export function DashboardPage() {
     }
     setPage(0);
     setAppliedFilters({
-      projectId: selectedProjectId,
+      projectId: effectiveProjectId,
       query: search.trim(),
       dateFrom,
       dateTo,
@@ -240,122 +241,135 @@ export function DashboardPage() {
       <Body>
         <SubSidebar aria-label="Навигация по дашборду">
           <SubList>
-            <SubItem>
-              <SubButton type="button" $active aria-current="page">
-                {DASHBOARD_VIEW_LABEL}
-              </SubButton>
-            </SubItem>
+            {DASHBOARD_VIEWS.map((view) => (
+              <SubItem key={view.id}>
+                <SubButton
+                  type="button"
+                  $active={activeView === view.id}
+                  aria-current={activeView === view.id ? "page" : undefined}
+                  onClick={() => setActiveView(view.id)}
+                >
+                  {view.label}
+                </SubButton>
+              </SubItem>
+            ))}
           </SubList>
         </SubSidebar>
         <Content>
-          <Toolbar>
-            <Field>
-              <Label>Дата начала</Label>
-              <StyledInput
-                type="date"
-                value={dateFrom}
-                max={defaultRange.dateTo}
-                onChange={(event) => {
-                  setDateFrom(event.target.value);
-                  resetDashboard();
-                }}
-              />
-            </Field>
-            <Field>
-              <Label>Дата конца</Label>
-              <StyledInput
-                type="date"
-                value={dateTo}
-                max={defaultRange.dateTo}
-                onChange={(event) => {
-                  setDateTo(event.target.value);
-                  resetDashboard();
-                }}
-              />
-            </Field>
-            <Field>
-              <Label>Проект</Label>
-              <SelectControl
-                value={selectedProjectId}
-                onValueChange={(value) => {
-                  setSelectedProjectId(value);
-                  resetDashboard();
-                }}
-                options={projectSelectOptions}
-              />
-            </Field>
-            <SearchField>
-              <Label>Поиск по домену</Label>
-              <StyledInput
-                value={search}
-                onChange={(event) => {
-                  setSearch(event.target.value);
-                  resetDashboard();
-                }}
-                placeholder="Введите домен"
-              />
-            </SearchField>
-            <ShowButton
-              type="button"
-              variant="primary"
-              onClick={handleShow}
-              disabled={isLoadingDashboard || !selectedProjectId}
-            >
-              {isLoadingDashboard ? "Загрузка..." : "Показать"}
-            </ShowButton>
-          </Toolbar>
-
-          {!hasLoaded ? (
-            <PlaceholderCard>Выберите фильтры и нажмите кнопку Показать.</PlaceholderCard>
+          {activeView === "metrics" ? (
+            <DashboardMetricsSection />
           ) : (
             <>
-              <DashboardChartPanel analytics={analytics} isFetching={isFetchingAnalytics} hasError={Boolean(analyticsError)} />
-              <DashboardSummaryPanel
-                analytics={analytics}
-                isFetching={isFetchingAnalytics}
-                hasError={Boolean(analyticsError)}
-              />
-              {shouldShowBulkRecrawlButton(selectedRows.length) ? (
-                <TableActions>
-                  <BulkRecrawlButton
-                    type="button"
-                    variant="primary"
-                    onClick={handleBulkRecrawl}
-                    disabled={isBulkRecrawling || isFetching}
-                  >
-                    {isBulkRecrawling ? "Переобход..." : "Запустить переобход"}
-                  </BulkRecrawlButton>
-                </TableActions>
-              ) : null}
-              <DashboardTable
-                rows={rows}
-                isFetching={isFetching}
-                activeRecrawlSiteId={activeRecrawlSiteId}
-                isBulkRecrawling={isBulkRecrawling}
-                selectedSiteIds={selectedSiteIds}
-                onToggleSelect={(siteId, checked) => {
-                  setSelectedSiteIds((prev) => {
-                    if (checked) {
-                      return prev.includes(siteId) ? prev : [...prev, siteId];
-                    }
-                    return prev.filter((value) => value !== siteId);
-                  });
-                }}
-                allVisibleRowsSelected={allVisibleRowsSelected}
-                someVisibleRowsSelected={someVisibleRowsSelected}
-                onToggleVisibleRows={handleToggleVisibleRows}
-                onRecrawl={handleRecrawl}
-                onOpenDetails={handleOpenDetails}
-              />
-              <PaginationControls
-                page={page}
-                totalPages={totalPages}
-                pageSize={pageSize}
-                pageSizeOptions={pageSizeOptions}
-                isFetching={isFetching}
-                onPageChange={setPage}
-                onPageSizeChange={setPageSize}
-              />
+              <Toolbar>
+                <Field>
+                  <Label>Дата начала</Label>
+                  <StyledInput
+                    type="date"
+                    value={dateFrom}
+                    max={defaultRange.dateTo}
+                    onChange={(event) => {
+                      setDateFrom(event.target.value);
+                      resetDashboard();
+                    }}
+                  />
+                </Field>
+                <Field>
+                  <Label>Дата конца</Label>
+                  <StyledInput
+                    type="date"
+                    value={dateTo}
+                    max={defaultRange.dateTo}
+                    onChange={(event) => {
+                      setDateTo(event.target.value);
+                      resetDashboard();
+                    }}
+                  />
+                </Field>
+                <Field>
+                  <Label>Проект</Label>
+                  <SelectControl
+                    value={effectiveProjectId}
+                    onValueChange={(value) => {
+                      setSelectedProjectId(value);
+                      resetDashboard();
+                    }}
+                    options={projectOptions}
+                  />
+                </Field>
+                <SearchField>
+                  <Label>Поиск по домену</Label>
+                  <StyledInput
+                    value={search}
+                    onChange={(event) => {
+                      setSearch(event.target.value);
+                      resetDashboard();
+                    }}
+                    placeholder="Введите домен"
+                  />
+                </SearchField>
+                <ShowButton
+                  type="button"
+                  variant="primary"
+                  onClick={handleShow}
+                  disabled={isLoadingDashboard || !effectiveProjectId}
+                >
+                  {isLoadingDashboard ? "Загрузка..." : "Показать"}
+                </ShowButton>
+              </Toolbar>
+
+              {!hasLoaded ? (
+                <PlaceholderCard>Выберите фильтры и нажмите кнопку Показать.</PlaceholderCard>
+              ) : (
+                <>
+                  <DashboardChartPanel analytics={analytics} isFetching={isFetchingAnalytics} hasError={Boolean(analyticsError)} />
+                  <DashboardSummaryPanel
+                    analytics={analytics}
+                    isFetching={isFetchingAnalytics}
+                    hasError={Boolean(analyticsError)}
+                  />
+                  {shouldShowBulkRecrawlButton(selectedRows.length) ? (
+                    <TableActions>
+                      <BulkRecrawlButton
+                        type="button"
+                        variant="primary"
+                        onClick={handleBulkRecrawl}
+                        disabled={isBulkRecrawling || isFetching}
+                      >
+                        {isBulkRecrawling ? "Переобход..." : "Запустить переобход"}
+                      </BulkRecrawlButton>
+                    </TableActions>
+                  ) : null}
+                  <DashboardTable
+                    rows={rows}
+                    isFetching={isFetching}
+                    activeRecrawlSiteId={activeRecrawlSiteId}
+                    isBulkRecrawling={isBulkRecrawling}
+                    selectedSiteIds={selectedSiteIds}
+                    onToggleSelect={(siteId, checked) => {
+                      setSelectedSiteIds((prev) => {
+                        if (checked) {
+                          return prev.includes(siteId) ? prev : [...prev, siteId];
+                        }
+                        return prev.filter((value) => value !== siteId);
+                      });
+                    }}
+                    allVisibleRowsSelected={allVisibleRowsSelected}
+                    someVisibleRowsSelected={someVisibleRowsSelected}
+                    onToggleVisibleRows={handleToggleVisibleRows}
+                    onRecrawl={handleRecrawl}
+                    onOpenDetails={handleOpenDetails}
+                  />
+                  <PaginationControls
+                    page={page}
+                    totalPages={totalPages}
+                    pageSize={pageSize}
+                    pageSizeOptions={pageSizeOptions}
+                    isFetching={isFetching}
+                    onPageChange={setPage}
+                    onPageSizeChange={setPageSize}
+                  />
+                </>
+              )}
             </>
           )}
         </Content>
@@ -843,7 +857,7 @@ const SubButton = styled.button<{ $active: boolean }>`
   color: ${({ $active }) => ($active ? "#1d4ed8" : "#334155")};
   font-size: 14px;
   font-weight: ${({ $active }) => ($active ? 600 : 500)};
-  cursor: default;
+  cursor: pointer;
 `;
 
 const Content = styled.section`

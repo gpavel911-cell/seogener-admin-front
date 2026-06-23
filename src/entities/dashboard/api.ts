@@ -3,6 +3,8 @@ import { baseApi } from "@shared/store";
 import type {
   DashboardAnalyticsRequest,
   DashboardAnalyticsResponseDto,
+  DashboardMetricsRequest,
+  DashboardMetricsResponse,
   DashboardBulkRecrawlRequestDto,
   DashboardBulkRecrawlResponseDto,
   DashboardDetailShellDto,
@@ -22,6 +24,19 @@ export const dashboardApi = baseApi.injectEndpoints({
         }
         return {
           url: API_ROUTES.DASHBOARD.GET_DASHBOARD,
+          params,
+        };
+      },
+      providesTags: ["Dashboard"],
+    }),
+    getDashboardMetrics: builder.query<DashboardMetricsResponse, DashboardMetricsRequest>({
+      query: ({ projectId, query, dateFrom, dateTo, pageNumber, pageSize }) => {
+        const params: Record<string, number | string> = { projectId, dateFrom, dateTo, pageNumber, pageSize };
+        if (query !== undefined) {
+          params.query = query;
+        }
+        return {
+          url: API_ROUTES.DASHBOARD.GET_DASHBOARD_METRICS,
           params,
         };
       },
@@ -74,6 +89,7 @@ export const dashboardApi = baseApi.injectEndpoints({
 
 export const {
   useGetDashboardQuery,
+  useGetDashboardMetricsQuery,
   useGetDashboardAnalyticsQuery,
   useGetDashboardDetailsQuery,
   useRecrawlDashboardSiteMutation,

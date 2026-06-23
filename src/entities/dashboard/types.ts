@@ -14,6 +14,26 @@ export type DashboardAnalyticsRequest = {
   dateTo: string;
 };
 
+export type DashboardMetricsRequest = {
+  projectId: number;
+  query?: string;
+  dateFrom: string;
+  dateTo: string;
+  pageNumber: number;
+  pageSize: number;
+};
+
+export type DashboardMetricsRowDto = {
+  domain: string;
+  pageviews?: number | null;
+  visits?: number | null;
+  visitors?: number | null;
+  entryUrl?: string | null;
+  goals?: number | null;
+};
+
+export type DashboardMetricsResponse = Page<DashboardMetricsRowDto>;
+
 export type DashboardAnalyticsPointDto = {
   date: string;
   value: number;

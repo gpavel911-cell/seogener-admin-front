@@ -6,6 +6,7 @@ export const API_ROUTES = {
   },
   DASHBOARD: {
     GET_DASHBOARD: "/api/v1/dashboard",
+    GET_DASHBOARD_METRICS: "/api/v1/dashboard/metrics",
     GET_DASHBOARD_ANALYTICS: "/api/v1/dashboard/analytics",
     GET_DASHBOARD_DETAILS: (siteId: string) => `/api/v1/dashboard/${siteId}/details`,
     RECRAWL_SITE: (siteId: string) => `/api/v1/dashboard/${siteId}/recrawl`,
