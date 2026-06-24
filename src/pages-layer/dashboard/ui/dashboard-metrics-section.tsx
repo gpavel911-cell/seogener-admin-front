@@ -4,7 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import { skipToken } from "@reduxjs/toolkit/query";
 import styled, { keyframes } from "styled-components";
 import { useGetDashboardMetricsQuery } from "@entities/dashboard/api";
-import type { DashboardMetricsRequest } from "@entities/dashboard/types";
+import type {
+  DashboardMetricsEntryUrlDto,
+  DashboardMetricsRequest,
+} from "@entities/dashboard/types";
 import { useGetProjectOptionsQuery } from "@entities/projects/api";
 import { getDefaultDashboardDateRange, validateDashboardAnalyticsFilters } from "../lib/dashboard-analytics";
 import { usePagination } from "@shared/lib/use-pagination";
@@ -34,6 +37,9 @@ type AppliedFilters = {
   dateTo: string;
 };
 
+type SortableColumn = "pageviews" | "visits" | "visitors" | "goalReaches";
+type SortDirection = "asc" | "desc";
+
 export function DashboardMetricsSection() {
   const defaultRange = useMemo(() => getDefaultDashboardDateRange(), []);
   const { showToast } = useToast();
@@ -43,6 +49,9 @@ export function DashboardMetricsSection() {
   const [dateFrom, setDateFrom] = useState(defaultRange.dateFrom);
   const [dateTo, setDateTo] = useState(defaultRange.dateTo);
   const [appliedFilters, setAppliedFilters] = useState<AppliedFilters | null>(null);
+  const [sortColumn, setSortColumn] = useState<SortableColumn | null>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const [expandedDomain, setExpandedDomain] = useState<string | null>(null);
 
   const { data: projectOptions = [] } = useGetProjectOptionsQuery();
   const effectiveProjectId = selectedProjectId || projectOptions[0]?.value || "";
@@ -71,6 +80,9 @@ export function DashboardMetricsSection() {
   const resetMetrics = () => {
     setPage(0);
     setAppliedFilters(null);
+    setSortColumn(null);
+    setSortDirection("asc");
+    setExpandedDomain(null);
   };
 
   const handleShow = () => {
@@ -84,6 +96,7 @@ export function DashboardMetricsSection() {
       return;
     }
     setPage(0);
+    setExpandedDomain(null);
     setAppliedFilters({
       projectId: effectiveProjectId,
       query: search.trim(),
@@ -92,10 +105,30 @@ export function DashboardMetricsSection() {
     });
   };
 
-  const rows = data?.content ?? [];
+  const rows = useMemo(() => data?.content ?? [], [data?.content]);
   const totalPages = data?.totalPages ?? 0;
   const hasLoaded = appliedFilters !== null;
   const showTableSkeleton = hasLoaded && isFetching && !currentData;
+  const sortedRows = useMemo(() => {
+    if (!sortColumn) {
+      return rows;
+    }
+    return [...rows].sort((left, right) => compareMetricValues(left[sortColumn], right[sortColumn], sortDirection));
+  }, [rows, sortColumn, sortDirection]);
+
+  const handleSort = (column: SortableColumn) => {
+    setExpandedDomain(null);
+    if (sortColumn === column) {
+      setSortDirection((current) => (current === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setSortColumn(column);
+    setSortDirection("asc");
+  };
+
+  const toggleExpandedRow = (domain: string) => {
+    setExpandedDomain((current) => (current === domain ? null : domain));
+  };
 
   return (
     <Content>
@@ -176,24 +209,82 @@ export function DashboardMetricsSection() {
               <TableHead>
                 <TableRow>
                   <TableHeaderCell>Домен</TableHeaderCell>
-                  <TableHeaderCell>Просмотры</TableHeaderCell>
-                  <TableHeaderCell>Визиты</TableHeaderCell>
-                  <TableHeaderCell>Посетители</TableHeaderCell>
+                  <TableHeaderCell>
+                    <SortButton type="button" onClick={() => handleSort("pageviews")}>
+                      <span>Просмотры</span>
+                      <SortIcons $active={sortColumn === "pageviews"}>
+                        <span>{sortColumn === "pageviews" && sortDirection === "asc" ? "▲" : "△"}</span>
+                        <span>{sortColumn === "pageviews" && sortDirection === "desc" ? "▼" : "▽"}</span>
+                      </SortIcons>
+                    </SortButton>
+                  </TableHeaderCell>
+                  <TableHeaderCell>
+                    <SortButton type="button" onClick={() => handleSort("visits")}>
+                      <span>Визиты</span>
+                      <SortIcons $active={sortColumn === "visits"}>
+                        <span>{sortColumn === "visits" && sortDirection === "asc" ? "▲" : "△"}</span>
+                        <span>{sortColumn === "visits" && sortDirection === "desc" ? "▼" : "▽"}</span>
+                      </SortIcons>
+                    </SortButton>
+                  </TableHeaderCell>
+                  <TableHeaderCell>
+                    <SortButton type="button" onClick={() => handleSort("visitors")}>
+                      <span>Посетители</span>
+                      <SortIcons $active={sortColumn === "visitors"}>
+                        <span>{sortColumn === "visitors" && sortDirection === "asc" ? "▲" : "△"}</span>
+                        <span>{sortColumn === "visitors" && sortDirection === "desc" ? "▼" : "▽"}</span>
+                      </SortIcons>
+                    </SortButton>
+                  </TableHeaderCell>
                   <TableHeaderCell>URL входа</TableHeaderCell>
-                  <TableHeaderCell>Цели</TableHeaderCell>
+                  <TableHeaderCell>
+                    <SortButton type="button" onClick={() => handleSort("goalReaches")}>
+                      <span>Достижения целей</span>
+                      <SortIcons $active={sortColumn === "goalReaches"}>
+                        <span>{sortColumn === "goalReaches" && sortDirection === "asc" ? "▲" : "△"}</span>
+                        <span>{sortColumn === "goalReaches" && sortDirection === "desc" ? "▼" : "▽"}</span>
+                      </SortIcons>
+                    </SortButton>
+                  </TableHeaderCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {rows.map((row) => (
-                  <TableRow key={row.domain}>
-                    <TableCell>{row.domain}</TableCell>
-                    <TableCell>{formatNumber(row.pageviews)}</TableCell>
-                    <TableCell>{formatNumber(row.visits)}</TableCell>
-                    <TableCell>{formatNumber(row.visitors)}</TableCell>
-                    <UrlCell>{row.entryUrl ?? UNAVAILABLE_PLACEHOLDER}</UrlCell>
-                    <TableCell>{formatNumber(row.goals)}</TableCell>
-                  </TableRow>
-                ))}
+                {sortedRows.map((row) => {
+                  const entryUrls = row.entryUrls ?? [];
+                  const firstEntryUrl = entryUrls[0];
+                  const isExpanded = expandedDomain === row.domain;
+
+                  return (
+                    <ExpandableRow
+                      key={row.domain}
+                      $expanded={isExpanded}
+                      onClick={() => toggleExpandedRow(row.domain)}
+                      aria-expanded={isExpanded}
+                    >
+                      <TableCell>{row.domain}</TableCell>
+                      <TableCell>{formatNumber(row.pageviews)}</TableCell>
+                      <TableCell>{formatNumber(row.visits)}</TableCell>
+                      <TableCell>{formatNumber(row.visitors)}</TableCell>
+                      <UrlCell>
+                        {firstEntryUrl ? (
+                          <UrlCellContent>
+                            {!isExpanded ? <ExpandedUrlItem as="span">{formatEntryUrl(firstEntryUrl)}</ExpandedUrlItem> : null}
+                            {isExpanded ? (
+                              <ExpandedUrlsList>
+                                {entryUrls.map((entryUrl) => (
+                                  <ExpandedUrlItem key={`${row.domain}-${entryUrl.url}`}>{formatEntryUrl(entryUrl)}</ExpandedUrlItem>
+                                ))}
+                              </ExpandedUrlsList>
+                            ) : null}
+                          </UrlCellContent>
+                        ) : (
+                          UNAVAILABLE_PLACEHOLDER
+                        )}
+                      </UrlCell>
+                      <TableCell>{formatNumber(row.goalReaches)}</TableCell>
+                    </ExpandableRow>
+                  );
+                })}
               </TableBody>
             </MetricsTable>
           </TableWrapper>
@@ -214,6 +305,16 @@ export function DashboardMetricsSection() {
 
 const formatNumber = (value?: number | null) =>
   value === null || value === undefined ? UNAVAILABLE_PLACEHOLDER : value.toLocaleString("ru-RU");
+
+const formatEntryUrl = (entryUrl: DashboardMetricsEntryUrlDto) =>
+  `${entryUrl.url} (${(entryUrl.visits ?? 0).toLocaleString("ru-RU")})`;
+
+const compareMetricValues = (left?: number | null, right?: number | null, direction: SortDirection = "asc") => {
+  if (left == null && right == null) return 0;
+  if (left == null) return 1;
+  if (right == null) return -1;
+  return direction === "asc" ? left - right : right - left;
+};
 
 const Content = styled.section`
   display: flex;
@@ -284,6 +385,26 @@ const MetricsTable = styled(Table)`
   }
 `;
 
+const SortButton = styled.button`
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  cursor: pointer;
+`;
+
+const SortIcons = styled.span<{ $active: boolean }>`
+  display: inline-flex;
+  gap: 2px;
+  color: ${({ $active }) => ($active ? "#2563eb" : "#94a3b8")};
+  font-size: 11px;
+`;
+
 const TableSkeletonCard = styled.div`
   display: flex;
   flex-direction: column;
@@ -318,6 +439,31 @@ const SkeletonLine = styled.span<{ $width: string; $height?: number }>`
   animation: ${shimmer} 1.2s ease-in-out infinite;
 `;
 
+const ExpandableRow = styled(TableRow)<{ $expanded: boolean }>`
+  cursor: pointer;
+  background: ${({ $expanded }) => ($expanded ? "#f8fbff" : "transparent")};
+`;
+
+const ExpandedUrlsList = styled.ul`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+`;
+
+const ExpandedUrlItem = styled.li`
+  word-break: break-all;
+  color: ${({ theme }) => theme.tokens.color.textPrimary};
+`;
+
 const UrlCell = styled(TableCell)`
   word-break: break-all;
+`;
+
+const UrlCellContent = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 `;

@@ -23,13 +23,18 @@ export type DashboardMetricsRequest = {
   pageSize: number;
 };
 
+export type DashboardMetricsEntryUrlDto = {
+  url: string;
+  visits?: number | null;
+};
+
 export type DashboardMetricsRowDto = {
   domain: string;
   pageviews?: number | null;
   visits?: number | null;
   visitors?: number | null;
-  entryUrl?: string | null;
-  goals?: number | null;
+  entryUrls?: DashboardMetricsEntryUrlDto[] | null;
+  goalReaches?: number | null;
 };
 
 export type DashboardMetricsResponse = Page<DashboardMetricsRowDto>;
