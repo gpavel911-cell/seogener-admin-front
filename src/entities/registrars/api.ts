@@ -58,13 +58,16 @@ export const domainsApi = baseApi.injectEndpoints({
       }),
     }),
     getRegistrarDomains: builder.query<RegistrarDomainListResponse, RegistrarDomainListRequest>({
-      query: ({ pageNumber, pageSize, profile, registrar }) => {
+      query: ({ pageNumber, pageSize, profile, registrar, query }) => {
         const params: Record<string, string | number> = {
           pageNumber,
           pageSize,
         };
         params.profile = profile;
         params.registrar = registrar;
+        if (query) {
+          params.query = query;
+        }
         return {
           url: API_ROUTES.REGISTRARS.GET_REGISTRAR_DOMAINS,
           params,

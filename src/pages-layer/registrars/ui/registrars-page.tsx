@@ -13,9 +13,10 @@ import {
   RegistrarProviderType,
   REGISTRAR_PROVIDER_TYPES,
 } from "@entities/registrars/types";
+import { useDebouncedSearchQuery } from "@shared/lib/use-debounced-search-query";
 import { usePagination } from "@shared/lib/use-pagination";
 import { PaginationControls } from "@shared/ui/pagination-controls";
-import { EMPTY_DATA_MESSAGE, IntegrationPageLayout, useToast } from "@shared/ui";
+import { DomainSearchField, EMPTY_DATA_MESSAGE, IntegrationPageLayout, useToast } from "@shared/ui";
 import {
   REGISTRARS_ACTION_SECTIONS,
   RegistrarsAction,
@@ -29,6 +30,7 @@ export function RegistrarsPage() {
   const [activeRegistrar, setActiveRegistrar] = useState<RegistrarProviderType | null>(null);
   const [activeProfile, setActiveProfile] = useState<string | null>(null);
   const [selectedAction, setSelectedAction] = useState<RegistrarsAction | null>(null);
+  const { search, setSearch, query } = useDebouncedSearchQuery();
 
   const registrarProfilesQuery = useGetRegistrarProfilesQuery();
   const profilesByProvider = useMemo(
@@ -75,9 +77,8 @@ export function RegistrarsPage() {
   const resolvedProvider = activeRegistrar;
   const resolvedProfile = activeProfile;
   const isProfilesFetching = registrarProfilesQuery.isFetching;
-
   const domainsQueryArgs = resolvedProvider && resolvedProfile
-    ? { pageNumber: page, pageSize, profile: resolvedProfile, registrar: resolvedProvider }
+    ? { pageNumber: page, pageSize, profile: resolvedProfile, registrar: resolvedProvider, query }
     : skipToken;
   const { data: domainData, isLoading, isFetching, error: loadError, refetch } = useGetRegistrarDomainsQuery(domainsQueryArgs);
   const [syncDomains, { isLoading: isSyncing }] = useSyncRegistrarDomainsMutation();
@@ -102,7 +103,7 @@ export function RegistrarsPage() {
 
   useEffect(() => {
     setPage(0);
-  }, [resolvedProvider, resolvedProfile, setPage]);
+  }, [resolvedProvider, resolvedProfile, query, setPage]);
 
   const handleSync = async () => {
     if (!resolvedProvider || !resolvedProfile) {
@@ -136,6 +137,13 @@ export function RegistrarsPage() {
       />
     </>
   );
+  const tableToolbarLeftSlot = (
+    <DomainSearchField
+      id="registrars-domain-search"
+      value={search}
+      onChange={setSearch}
+    />
+  );
 
   return (
     <IntegrationPageLayout
@@ -161,6 +169,7 @@ export function RegistrarsPage() {
       profilesEmptyMessage="Нет доступных профилей. Проверьте конфигурацию."
       showTableEmptyState={shouldShowEmptyState}
       tableEmptyMessage={EMPTY_DATA_MESSAGE}
+      tableToolbarLeftSlot={tableToolbarLeftSlot}
       tableContent={tableContent}
       actionContent={renderRegistrarsActionContent(activeAction as RegistrarsAction, {
         profile: resolvedProfile,

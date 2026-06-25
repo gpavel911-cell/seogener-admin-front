@@ -23,6 +23,7 @@ type IntegrationPageLayoutProps<TProvider extends string> = {
   profilesEmptyMessage: string;
   showTableEmptyState: boolean;
   tableEmptyMessage: string;
+  tableToolbarLeftSlot?: ReactNode;
   tableContent: ReactNode;
   tableDetailsContent?: ReactNode;
   actionContent: ReactNode;
@@ -46,6 +47,7 @@ export const IntegrationPageLayout = <TProvider extends string>({
   profilesEmptyMessage,
   showTableEmptyState,
   tableEmptyMessage,
+  tableToolbarLeftSlot,
   tableContent,
   tableDetailsContent,
   actionContent,
@@ -81,6 +83,7 @@ export const IntegrationPageLayout = <TProvider extends string>({
                 onSync={onSync}
                 isLoading={isSyncLoading}
                 disabled={syncDisabled}
+                leftSlot={tableToolbarLeftSlot}
               />
               {showProfilesEmptyState ? (
                 <SelectionState>{profilesEmptyMessage}</SelectionState>

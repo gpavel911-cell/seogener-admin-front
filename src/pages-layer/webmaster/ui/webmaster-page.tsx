@@ -13,8 +13,9 @@ import {
   WebmasterProviderType,
   WEBMASTER_PROVIDER_TYPES,
 } from "@entities/webmaster/types";
+import { useDebouncedSearchQuery } from "@shared/lib/use-debounced-search-query";
 import { usePagination } from "@shared/lib/use-pagination";
-import { EMPTY_DATA_MESSAGE, IntegrationPageLayout, useToast } from "@shared/ui";
+import { DomainSearchField, EMPTY_DATA_MESSAGE, IntegrationPageLayout, useToast } from "@shared/ui";
 import { PaginationControls } from "@shared/ui/pagination-controls";
 import {
   WEBMASTER_ACTION_SECTIONS,
@@ -29,6 +30,7 @@ export function WebmasterPage() {
   const [activeProvider, setActiveProvider] = useState<WebmasterProviderType | null>(null);
   const [activeProfile, setActiveProfile] = useState<string | null>(null);
   const [selectedAction, setSelectedAction] = useState<WebmasterAction | null>(null);
+  const { search, setSearch, query } = useDebouncedSearchQuery();
 
   const webmasterProfilesQuery = useGetWebmasterProfilesQuery();
   const profilesByProvider = useMemo(
@@ -75,9 +77,8 @@ export function WebmasterPage() {
   const resolvedProvider = activeProvider;
   const resolvedProfile = activeProfile;
   const isProfilesFetching = webmasterProfilesQuery.isFetching;
-
   const hostsQueryArgs = resolvedProvider && resolvedProfile
-    ? { provider: resolvedProvider, profile: resolvedProfile, pageNumber: page, pageSize }
+    ? { provider: resolvedProvider, profile: resolvedProfile, pageNumber: page, pageSize, query }
     : skipToken;
   const { data, isFetching, isLoading, error: loadError, refetch } = useGetWebmasterHostsQuery(hostsQueryArgs);
   const [syncHosts, { isLoading: isSyncingHosts }] = useSyncWebmasterHostsMutation();
@@ -102,7 +103,7 @@ export function WebmasterPage() {
 
   useEffect(() => {
     setPage(0);
-  }, [resolvedProvider, resolvedProfile, setPage]);
+  }, [resolvedProvider, resolvedProfile, query, setPage]);
 
   const handleSyncHosts = async () => {
     if (!resolvedProvider || !resolvedProfile) {
@@ -136,6 +137,13 @@ export function WebmasterPage() {
       />
     </>
   );
+  const tableToolbarLeftSlot = (
+    <DomainSearchField
+      id="webmaster-domain-search"
+      value={search}
+      onChange={setSearch}
+    />
+  );
 
   return (
     <IntegrationPageLayout
@@ -161,6 +169,7 @@ export function WebmasterPage() {
       profilesEmptyMessage="Нет доступных профилей. Проверьте конфигурацию."
       showTableEmptyState={shouldShowEmptyState}
       tableEmptyMessage={EMPTY_DATA_MESSAGE}
+      tableToolbarLeftSlot={tableToolbarLeftSlot}
       tableContent={tableContent}
       actionContent={renderWebmasterActionContent(activeAction as WebmasterAction, {
         profile: resolvedProfile,

@@ -13,8 +13,10 @@ import {
   type MetricsProfileDto,
   MetricsProviderType,
 } from "@entities/metrics/types";
+import { useDebouncedSearchQuery } from "@shared/lib/use-debounced-search-query";
 import { usePagination } from "@shared/lib/use-pagination";
 import {
+  DomainSearchField,
   EMPTY_DATA_MESSAGE,
   IntegrationPageLayout,
   useToast,
@@ -29,6 +31,7 @@ export function MetricsPage() {
   const [activeProvider, setActiveProvider] = useState<MetricsProviderType | null>(null);
   const [activeProfile, setActiveProfile] = useState<string | null>(null);
   const [selectedAction, setSelectedAction] = useState<MetricsAction | null>(null);
+  const { search, setSearch, query } = useDebouncedSearchQuery();
 
   const metricaProfilesQuery = useGetMetricsProfilesQuery();
   const profilesByProvider = useMemo(
@@ -75,9 +78,8 @@ export function MetricsPage() {
   const resolvedProvider = activeProvider;
   const resolvedProfile = activeProfile;
   const isProfilesFetching = metricaProfilesQuery.isFetching;
-
   const countersQueryArgs = resolvedProvider && resolvedProfile
-    ? { provider: resolvedProvider, profile: resolvedProfile, pageNumber: page, pageSize }
+    ? { provider: resolvedProvider, profile: resolvedProfile, pageNumber: page, pageSize, query }
     : skipToken;
   const { data, isFetching, isLoading, error: loadError, refetch } = useGetMetricsCountersQuery(countersQueryArgs);
   const [syncCounters, { isLoading: isSyncingCounters }] = useSyncMetricsCountersMutation();
@@ -102,7 +104,7 @@ export function MetricsPage() {
 
   useEffect(() => {
     setPage(0);
-  }, [resolvedProvider, resolvedProfile, setPage]);
+  }, [resolvedProvider, resolvedProfile, query, setPage]);
 
   const handleSyncCounters = async () => {
     if (!resolvedProvider || !resolvedProfile) {
@@ -148,6 +150,13 @@ export function MetricsPage() {
       />
     </>
   );
+  const tableToolbarLeftSlot = (
+    <DomainSearchField
+      id="metrics-domain-search"
+      value={search}
+      onChange={setSearch}
+    />
+  );
 
   return (
     <IntegrationPageLayout
@@ -173,6 +182,7 @@ export function MetricsPage() {
       profilesEmptyMessage="Нет доступных профилей. Проверьте конфигурацию."
       showTableEmptyState={shouldShowEmptyState}
       tableEmptyMessage={EMPTY_DATA_MESSAGE}
+      tableToolbarLeftSlot={tableToolbarLeftSlot}
       tableContent={tableContent}
       actionContent={renderMetricsActionContent(activeAction as MetricsAction, {
         profile: resolvedProfile,

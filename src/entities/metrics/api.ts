@@ -41,8 +41,11 @@ export const analyticsApi = baseApi.injectEndpoints({
       }),
     }),
     getMetricsCounters: builder.query<MetricsCountersListResponse, MetricsCounterListRequest>({
-      query: ({ provider, profile, pageNumber, pageSize }) => {
+      query: ({ provider, profile, pageNumber, pageSize, query }) => {
         const params: Record<string, string | number> = { provider, profile, pageNumber, pageSize };
+        if (query) {
+          params.query = query;
+        }
         return {
           url: API_ROUTES.METRICS.GET_METRICS_COUNTERS,
           params,

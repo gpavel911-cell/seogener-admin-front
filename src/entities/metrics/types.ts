@@ -55,6 +55,7 @@ export type MetricsCounterListRequest = {
   pageSize: number;
   provider: MetricsProviderType;
   profile: string;
+  query?: string;
 };
 
 export type MetricsCounterStatisticsRequest = {

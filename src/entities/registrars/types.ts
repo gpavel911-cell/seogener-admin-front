@@ -51,6 +51,7 @@ export type RegistrarDomainListRequest = {
   pageSize: number;
   profile: string;
   registrar: RegistrarProviderType;
+  query?: string;
 };
 
 export type RegistrarDomainProfileDto = {

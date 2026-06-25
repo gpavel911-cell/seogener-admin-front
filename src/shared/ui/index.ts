@@ -38,4 +38,5 @@ export {
 export { ProfilesSidebar, type ProfileSidebarGroup } from "./profiles-sidebar";
 export { TableSyncPanel } from "./table-sync-panel";
 export { ActionsSidebar } from "./actions-sidebar";
+export { DomainSearchField } from "./domain-search-field";
 export { IntegrationPageLayout } from "./integration-page-layout";

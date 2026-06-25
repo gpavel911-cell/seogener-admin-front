@@ -45,10 +45,16 @@ export const webmasterApi = baseApi.injectEndpoints({
       }),
     }),
     getWebmasterHosts: builder.query<WebmasterHostsListResponse, WebmasterHostListRequest>({
-      query: ({ provider, profile, pageNumber, pageSize }) => ({
-        url: API_ROUTES.WEBMASTER.GET_WEBMASTER_HOSTS,
-        params: { provider, profile, pageNumber, pageSize },
-      }),
+      query: ({ provider, profile, pageNumber, pageSize, query }) => {
+        const params: Record<string, string | number | undefined> = { provider, profile, pageNumber, pageSize };
+        if (query) {
+          params.query = query;
+        }
+        return {
+          url: API_ROUTES.WEBMASTER.GET_WEBMASTER_HOSTS,
+          params,
+        };
+      },
     }),
     getWebmasterHostOptions: builder.query<WebmasterHostOptionDto[], { provider: WebmasterHostListRequest["provider"]; profile: string }>({
       query: ({ provider, profile }) => ({

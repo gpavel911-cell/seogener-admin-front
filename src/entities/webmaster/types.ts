@@ -31,6 +31,7 @@ export type WebmasterHostListRequest = {
   profile: string;
   pageNumber?: number;
   pageSize?: number;
+  query?: string;
 };
 
 export type WebmasterHostDto = {
