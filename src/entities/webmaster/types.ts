@@ -171,22 +171,41 @@ export type WebmasterHostImportSingleCreateResponse = {
   errorMessage?: string | null;
 };
 
-export type WebmasterHostVerifyDnsRequest = {
+export enum WebmasterHostDnsTxtState {
+  PRESENT = "PRESENT",
+  ABSENT = "ABSENT",
+  UNKNOWN = "UNKNOWN",
+}
+
+export type WebmasterHostBulkDnsRequest = {
   provider: WebmasterProviderType;
   profile: string;
-  hostId: string;
-  hostUrl?: string;
-  startVerification?: boolean;
+  registrar: RegistrarProviderType;
+  registrarProfile: string;
+  hostIds: string[];
 };
 
-export type WebmasterHostVerifyDnsResponse = {
+export type WebmasterHostBulkDnsPageRequest = {
+  provider: WebmasterProviderType;
+  profile: string;
+  registrar: RegistrarProviderType;
+  registrarProfile: string;
+  pageNumber?: number;
+  pageSize?: number;
+  query?: string;
+};
+
+export type WebmasterHostBulkDnsRowResponse = {
   hostId: string;
   hostUrl: string;
-  verificationUin: string;
-  verificationType: string;
-  verificationState: string;
   verified: boolean | null;
+  verificationUin?: string | null;
+  verificationState?: string | null;
+  txtRecordState: WebmasterHostDnsTxtState;
+  error?: string | null;
 };
+
+export type WebmasterHostBulkDnsPageResponse = Page<WebmasterHostBulkDnsRowResponse>;
 
 export type WebmasterSearchQueriesPopularRequest = {
   provider: WebmasterProviderType;

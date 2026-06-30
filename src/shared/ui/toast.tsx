@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useRef } from "react";
+import { type ReactNode, useCallback, useEffect, useRef } from "react";
 import styled, { keyframes } from "styled-components";
 
 import { useAppDispatch, useAppSelector } from "@shared/store";
@@ -10,18 +10,20 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const timersRef = useRef<Map<number, NodeJS.Timeout>>(new Map());
 
   useEffect(() => {
+    const timers = timersRef.current;
+
     toasts.forEach((toast) => {
-      if (timersRef.current.has(toast.id)) return;
+      if (timers.has(toast.id)) return;
       const timer = setTimeout(() => {
         dispatch(clearToast(toast.id));
-        timersRef.current.delete(toast.id);
+        timers.delete(toast.id);
       }, toast.durationMs);
-      timersRef.current.set(toast.id, timer);
+      timers.set(toast.id, timer);
     });
 
     return () => {
-      timersRef.current.forEach((timer) => clearTimeout(timer));
-      timersRef.current.clear();
+      timers.forEach((timer) => clearTimeout(timer));
+      timers.clear();
     };
   }, [dispatch, toasts]);
 
@@ -43,10 +45,15 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
 export const useToast = () => {
   const dispatch = useAppDispatch();
+  const stableShowToast = useCallback(
+    (args: { message: string; variant: ToastVariant; durationMs?: number }) => {
+      dispatch(showToast(args));
+    },
+    [dispatch],
+  );
 
   return {
-    showToast: (args: { message: string; variant: ToastVariant; durationMs?: number }) =>
-      dispatch(showToast(args)),
+    showToast: stableShowToast,
   };
 };
 

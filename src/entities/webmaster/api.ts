@@ -14,8 +14,10 @@ import type {
   WebmasterHostImportSingleCreateResponse,
   WebmasterHostImportStartResponse,
   WebmasterHostCreateRequest,
-  WebmasterHostVerifyDnsRequest,
-  WebmasterHostVerifyDnsResponse,
+  WebmasterHostBulkDnsRequest,
+  WebmasterHostBulkDnsPageRequest,
+  WebmasterHostBulkDnsPageResponse,
+  WebmasterHostBulkDnsRowResponse,
   WebmasterHostListRequest,
   WebmasterHostsListResponse,
   WebmasterHostOptionDto,
@@ -132,9 +134,30 @@ export const webmasterApi = baseApi.injectEndpoints({
         method: "POST",
       }),
     }),
-    verifyWebmasterHostDns: builder.mutation<WebmasterHostVerifyDnsResponse, WebmasterHostVerifyDnsRequest>({
+    getWebmasterHostsBulkDnsPage: builder.query<WebmasterHostBulkDnsPageResponse, WebmasterHostBulkDnsPageRequest>({
       query: (body) => ({
-        url: API_ROUTES.WEBMASTER.VERIFY_WEBMASTER_HOST_DNS,
+        url: API_ROUTES.WEBMASTER.GET_WEBMASTER_HOSTS_BULK_DNS_PAGE,
+        method: "POST",
+        body,
+      }),
+    }),
+    getWebmasterHostsBulkDnsStatus: builder.mutation<WebmasterHostBulkDnsRowResponse[], WebmasterHostBulkDnsRequest>({
+      query: (body) => ({
+        url: API_ROUTES.WEBMASTER.GET_WEBMASTER_HOSTS_BULK_DNS_STATUS,
+        method: "POST",
+        body,
+      }),
+    }),
+    createWebmasterHostsBulkTxt: builder.mutation<WebmasterHostBulkDnsRowResponse[], WebmasterHostBulkDnsRequest>({
+      query: (body) => ({
+        url: API_ROUTES.WEBMASTER.CREATE_WEBMASTER_HOSTS_BULK_TXT,
+        method: "POST",
+        body,
+      }),
+    }),
+    startWebmasterHostsBulkDnsVerification: builder.mutation<WebmasterHostBulkDnsRowResponse[], WebmasterHostBulkDnsRequest>({
+      query: (body) => ({
+        url: API_ROUTES.WEBMASTER.START_WEBMASTER_HOSTS_BULK_DNS_VERIFICATION,
         method: "POST",
         body,
       }),
@@ -175,7 +198,10 @@ export const {
   useStartWebmasterHostImportCheckMutation,
   useStartWebmasterHostImportAddMissingMutation,
   useCreateWebmasterHostImportRowMutation,
-  useVerifyWebmasterHostDnsMutation,
+  useGetWebmasterHostsBulkDnsPageQuery,
+  useGetWebmasterHostsBulkDnsStatusMutation,
+  useCreateWebmasterHostsBulkTxtMutation,
+  useStartWebmasterHostsBulkDnsVerificationMutation,
   useLazyGetWebmasterPopularQueriesQuery,
   useLazyGetWebmasterSearchEventsHistoryQuery,
   useLazyGetWebmasterSearchQueriesHistoryQuery,
