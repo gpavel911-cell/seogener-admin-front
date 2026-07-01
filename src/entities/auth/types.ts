@@ -5,7 +5,9 @@ export type AuthUserResponse = {
 
 export type AuthResponse = {
   accessToken: string;
-  expiresIn: number;
+  accessTokenExpiresAt: string;
+  sessionIdleExpiresAt: string;
+  sessionAbsoluteExpiresAt: string;
   user: AuthUserResponse;
 };
 

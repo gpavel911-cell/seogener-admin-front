@@ -4,6 +4,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useRefreshMutation } from "@entities/auth/api";
 import { ROUTES } from "@shared/config/routes";
+import { runSingleFlightRefresh } from "@shared/store/refresh-session";
 import { clearCredentials, selectAuth, setCredentials, useAppDispatch, useAppSelector } from "@shared/store";
 
 type AuthGuardProps = {
@@ -27,7 +28,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
       }
 
       try {
-        const result = await refresh().unwrap();
+        const result = await runSingleFlightRefresh(() => refresh().unwrap());
         if (!isMounted) {
           return;
         }
