@@ -7,6 +7,7 @@ import {
 } from "@reduxjs/toolkit/query/react";
 import type { AuthResponse } from "@entities/auth/types";
 import { API_ROUTES } from "@shared/config/api-routes";
+import { runSingleFlightRefresh } from "./refresh-session";
 import { clearCredentials, setCredentials } from "./auth-slice";
 import type { RootState } from "./store";
 
@@ -16,7 +17,7 @@ if (!apiBaseUrl) {
   throw new Error("NEXT_PUBLIC_API_BASE_URL is required");
 }
 
-const rawBaseQuery = fetchBaseQuery({
+const authenticatedBaseQuery = fetchBaseQuery({
   baseUrl: apiBaseUrl,
   credentials: "include",
   prepareHeaders: (headers, { getState }) => {
@@ -29,6 +30,11 @@ const rawBaseQuery = fetchBaseQuery({
   },
 });
 
+const unauthenticatedBaseQuery = fetchBaseQuery({
+  baseUrl: apiBaseUrl,
+  credentials: "include",
+});
+
 const AUTH_ENDPOINTS = Object.values(API_ROUTES.AUTH);
 
 const isAuthEndpoint = (args: string | FetchArgs) => {
@@ -36,27 +42,43 @@ const isAuthEndpoint = (args: string | FetchArgs) => {
   return AUTH_ENDPOINTS.some((endpoint) => url.startsWith(endpoint));
 };
 
+const executeBaseQuery = (
+  args: string | FetchArgs,
+  api: Parameters<BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError>>[1],
+  extraOptions: Parameters<BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError>>[2],
+) => {
+  return (isAuthEndpoint(args) ? unauthenticatedBaseQuery : authenticatedBaseQuery)(args, api, extraOptions);
+};
+
 const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> = async (
   args,
   api,
   extraOptions,
 ) => {
-  let result = await rawBaseQuery(args, api, extraOptions);
+  let result = await executeBaseQuery(args, api, extraOptions);
 
   if (result.error && result.error.status === 401 && !isAuthEndpoint(args)) {
-    const refreshResult = await rawBaseQuery(
-      {
-        url: API_ROUTES.AUTH.REFRESH,
-        method: "POST",
-      },
-      api,
-      extraOptions,
-    );
+    try {
+      const refreshData = await runSingleFlightRefresh(async () => {
+        const refreshResult = await unauthenticatedBaseQuery(
+          {
+            url: API_ROUTES.AUTH.REFRESH,
+            method: "POST",
+          },
+          api,
+          extraOptions,
+        );
 
-    if (refreshResult.data) {
-      api.dispatch(setCredentials(refreshResult.data as AuthResponse));
-      result = await rawBaseQuery(args, api, extraOptions);
-    } else {
+        if (!refreshResult.data) {
+          throw refreshResult.error ?? new Error("Refresh failed");
+        }
+
+        return refreshResult.data as AuthResponse;
+      });
+
+      api.dispatch(setCredentials(refreshData));
+      result = await executeBaseQuery(args, api, extraOptions);
+    } catch {
       api.dispatch(clearCredentials());
     }
   }

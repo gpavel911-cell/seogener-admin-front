@@ -1,15 +1,15 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import type { AuthResponse, AuthUserResponse } from "@entities/auth/types";
-import { clearAuthState, loadAuthState, persistAuthState, type StoredAuthState } from "./auth-storage";
 import type { RootState } from "./store";
 
-type AuthState = StoredAuthState & {
-  isInitialized: boolean;
+type AuthState = {
+  accessToken: string | null;
+  user: AuthUserResponse | null;
 };
 
 const initialState: AuthState = {
-  ...loadAuthState(),
-  isInitialized: true,
+  accessToken: null,
+  user: null,
 };
 
 const authSlice = createSlice({
@@ -18,16 +18,11 @@ const authSlice = createSlice({
   reducers: {
     setCredentials: (state, action: PayloadAction<AuthResponse>) => {
       state.accessToken = action.payload.accessToken;
-      state.user = action.payload.user as AuthUserResponse;
-      persistAuthState({
-        accessToken: state.accessToken,
-        user: state.user,
-      });
+      state.user = action.payload.user;
     },
     clearCredentials: (state) => {
       state.accessToken = null;
       state.user = null;
-      clearAuthState();
     },
   },
 });
