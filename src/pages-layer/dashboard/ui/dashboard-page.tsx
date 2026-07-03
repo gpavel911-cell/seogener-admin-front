@@ -9,6 +9,7 @@ import { getDefaultDashboardDateRange, validateDashboardAnalyticsFilters } from 
 import { shouldShowBulkRecrawlButton } from "../lib/dashboard-action-visibility";
 import { buildDashboardBarGroups, getNearestDashboardChartIndex } from "../lib/dashboard-chart";
 import { DashboardMetricsSection } from "./dashboard-metrics-section";
+import { DashboardPositioningSection } from "./dashboard-positioning-section";
 import {
   formatDashboardSummaryDelta,
   getDashboardSummaryCardDotColor,
@@ -52,11 +53,12 @@ import {
 } from "@shared/ui";
 import { ModalDialog } from "@shared/ui-kit/modal-dialog";
 
-type DashboardView = "indexing" | "metrics";
+type DashboardView = "indexing" | "metrics" | "positioning";
 
 const DASHBOARD_VIEWS: Array<{ id: DashboardView; label: string }> = [
   { id: "indexing", label: "Индексация" },
   { id: "metrics", label: "Метрика" },
+  { id: "positioning", label: "Позиционирование" },
 ];
 const UNAVAILABLE_PLACEHOLDER = "—";
 const CHART_COLORS: Record<DashboardAnalyticsSeriesDto["key"], string> = {
@@ -258,6 +260,8 @@ export function DashboardPage() {
         <Content>
           {activeView === "metrics" ? (
             <DashboardMetricsSection />
+          ) : activeView === "positioning" ? (
+            <DashboardPositioningSection />
           ) : (
             <>
               <Toolbar>

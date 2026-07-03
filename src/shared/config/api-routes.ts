@@ -13,6 +13,12 @@ export const API_ROUTES = {
     RECRAWL_BULK: "/api/v1/dashboard/recrawl-bulk",
     RECRAWL_URLS: (siteId: string) => `/api/v1/dashboard/${siteId}/recrawl-urls`,
   },
+  POSITIONING: {
+    GET_POSITIONING: "/api/v1/dashboard/positioning",
+    GET_POSITIONING_DETAILS: (siteId: string) => `/api/v1/dashboard/positioning/${siteId}`,
+    ADD_POSITIONING_KEYWORD: (siteId: string) => `/api/v1/dashboard/positioning/${siteId}/keywords`,
+    DELETE_POSITIONING_KEYWORD: (siteId: string, keywordId: string) => `/api/v1/dashboard/positioning/${siteId}/keywords/${keywordId}`,
+  },
   METRICS: {
     GET_METRICS_PROFILES: "/api/v1/metrics/profiles",
     SYNC_METRICS_COUNTERS: "/api/v1/metrics/metrics-counters/sync",

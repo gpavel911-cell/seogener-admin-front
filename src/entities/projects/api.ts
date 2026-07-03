@@ -1,4 +1,5 @@
 import { API_ROUTES } from "@shared/config/api-routes";
+import { positioningListTags } from "@entities/positioning/api";
 import { baseApi } from "@shared/store";
 import type {
   ProjectDto,
@@ -114,7 +115,11 @@ export const projectsApi = baseApi.injectEndpoints({
         method: "POST",
         body: { siteIds },
       }),
-      invalidatesTags: [{ type: "Projects", id: "LIST" }, { type: "ProjectSites", id: "LIST" }],
+      invalidatesTags: (_result, _error, { projectId }) => [
+        { type: "Projects", id: "LIST" },
+        { type: "ProjectSites", id: "LIST" },
+        ...positioningListTags(Number(projectId)),
+      ],
     }),
     unassignProjectSites: builder.mutation<void, ProjectUnassignSitesRequest>({
       query: ({ projectId, siteIds }) => ({
@@ -122,7 +127,11 @@ export const projectsApi = baseApi.injectEndpoints({
         method: "POST",
         body: { siteIds },
       }),
-      invalidatesTags: [{ type: "Projects", id: "LIST" }, { type: "ProjectSites", id: "LIST" }],
+      invalidatesTags: (_result, _error, { projectId }) => [
+        { type: "Projects", id: "LIST" },
+        { type: "ProjectSites", id: "LIST" },
+        ...positioningListTags(Number(projectId)),
+      ],
     }),
   }),
 });
