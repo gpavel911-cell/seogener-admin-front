@@ -18,12 +18,11 @@ export type PositioningListResponse = Page<PositioningRowDto>;
 export type PositioningKeywordDto = {
   id: number;
   keyword: string;
-  position: string | null;
+  yandexPosition: string | null;
+  googlePosition: string | null;
 };
 
 export type PositioningDetailsDto = {
-  siteId: number;
-  domain: string;
   keywords: PositioningKeywordDto[];
 };
 

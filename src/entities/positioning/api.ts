@@ -11,7 +11,6 @@ import type {
 } from "./types";
 
 const positioningListTags = (projectId: number) => [
-  { type: "Positioning" as const, id: "LIST" },
   { type: "Positioning" as const, id: `LIST-${projectId}` },
 ];
 

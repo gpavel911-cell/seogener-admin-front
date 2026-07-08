@@ -55,10 +55,7 @@ function PositioningDomainPanel({ siteId, projectId }: PositioningDomainPanelPro
   const [pendingKeywords, setPendingKeywords] = useState<PositioningKeywordDto[]>([]);
   const [removedKeywordIds, setRemovedKeywordIds] = useState<number[]>([]);
 
-  const { data, isFetching, isLoading, error } = useGetPositioningDetailsQuery(
-    { siteId, projectId },
-    { refetchOnMountOrArgChange: true },
-  );
+  const { data, isFetching, isLoading, error } = useGetPositioningDetailsQuery({ siteId, projectId });
   const [addKeyword, { isLoading: isAdding }] = useAddPositioningKeywordMutation();
   const [deleteKeyword, { isLoading: isDeleting }] = useDeletePositioningKeywordMutation();
 
@@ -90,7 +87,7 @@ function PositioningDomainPanel({ siteId, projectId }: PositioningDomainPanelPro
         projectId,
         body: { keyword },
       }).unwrap();
-      setPendingKeywords((prev) => [...prev, { ...created, position: null }]);
+      setPendingKeywords((prev) => [...prev, { ...created, yandexPosition: null, googlePosition: null }]);
       setNewKeyword("");
     } catch (addError) {
       const message = (addError as ApiError)?.data?.message ?? "Не удалось добавить ключевое слово.";
@@ -124,6 +121,7 @@ function PositioningDomainPanel({ siteId, projectId }: PositioningDomainPanelPro
           <TableSkeletonHeader />
           {Array.from({ length: 4 }, (_, index) => (
             <TableSkeletonRow key={index}>
+              <SkeletonLine $width="100%" />
               <SkeletonLine $width="100%" />
               <SkeletonLine $width="100%" />
               <SkeletonIcon $height={32} />
@@ -165,7 +163,8 @@ function PositioningDomainPanel({ siteId, projectId }: PositioningDomainPanelPro
             <TableHead>
               <TableRow>
                 <TableHeaderCell>Ключ</TableHeaderCell>
-                <TableHeaderCell>Позиция</TableHeaderCell>
+                <TableHeaderCell>Позиция (Яндекс)</TableHeaderCell>
+                <TableHeaderCell>Позиция (Google)</TableHeaderCell>
                 <TableHeaderCell />
               </TableRow>
             </TableHead>
@@ -173,7 +172,8 @@ function PositioningDomainPanel({ siteId, projectId }: PositioningDomainPanelPro
               {displayKeywords.map((item) => (
                 <TableRow key={item.id}>
                   <TableCell>{item.keyword}</TableCell>
-                  <TableCell>{formatPositioningPosition(item.position, isDetailsLoading)}</TableCell>
+                  <TableCell>{formatPositioningPosition(item.yandexPosition, isDetailsLoading)}</TableCell>
+                  <TableCell>{formatPositioningPosition(item.googlePosition, isDetailsLoading)}</TableCell>
                   <TableCell>
                     <ActionsCell>
                       <DangerIconButton
@@ -247,8 +247,8 @@ const PlaceholderCard = styled(PlaceholderText)`
 `;
 
 const KeywordsTable = styled(Table)`
-  ${TableHeaderCell}:nth-child(3),
-  ${TableCell}:nth-child(3) {
+  ${TableHeaderCell}:nth-child(4),
+  ${TableCell}:nth-child(4) {
     width: 88px;
   }
 `;
@@ -349,7 +349,7 @@ const TableSkeletonHeader = styled.div`
 
 const TableSkeletonRow = styled.div`
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 120px) 88px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 120px) minmax(0, 120px) 88px;
   gap: 12px;
   align-items: center;
   min-width: 0;
