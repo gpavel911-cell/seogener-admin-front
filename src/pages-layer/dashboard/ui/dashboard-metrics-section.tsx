@@ -14,6 +14,7 @@ import { usePagination } from "@shared/lib/use-pagination";
 import { PaginationControls } from "@shared/ui/pagination-controls";
 import {
   Button,
+  DateInput,
   EMPTY_DATA_MESSAGE,
   PlaceholderText,
   SelectControl,
@@ -135,10 +136,9 @@ export function DashboardMetricsSection() {
       <Toolbar>
         <Field>
           <Label>Дата начала</Label>
-          <StyledInput
-            type="date"
+          <DateInput
             value={dateFrom}
-            max={defaultRange.dateTo}
+            max={dateTo || defaultRange.dateTo}
             onChange={(event) => {
               setDateFrom(event.target.value);
               resetMetrics();
@@ -147,9 +147,9 @@ export function DashboardMetricsSection() {
         </Field>
         <Field>
           <Label>Дата конца</Label>
-          <StyledInput
-            type="date"
+          <DateInput
             value={dateTo}
+            min={dateFrom}
             max={defaultRange.dateTo}
             onChange={(event) => {
               setDateTo(event.target.value);

@@ -8,6 +8,7 @@ import styled, { css, keyframes } from "styled-components";
 import { getDefaultDashboardDateRange, validateDashboardAnalyticsFilters } from "../lib/dashboard-analytics";
 import { shouldShowBulkRecrawlButton } from "../lib/dashboard-action-visibility";
 import { buildDashboardBarGroups, getNearestDashboardChartIndex } from "../lib/dashboard-chart";
+import { DashboardDistributionSection } from "./dashboard-distribution-section";
 import { DashboardMetricsSection } from "./dashboard-metrics-section";
 import { DashboardPositioningSection } from "./dashboard-positioning-section";
 import {
@@ -40,6 +41,7 @@ import {
   EMPTY_DATA_MESSAGE,
   PageHeader,
   PlaceholderText,
+  DateInput,
   SelectControl,
   StyledInput,
   Table,
@@ -53,12 +55,13 @@ import {
 } from "@shared/ui";
 import { ModalDialog } from "@shared/ui-kit/modal-dialog";
 
-type DashboardView = "indexing" | "metrics" | "positioning";
+type DashboardView = "indexing" | "metrics" | "positioning" | "distribution";
 
 const DASHBOARD_VIEWS: Array<{ id: DashboardView; label: string }> = [
   { id: "indexing", label: "Индексация" },
   { id: "metrics", label: "Метрика" },
   { id: "positioning", label: "Позиционирование" },
+  { id: "distribution", label: "Дистрибуция (Отели)" },
 ];
 const UNAVAILABLE_PLACEHOLDER = "—";
 const CHART_COLORS: Record<DashboardAnalyticsSeriesDto["key"], string> = {
@@ -262,15 +265,16 @@ export function DashboardPage() {
             <DashboardMetricsSection />
           ) : activeView === "positioning" ? (
             <DashboardPositioningSection />
+          ) : activeView === "distribution" ? (
+            <DashboardDistributionSection />
           ) : (
             <>
               <Toolbar>
                 <Field>
                   <Label>Дата начала</Label>
-                  <StyledInput
-                    type="date"
+                  <DateInput
                     value={dateFrom}
-                    max={defaultRange.dateTo}
+                    max={dateTo || defaultRange.dateTo}
                     onChange={(event) => {
                       setDateFrom(event.target.value);
                       resetDashboard();
@@ -279,9 +283,9 @@ export function DashboardPage() {
                 </Field>
                 <Field>
                   <Label>Дата конца</Label>
-                  <StyledInput
-                    type="date"
+                  <DateInput
                     value={dateTo}
+                    min={dateFrom}
                     max={defaultRange.dateTo}
                     onChange={(event) => {
                       setDateTo(event.target.value);

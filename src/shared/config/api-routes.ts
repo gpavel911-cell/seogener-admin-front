@@ -96,6 +96,9 @@ export const API_ROUTES = {
   TOPVISOR: {
     SYNC_TOPVISOR_POSITIONS: "/api/v1/topvisor/positions/sync",
   },
+  DISTRIBUTION: {
+    GET_ORDERS: "/api/v1/distribution/orders",
+  },
   PROJECTS: {
     GET_PROJECTS: "/api/v1/projects",
     CREATE_PROJECT: "/api/v1/projects",

@@ -60,7 +60,7 @@ const getDaysInclusive = (dateFrom: string, dateTo: string) => {
   return Math.floor(diffMs / (24 * 60 * 60 * 1000)) + 1;
 };
 
-const formatDateInputValue = (value: Date) => {
+export const formatDateInputValue = (value: Date) => {
   const year = value.getFullYear();
   const month = `${value.getMonth() + 1}`.padStart(2, "0");
   const day = `${value.getDate()}`.padStart(2, "0");
