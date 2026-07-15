@@ -6,6 +6,7 @@ import { skipToken } from "@reduxjs/toolkit/query";
 import { FaInfoCircle, FaSyncAlt } from "react-icons/fa";
 import styled, { css, keyframes } from "styled-components";
 import { getDefaultDashboardDateRange, validateDashboardAnalyticsFilters } from "../lib/dashboard-analytics";
+import { compareDashboardNumericValues, type SortDirection } from "../lib/dashboard-sort";
 import { shouldShowBulkRecrawlButton } from "../lib/dashboard-action-visibility";
 import { buildDashboardBarGroups, getNearestDashboardChartIndex } from "../lib/dashboard-chart";
 import { DashboardDistributionSection } from "./dashboard-distribution-section";
@@ -78,6 +79,21 @@ type AppliedFilters = {
   dateTo: string;
 };
 
+type SortableIndexingColumn =
+  | "totalPages"
+  | "inSearchCount"
+  | "recrawlCount"
+  | "outOfIndexCount"
+  | "notInSearchCount";
+
+const INDEXING_SORTABLE_COLUMNS: Array<{ column: SortableIndexingColumn; label: string }> = [
+  { column: "totalPages", label: "Всего" },
+  { column: "inSearchCount", label: "В индексе" },
+  { column: "recrawlCount", label: "На переобходе" },
+  { column: "outOfIndexCount", label: "Вне индекса" },
+  { column: "notInSearchCount", label: "Не в поиске" },
+];
+
 export function DashboardPage() {
   const defaultRange = useMemo(() => getDefaultDashboardDateRange(), []);
   const { showToast } = useToast();
@@ -95,6 +111,8 @@ export function DashboardPage() {
   const [isBulkRecrawling, setIsBulkRecrawling] = useState(false);
   const [detailRow, setDetailRow] = useState<DashboardRowDto | null>(null);
   const [activeView, setActiveView] = useState<DashboardView>("indexing");
+  const [sortColumn, setSortColumn] = useState<SortableIndexingColumn | null>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
 
   const { data: projectOptions = [] } = useGetProjectOptionsQuery();
   const [recrawlDashboardSite] = useRecrawlDashboardSiteMutation();
@@ -132,6 +150,14 @@ export function DashboardPage() {
     error: analyticsError,
   } = useGetDashboardAnalyticsQuery(analyticsQueryArgs);
   const rows = useMemo(() => data?.content ?? [], [data?.content]);
+  const sortedRows = useMemo(() => {
+    if (!sortColumn) {
+      return rows;
+    }
+    return [...rows].sort((left, right) =>
+      compareDashboardNumericValues(left[sortColumn], right[sortColumn], sortDirection),
+    );
+  }, [rows, sortColumn, sortDirection]);
   const totalPages = data?.totalPages ?? 0;
   const hasLoaded = appliedFilters !== null;
   const isLoadingDashboard = isFetching || isFetchingAnalytics;
@@ -161,6 +187,17 @@ export function DashboardPage() {
     setPage(0);
     setAppliedFilters(null);
     setSelectedSiteIds([]);
+    setSortColumn(null);
+    setSortDirection("asc");
+  };
+
+  const handleSort = (column: SortableIndexingColumn) => {
+    if (sortColumn === column) {
+      setSortDirection((current) => (current === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setSortColumn(column);
+    setSortDirection("asc");
   };
 
   const executeSiteRecrawl = async (row: DashboardRowDto) => {
@@ -348,11 +385,14 @@ export function DashboardPage() {
                     </TableActions>
                   ) : null}
                   <DashboardTable
-                    rows={rows}
+                    rows={sortedRows}
                     isFetching={isFetching}
                     activeRecrawlSiteId={activeRecrawlSiteId}
                     isBulkRecrawling={isBulkRecrawling}
                     selectedSiteIds={selectedSiteIds}
+                    sortColumn={sortColumn}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
                     onToggleSelect={(siteId, checked) => {
                       setSelectedSiteIds((prev) => {
                         if (checked) {
@@ -434,6 +474,9 @@ type DashboardTableProps = {
   activeRecrawlSiteId: number | null;
   isBulkRecrawling: boolean;
   selectedSiteIds: number[];
+  sortColumn: SortableIndexingColumn | null;
+  sortDirection: SortDirection;
+  onSort: (column: SortableIndexingColumn) => void;
   onToggleSelect: (siteId: number, checked: boolean) => void;
   allVisibleRowsSelected: boolean;
   someVisibleRowsSelected: boolean;
@@ -684,6 +727,9 @@ function DashboardTable({
   activeRecrawlSiteId,
   isBulkRecrawling,
   selectedSiteIds,
+  sortColumn,
+  sortDirection,
+  onSort,
   onToggleSelect,
   allVisibleRowsSelected,
   someVisibleRowsSelected,
@@ -731,11 +777,17 @@ function DashboardTable({
             </TableHeaderCell>
             <TableHeaderCell>Проект</TableHeaderCell>
             <TableHeaderCell>Домен</TableHeaderCell>
-            <TableHeaderCell>Всего</TableHeaderCell>
-            <TableHeaderCell>В индексе</TableHeaderCell>
-            <TableHeaderCell>На переобходе</TableHeaderCell>
-            <TableHeaderCell>Вне индекса</TableHeaderCell>
-            <TableHeaderCell>Не в поиске</TableHeaderCell>
+            {INDEXING_SORTABLE_COLUMNS.map(({ column, label }) => (
+              <TableHeaderCell key={column}>
+                <SortButton type="button" onClick={() => onSort(column)}>
+                  <span>{label}</span>
+                  <SortIcons $active={sortColumn === column}>
+                    <span>{sortColumn === column && sortDirection === "asc" ? "▲" : "△"}</span>
+                    <span>{sortColumn === column && sortDirection === "desc" ? "▼" : "▽"}</span>
+                  </SortIcons>
+                </SortButton>
+              </TableHeaderCell>
+            ))}
             <TableHeaderCell />
           </TableRow>
         </TableHead>
@@ -1139,6 +1191,26 @@ const ActionsCell = styled.div`
   width: 100%;
   align-items: center;
   gap: 8px;
+`;
+
+const SortButton = styled.button`
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  cursor: pointer;
+`;
+
+const SortIcons = styled.span<{ $active: boolean }>`
+  display: inline-flex;
+  gap: 2px;
+  color: ${({ $active }) => ($active ? "#2563eb" : "#94a3b8")};
+  font-size: 11px;
 `;
 
 const DashboardListTable = styled(Table)`

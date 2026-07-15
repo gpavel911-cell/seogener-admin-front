@@ -10,6 +10,7 @@ import type {
 } from "@entities/dashboard/types";
 import { useGetProjectOptionsQuery } from "@entities/projects/api";
 import { getDefaultDashboardDateRange, validateDashboardAnalyticsFilters } from "../lib/dashboard-analytics";
+import { compareDashboardNumericValues, type SortDirection } from "../lib/dashboard-sort";
 import { usePagination } from "@shared/lib/use-pagination";
 import { PaginationControls } from "@shared/ui/pagination-controls";
 import {
@@ -39,7 +40,6 @@ type AppliedFilters = {
 };
 
 type SortableColumn = "pageviews" | "visits" | "visitors" | "goalReaches";
-type SortDirection = "asc" | "desc";
 
 export function DashboardMetricsSection() {
   const defaultRange = useMemo(() => getDefaultDashboardDateRange(), []);
@@ -114,7 +114,9 @@ export function DashboardMetricsSection() {
     if (!sortColumn) {
       return rows;
     }
-    return [...rows].sort((left, right) => compareMetricValues(left[sortColumn], right[sortColumn], sortDirection));
+    return [...rows].sort((left, right) =>
+      compareDashboardNumericValues(left[sortColumn], right[sortColumn], sortDirection),
+    );
   }, [rows, sortColumn, sortDirection]);
 
   const handleSort = (column: SortableColumn) => {
@@ -308,13 +310,6 @@ const formatNumber = (value?: number | null) =>
 
 const formatEntryUrl = (entryUrl: DashboardMetricsEntryUrlDto) =>
   `${entryUrl.url} (${(entryUrl.visits ?? 0).toLocaleString("ru-RU")})`;
-
-const compareMetricValues = (left?: number | null, right?: number | null, direction: SortDirection = "asc") => {
-  if (left == null && right == null) return 0;
-  if (left == null) return 1;
-  if (right == null) return -1;
-  return direction === "asc" ? left - right : right - left;
-};
 
 const Content = styled.section`
   display: flex;
