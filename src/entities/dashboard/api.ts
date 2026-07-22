@@ -12,6 +12,14 @@ import type {
   DashboardListResponse,
   DashboardRecrawlReportDto,
   DashboardSelectiveRecrawlResponseDto,
+  GoogleIndexingDetailShellDto,
+  GoogleIndexingListRequest,
+  GoogleIndexingListResponse,
+  GoogleIndexingRefreshRequestDto,
+  GoogleIndexingRefreshResponseDto,
+  GoogleIndexingSummaryRequest,
+  GoogleIndexingSummaryResponseDto,
+  GoogleInspectUrlResponseDto,
 } from "./types";
 
 export const dashboardApi = baseApi.injectEndpoints({
@@ -84,6 +92,54 @@ export const dashboardApi = baseApi.injectEndpoints({
       }),
       invalidatesTags: ["Dashboard"],
     }),
+    getGoogleIndexing: builder.query<GoogleIndexingListResponse, GoogleIndexingListRequest>({
+      query: ({ pageNumber, pageSize, projectId, query }) => {
+        const params: Record<string, number | string> = { pageNumber, pageSize, projectId };
+        if (query !== undefined) {
+          params.query = query;
+        }
+        return {
+          url: API_ROUTES.DASHBOARD.GET_GOOGLE_INDEXING,
+          params,
+        };
+      },
+      providesTags: ["Dashboard"],
+    }),
+    getGoogleIndexingSummary: builder.query<GoogleIndexingSummaryResponseDto, GoogleIndexingSummaryRequest>({
+      query: ({ projectId, query }) => {
+        const params: Record<string, number | string> = { projectId };
+        if (query !== undefined) {
+          params.query = query;
+        }
+        return {
+          url: API_ROUTES.DASHBOARD.GET_GOOGLE_INDEXING_SUMMARY,
+          params,
+        };
+      },
+      providesTags: ["Dashboard"],
+    }),
+    getGoogleIndexingDetails: builder.query<GoogleIndexingDetailShellDto, number>({
+      query: (siteId) => ({
+        url: API_ROUTES.DASHBOARD.GET_GOOGLE_INDEXING_DETAILS(siteId.toString()),
+      }),
+      providesTags: ["Dashboard"],
+    }),
+    refreshGoogleIndexing: builder.mutation<GoogleIndexingRefreshResponseDto, GoogleIndexingRefreshRequestDto>({
+      query: (body) => ({
+        url: API_ROUTES.DASHBOARD.GOOGLE_INDEXING_REFRESH,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["Dashboard"],
+    }),
+    inspectGoogleIndexingUrl: builder.mutation<GoogleInspectUrlResponseDto, { siteId: number; url: string }>({
+      query: ({ siteId, url }) => ({
+        url: API_ROUTES.DASHBOARD.GOOGLE_INDEXING_INSPECT_URL(siteId.toString()),
+        method: "POST",
+        body: { url },
+      }),
+      invalidatesTags: ["Dashboard"],
+    }),
   }),
 });
 
@@ -95,4 +151,9 @@ export const {
   useRecrawlDashboardSiteMutation,
   useRecrawlDashboardSitesMutation,
   useRecrawlDashboardUrlsMutation,
+  useGetGoogleIndexingQuery,
+  useGetGoogleIndexingSummaryQuery,
+  useGetGoogleIndexingDetailsQuery,
+  useRefreshGoogleIndexingMutation,
+  useInspectGoogleIndexingUrlMutation,
 } = dashboardApi;

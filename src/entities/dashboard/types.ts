@@ -126,3 +126,96 @@ export type DashboardSelectiveRecrawlResponseDto = {
 };
 
 export type DashboardListResponse = Page<DashboardRowDto>;
+
+export type GoogleIndexingListRequest = {
+  pageNumber: number;
+  pageSize: number;
+  projectId: number;
+  query?: string;
+};
+
+export type GoogleIndexingSummaryRequest = {
+  projectId: number;
+  query?: string;
+};
+
+export type GoogleIndexingRowDto = {
+  projectName?: string | null;
+  siteId: number;
+  domain: string;
+  totalPages?: number | null;
+  inSearchCount?: number | null;
+  outOfIndexCount?: number | null;
+  notInSearchCount?: number | null;
+};
+
+export type GoogleIndexingListResponse = Page<GoogleIndexingRowDto>;
+
+export type GoogleIndexingQueueStatusDto = {
+  totalCount: number;
+  pendingCount: number;
+  runningCount: number;
+  deferredCount: number;
+};
+
+export type GoogleIndexingSummaryCardDto = {
+  key: "total-pages" | "in-search" | "out-of-index" | "not-in-search";
+  label: string;
+  value: number;
+  deltaValue?: number | null;
+};
+
+export type GoogleIndexingSummaryResponseDto = {
+  queueStatus: GoogleIndexingQueueStatusDto;
+  cards: GoogleIndexingSummaryCardDto[];
+};
+
+export type GoogleIndexingDetailSectionKey = "in-search" | "out-of-index" | "not-in-search";
+
+export type GoogleIndexingDetailRowDto = {
+  pageUrl: string;
+  lastCrawlTime?: string | null;
+  inspectedAt?: string | null;
+  reason?: string | null;
+  eventDate?: string | null;
+  coverageState?: string | null;
+  inspectionState?: string | null;
+};
+
+export type GoogleIndexingDetailSectionDto = {
+  key: GoogleIndexingDetailSectionKey;
+  title: string;
+  rows: GoogleIndexingDetailRowDto[];
+};
+
+export type GoogleIndexingDetailShellDto = {
+  siteId: number;
+  domain: string;
+  sections: GoogleIndexingDetailSectionDto[];
+};
+
+export type GoogleIndexingRefreshScope = "FILTERED_TABLE" | "SELECTED_ROWS" | "SITE" | "URLS";
+
+export type GoogleIndexingRefreshRequestDto = {
+  projectId: number;
+  query?: string;
+  siteIds?: number[];
+  urlsBySiteId?: Record<number, string[]>;
+  scope: GoogleIndexingRefreshScope;
+};
+
+export type GoogleInspectionJobStatus = "PENDING" | "RUNNING" | "DONE" | "DEFERRED" | "FAILED";
+
+export type GoogleIndexingRefreshResponseDto = {
+  acceptedCount: number;
+  deferredCount: number;
+  alreadyQueuedCount: number;
+  status: GoogleInspectionJobStatus;
+  message?: string | null;
+};
+
+export type GoogleInspectUrlResponseDto = {
+  row?: GoogleIndexingDetailRowDto | null;
+  status: Extract<GoogleInspectionJobStatus, "DONE" | "DEFERRED" | "FAILED">;
+  message?: string | null;
+};

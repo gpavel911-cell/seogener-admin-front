@@ -12,6 +12,11 @@ export const API_ROUTES = {
     RECRAWL_SITE: (siteId: string) => `/api/v1/dashboard/${siteId}/recrawl`,
     RECRAWL_BULK: "/api/v1/dashboard/recrawl-bulk",
     RECRAWL_URLS: (siteId: string) => `/api/v1/dashboard/${siteId}/recrawl-urls`,
+    GET_GOOGLE_INDEXING: "/api/v1/dashboard/google-indexing",
+    GET_GOOGLE_INDEXING_SUMMARY: "/api/v1/dashboard/google-indexing/summary",
+    GET_GOOGLE_INDEXING_DETAILS: (siteId: string) => `/api/v1/dashboard/google-indexing/${siteId}/details`,
+    GOOGLE_INDEXING_REFRESH: "/api/v1/dashboard/google-indexing/refresh",
+    GOOGLE_INDEXING_INSPECT_URL: (siteId: string) => `/api/v1/dashboard/google-indexing/${siteId}/inspect-url`,
   },
   POSITIONING: {
     GET_POSITIONING: "/api/v1/dashboard/positioning",

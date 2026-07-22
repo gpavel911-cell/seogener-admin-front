@@ -20,6 +20,7 @@ import {
   shouldRenderDashboardSummaryDelta,
 } from "../lib/dashboard-summary";
 import { DashboardDetailsModalContent } from "./dashboard-detail-page";
+import { GoogleIndexingSection } from "./google-indexing-section";
 import {
   useGetDashboardAnalyticsQuery,
   useGetDashboardQuery,
@@ -56,10 +57,11 @@ import {
 } from "@shared/ui";
 import { ModalDialog } from "@shared/ui-kit/modal-dialog";
 
-type DashboardView = "indexing" | "metrics" | "positioning" | "distribution";
+type DashboardView = "indexing" | "google-indexing" | "metrics" | "positioning" | "distribution";
 
 const DASHBOARD_VIEWS: Array<{ id: DashboardView; label: string }> = [
-  { id: "indexing", label: "Индексация" },
+  { id: "indexing", label: "Индексация (Яндекс)" },
+  { id: "google-indexing", label: "Индексация (Google)" },
   { id: "metrics", label: "Метрика" },
   { id: "positioning", label: "Позиционирование" },
   { id: "distribution", label: "Дистрибуция (Отели)" },
@@ -300,6 +302,8 @@ export function DashboardPage() {
         <Content>
           {activeView === "metrics" ? (
             <DashboardMetricsSection />
+          ) : activeView === "google-indexing" ? (
+            <GoogleIndexingSection />
           ) : activeView === "positioning" ? (
             <DashboardPositioningSection />
           ) : activeView === "distribution" ? (
