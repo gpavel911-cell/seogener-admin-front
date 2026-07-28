@@ -2,12 +2,14 @@ import type { Page } from "@shared/api";
 
 export enum MetricsProviderType {
   YANDEX_METRICA = "YANDEX_METRICA",
+  GOOGLE_ANALYTICS = "GOOGLE_ANALYTICS",
 }
 
 export const METRICS_PROVIDER_TYPES = Object.values(MetricsProviderType) as MetricsProviderType[];
 
 export const METRICS_PROVIDER_TYPE_LABELS: Record<MetricsProviderType, string> = {
   [MetricsProviderType.YANDEX_METRICA]: "Яндекс Метрика",
+  [MetricsProviderType.GOOGLE_ANALYTICS]: "Google Analytics",
 };
 
 export const getMetricsProviderTypeLabel = (provider: MetricsProviderType): string =>

@@ -1,4 +1,5 @@
 import type { Page } from "@shared/api";
+import type { MetricsProviderType } from "@entities/metrics/types";
 
 export type DashboardListRequest = {
   pageNumber: number;
@@ -15,6 +16,7 @@ export type DashboardAnalyticsRequest = {
 };
 
 export type DashboardMetricsRequest = {
+  provider: MetricsProviderType;
   projectId: number;
   query?: string;
   dateFrom: string;

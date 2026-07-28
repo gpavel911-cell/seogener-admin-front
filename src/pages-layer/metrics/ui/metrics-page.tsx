@@ -22,7 +22,7 @@ import {
   useToast,
 } from "@shared/ui";
 import { PaginationControls } from "@shared/ui/pagination-controls";
-import { METRICS_ACTION_SECTIONS, MetricsAction, renderMetricsActionContent } from "../lib/actions";
+import { MetricsAction, getMetricsActionSections, renderMetricsActionContent } from "../lib/actions";
 import { CountersTable } from "./actions/counters-table";
 
 export function MetricsPage() {
@@ -68,15 +68,17 @@ export function MetricsPage() {
       })),
     [providerGroups],
   );
-  const actionSections = METRICS_ACTION_SECTIONS;
+  const resolvedProvider = activeProvider;
+  const resolvedProfile = activeProfile;
+  const actionSections = useMemo(() => getMetricsActionSections(resolvedProvider), [resolvedProvider]);
   const availableActions = useMemo(
     () => new Set(actionSections.flatMap((section) => section.actions.map((action) => action.id))),
     [actionSections],
   );
-  const activeAction = selectedAction && availableActions.has(selectedAction) ? selectedAction : null;
+  const activeAction = resolvedProvider === MetricsProviderType.GOOGLE_ANALYTICS
+    ? MetricsAction.SYNC_METRICS_COUNTERS
+    : selectedAction && availableActions.has(selectedAction) ? selectedAction : null;
 
-  const resolvedProvider = activeProvider;
-  const resolvedProfile = activeProfile;
   const isProfilesFetching = metricaProfilesQuery.isFetching;
   const countersQueryArgs = resolvedProvider && resolvedProfile
     ? { provider: resolvedProvider, profile: resolvedProfile, pageNumber: page, pageSize, query }
@@ -168,6 +170,9 @@ export function MetricsPage() {
       onSelectProfile={(provider, profile) => {
         setActiveProvider(provider);
         setActiveProfile(profile);
+        if (provider === MetricsProviderType.GOOGLE_ANALYTICS) {
+          setSelectedAction(MetricsAction.SYNC_METRICS_COUNTERS);
+        }
       }}
       actionSections={actionSections}
       activeAction={activeAction}

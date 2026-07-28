@@ -38,8 +38,8 @@ export const dashboardApi = baseApi.injectEndpoints({
       providesTags: ["Dashboard"],
     }),
     getDashboardMetrics: builder.query<DashboardMetricsResponse, DashboardMetricsRequest>({
-      query: ({ projectId, query, dateFrom, dateTo, pageNumber, pageSize }) => {
-        const params: Record<string, number | string> = { projectId, dateFrom, dateTo, pageNumber, pageSize };
+      query: ({ provider, projectId, query, dateFrom, dateTo, pageNumber, pageSize }) => {
+        const params: Record<string, number | string> = { provider, projectId, dateFrom, dateTo, pageNumber, pageSize };
         if (query !== undefined) {
           params.query = query;
         }

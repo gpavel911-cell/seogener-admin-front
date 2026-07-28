@@ -1,4 +1,5 @@
 import { type ReactNode } from "react";
+import { MetricsProviderType } from "@entities/metrics/types";
 import { CreateCountersBulk } from "@pages/metrics/ui/actions/create-counters-bulk";
 import { CreateCounter } from "@pages/metrics/ui/actions/create-counter";
 import { ViewCounterGoals } from "@pages/metrics/ui/actions/view-counter-goals";
@@ -34,6 +35,20 @@ export const METRICS_ACTION_SECTIONS: MetricsActionSection[] = [
     ],
   },
 ];
+
+export const getMetricsActionSections = (provider?: MetricsProviderType | null): MetricsActionSection[] => {
+  if (provider === MetricsProviderType.GOOGLE_ANALYTICS) {
+    return [
+      {
+        title: "Действия",
+        actions: [
+          { id: MetricsAction.SYNC_METRICS_COUNTERS, label: "Счетчики" },
+        ],
+      },
+    ];
+  }
+  return METRICS_ACTION_SECTIONS;
+};
 
 export type MetricsActionRenderContext = {
   profile?: string | null;

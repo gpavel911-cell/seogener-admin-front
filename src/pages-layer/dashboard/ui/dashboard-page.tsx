@@ -36,6 +36,7 @@ import type {
   DashboardRowDto,
 } from "@entities/dashboard/types";
 import { useGetProjectOptionsQuery } from "@entities/projects/api";
+import { MetricsProviderType } from "@entities/metrics/types";
 import { usePagination } from "@shared/lib/use-pagination";
 import { PaginationControls } from "@shared/ui/pagination-controls";
 import {
@@ -57,12 +58,13 @@ import {
 } from "@shared/ui";
 import { ModalDialog } from "@shared/ui-kit/modal-dialog";
 
-type DashboardView = "indexing" | "google-indexing" | "metrics" | "positioning" | "distribution";
+type DashboardView = "indexing" | "google-indexing" | "metrics-yandex" | "metrics-google" | "positioning" | "distribution";
 
 const DASHBOARD_VIEWS: Array<{ id: DashboardView; label: string }> = [
   { id: "indexing", label: "Индексация (Яндекс)" },
   { id: "google-indexing", label: "Индексация (Google)" },
-  { id: "metrics", label: "Метрика" },
+  { id: "metrics-yandex", label: "Метрика (Яндекс)" },
+  { id: "metrics-google", label: "Метрика (Google)" },
   { id: "positioning", label: "Позиционирование" },
   { id: "distribution", label: "Дистрибуция (Отели)" },
 ];
@@ -300,8 +302,10 @@ export function DashboardPage() {
           </SubList>
         </SubSidebar>
         <Content>
-          {activeView === "metrics" ? (
-            <DashboardMetricsSection />
+          {activeView === "metrics-yandex" ? (
+            <DashboardMetricsSection provider={MetricsProviderType.YANDEX_METRICA} />
+          ) : activeView === "metrics-google" ? (
+            <DashboardMetricsSection provider={MetricsProviderType.GOOGLE_ANALYTICS} />
           ) : activeView === "google-indexing" ? (
             <GoogleIndexingSection />
           ) : activeView === "positioning" ? (

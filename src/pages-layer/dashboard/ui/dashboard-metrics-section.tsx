@@ -8,6 +8,7 @@ import type {
   DashboardMetricsEntryUrlDto,
   DashboardMetricsRequest,
 } from "@entities/dashboard/types";
+import { MetricsProviderType } from "@entities/metrics/types";
 import { useGetProjectOptionsQuery } from "@entities/projects/api";
 import { getDefaultDashboardDateRange, validateDashboardAnalyticsFilters } from "../lib/dashboard-analytics";
 import { compareDashboardNumericValues, type SortDirection } from "../lib/dashboard-sort";
@@ -41,7 +42,11 @@ type AppliedFilters = {
 
 type SortableColumn = "pageviews" | "visits" | "visitors" | "goalReaches";
 
-export function DashboardMetricsSection() {
+type DashboardMetricsSectionProps = {
+  provider: MetricsProviderType;
+};
+
+export function DashboardMetricsSection({ provider }: DashboardMetricsSectionProps) {
   const defaultRange = useMemo(() => getDefaultDashboardDateRange(), []);
   const { showToast } = useToast();
   const { page, pageSize, pageSizeOptions, setPage, setPageSize } = usePagination({ initialPageSize: 15 });
@@ -62,6 +67,7 @@ export function DashboardMetricsSection() {
       return skipToken;
     }
     return {
+      provider,
       projectId: Number(appliedFilters.projectId),
       query: appliedFilters.query || undefined,
       dateFrom: appliedFilters.dateFrom,
@@ -69,7 +75,7 @@ export function DashboardMetricsSection() {
       pageNumber: page,
       pageSize,
     };
-  }, [appliedFilters, page, pageSize]);
+  }, [appliedFilters, page, pageSize, provider]);
 
   const { data, currentData, isFetching, error } = useGetDashboardMetricsQuery(queryArgs);
 
