@@ -53,10 +53,15 @@ const isJobInProgress = (status?: MetricsCounterBulkJobStatus): boolean =>
 
 type CreateCountersBulkProps = {
   fixedProfile?: string | null;
+  provider?: MetricsProviderType | null;
   onRefreshCounters?: () => Promise<unknown> | void;
 };
 
-export const CreateCountersBulk = ({ fixedProfile = null, onRefreshCounters }: CreateCountersBulkProps = {}) => {
+export const CreateCountersBulk = ({
+  fixedProfile = null,
+  provider: providerProp = null,
+  onRefreshCounters,
+}: CreateCountersBulkProps = {}) => {
   const { page, pageSize, pageSizeOptions, setPage, setPageSize } = usePagination();
   const { showToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -70,9 +75,10 @@ export const CreateCountersBulk = ({ fixedProfile = null, onRefreshCounters }: C
   const [jobId, setJobId] = useState<string | null>(null);
   const [jobImportId, setJobImportId] = useState<string | null>(null);
   const [activeRowIds, setActiveRowIds] = useState<number[]>([]);
+  const handledJobResultRef = useRef<string | null>(null);
 
   const profile = fixedProfile ?? null;
-  const provider = MetricsProviderType.YANDEX_METRICA;
+  const provider = providerProp ?? MetricsProviderType.YANDEX_METRICA;
   const canQuery = Boolean(profile);
 
   const importsQueryArgs = canQuery ? { provider, profile: profile as string } : skipToken;
@@ -126,15 +132,31 @@ export const CreateCountersBulk = ({ fixedProfile = null, onRefreshCounters }: C
 
   useEffect(() => {
     if (!status || !jobId || status.jobId !== jobId) return;
+    if (
+      status.status !== MetricsCounterBulkJobStatus.COMPLETED
+      && status.status !== MetricsCounterBulkJobStatus.FAILED
+    ) {
+      return;
+    }
+    if (handledJobResultRef.current === jobId) {
+      return;
+    }
+    handledJobResultRef.current = jobId;
+
+    setJobId(null);
+    setJobImportId(null);
+
     if (status.status === MetricsCounterBulkJobStatus.COMPLETED) {
-      const timer = setTimeout(() => {
-        setJobId(null);
-        setJobImportId(null);
-      }, 0);
       if (status.failedRows > 0) {
         showToast({
           variant: "error",
           message: `Создание завершено с ошибками. Ошибок: ${status.failedRows}.`,
+        });
+      } else if (provider === MetricsProviderType.GOOGLE_ANALYTICS) {
+        showToast({
+          variant: "success",
+          message:
+            "Создание завершено. Установите Measurement ID (тег) на каждый сайт (GTM или snippet), иначе данные не будут собираться.",
         });
       } else {
         showToast({ variant: "success", message: "Создание завершено." });
@@ -142,29 +164,26 @@ export const CreateCountersBulk = ({ fixedProfile = null, onRefreshCounters }: C
       void refetchImports();
       void refetchRows();
       void onRefreshCounters?.();
-      return () => clearTimeout(timer);
+      return;
     }
-    if (status.status === MetricsCounterBulkJobStatus.FAILED) {
-      const timer = setTimeout(() => {
-        setJobId(null);
-        setJobImportId(null);
-      }, 0);
-      showToast({
-        variant: "error",
-        message: status.latestError ?? "Ошибка массового создания счетчиков.",
-      });
-      void refetchImports();
-      void refetchRows();
-      return () => clearTimeout(timer);
-    }
-    return undefined;
-  }, [jobId, onRefreshCounters, refetchImports, refetchRows, showToast, status]);
+
+    showToast({
+      variant: "error",
+      message: status.latestError ?? "Ошибка массового создания счетчиков.",
+    });
+    void refetchImports();
+    void refetchRows();
+  }, [jobId, onRefreshCounters, provider, refetchImports, refetchRows, showToast, status]);
 
   useEffect(() => {
     if (!jobId || !statusError) {
       return;
     }
+    if (handledJobResultRef.current === jobId) {
+      return;
+    }
     if (statusError.status === 404) {
+      handledJobResultRef.current = jobId;
       showToast({
         variant: "error",
         message: "Статус задачи недоступен (возможно, сервер был перезапущен). Используйте повторный запуск для недостающих строк.",
@@ -201,7 +220,7 @@ export const CreateCountersBulk = ({ fixedProfile = null, onRefreshCounters }: C
       return;
     }
     if (!profile) {
-      showToast({ variant: "error", message: "Выберите профиль Метрики." });
+      showToast({ variant: "error", message: "Выберите профиль." });
       return;
     }
     try {
@@ -231,6 +250,7 @@ export const CreateCountersBulk = ({ fixedProfile = null, onRefreshCounters }: C
     }
     try {
       const response = await startCreateMissing({ importId: effectiveSelectedImportId }).unwrap();
+      handledJobResultRef.current = null;
       setJobId(response.jobId);
       setJobImportId(effectiveSelectedImportId);
       showToast({ variant: "success", message: "Создание недостающих счетчиков запущено." });
@@ -302,6 +322,14 @@ export const CreateCountersBulk = ({ fixedProfile = null, onRefreshCounters }: C
         showToast({ variant: "error", message: response.errorMessage ?? "Не удалось создать счетчик." });
       } else if (response.status === MetricsCounterImportRowStatus.ALREADY_EXISTS) {
         showToast({ variant: "success", message: "Счетчик уже существует." });
+      } else if (response.installRequired) {
+        const measurementPart = response.measurementId
+          ? ` Measurement ID: ${response.measurementId}.`
+          : "";
+        showToast({
+          variant: "success",
+          message: `Счетчик успешно создан.${measurementPart} Установите тег на сайт (GTM или snippet), иначе данные не будут собираться.`,
+        });
       } else {
         showToast({ variant: "success", message: "Счетчик успешно создан." });
       }
@@ -399,7 +427,7 @@ export const CreateCountersBulk = ({ fixedProfile = null, onRefreshCounters }: C
                 <TableHead>
                   <TableRow>
                     <TableHeaderCell>Название</TableHeaderCell>
-                    <TableHeaderCell>Регистратор</TableHeaderCell>
+                    <TableHeaderCell>Провайдер</TableHeaderCell>
                     <TableHeaderCell>Профиль</TableHeaderCell>
                     <TableHeaderCell>Домен</TableHeaderCell>
                     <TableHeaderCell>Статус</TableHeaderCell>

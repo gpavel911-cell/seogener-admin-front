@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { skipToken } from "@reduxjs/toolkit/query";
 import {
   useGetMetricsCountersQuery,
@@ -75,9 +75,7 @@ export function MetricsPage() {
     () => new Set(actionSections.flatMap((section) => section.actions.map((action) => action.id))),
     [actionSections],
   );
-  const activeAction = resolvedProvider === MetricsProviderType.GOOGLE_ANALYTICS
-    ? MetricsAction.SYNC_METRICS_COUNTERS
-    : selectedAction && availableActions.has(selectedAction) ? selectedAction : null;
+  const activeAction = selectedAction && availableActions.has(selectedAction) ? selectedAction : null;
 
   const isProfilesFetching = metricaProfilesQuery.isFetching;
   const countersQueryArgs = resolvedProvider && resolvedProfile
@@ -122,7 +120,7 @@ export function MetricsPage() {
     }
   };
 
-  const refreshCountersAfterBulk = async () => {
+  const refreshCountersAfterBulk = useCallback(async () => {
     if (!resolvedProvider || !resolvedProfile) {
       return;
     }
@@ -132,7 +130,7 @@ export function MetricsPage() {
     } catch {
       showToast({ variant: "error", message: "Ошибка синхронизации счетчиков после массового создания." });
     }
-  };
+  }, [refetch, resolvedProfile, resolvedProvider, showToast, syncCounters]);
 
   const tableContent = (
     <>
@@ -190,8 +188,12 @@ export function MetricsPage() {
       tableToolbarLeftSlot={tableToolbarLeftSlot}
       tableContent={tableContent}
       actionContent={renderMetricsActionContent(activeAction as MetricsAction, {
+        provider: resolvedProvider,
         profile: resolvedProfile,
         onRefreshCounters: refreshCountersAfterBulk,
+        onRefreshCountersList: async () => {
+          await refetch();
+        },
       })}
     />
   );

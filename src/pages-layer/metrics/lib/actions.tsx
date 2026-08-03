@@ -43,6 +43,8 @@ export const getMetricsActionSections = (provider?: MetricsProviderType | null):
         title: "Действия",
         actions: [
           { id: MetricsAction.SYNC_METRICS_COUNTERS, label: "Счетчики" },
+          { id: MetricsAction.CREATE_METRICS_COUNTER, label: "Создать счетчик" },
+          { id: MetricsAction.CREATE_METRICS_COUNTERS_BULK, label: "Создать счетчики" },
         ],
       },
     ];
@@ -51,8 +53,10 @@ export const getMetricsActionSections = (provider?: MetricsProviderType | null):
 };
 
 export type MetricsActionRenderContext = {
+  provider?: MetricsProviderType | null;
   profile?: string | null;
   onRefreshCounters?: () => Promise<unknown> | void;
+  onRefreshCountersList?: () => Promise<unknown> | void;
 };
 
 export const renderMetricsActionContent = (
@@ -63,10 +67,22 @@ export const renderMetricsActionContent = (
     return <ViewCounterStatistics fixedProfile={context?.profile} />;
   }
   if (action === MetricsAction.CREATE_METRICS_COUNTERS_BULK) {
-    return <CreateCountersBulk fixedProfile={context?.profile} onRefreshCounters={context?.onRefreshCounters} />;
+    return (
+      <CreateCountersBulk
+        fixedProfile={context?.profile}
+        provider={context?.provider}
+        onRefreshCounters={context?.onRefreshCounters}
+      />
+    );
   }
   if (action === MetricsAction.CREATE_METRICS_COUNTER) {
-    return <CreateCounter fixedProfile={context?.profile} />;
+    return (
+      <CreateCounter
+        fixedProfile={context?.profile}
+        provider={context?.provider}
+        onRefreshCounters={context?.onRefreshCountersList}
+      />
+    );
   }
   if (action === MetricsAction.GET_METRICS_GOALS) {
     return <ViewCounterGoals fixedProfile={context?.profile} />;

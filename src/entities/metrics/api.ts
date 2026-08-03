@@ -16,6 +16,7 @@ import type {
   MetricsCountersListResponse,
   MetricsCounterOptionDto,
   MetricsCounterCreateRequest,
+  MetricsCounterCreateResponse,
   MetricsCounterSingleCreateResponse,
   MetricsCounterStatisticsRequest,
   MetricsCounterStatisticsResponse,
@@ -58,7 +59,7 @@ export const analyticsApi = baseApi.injectEndpoints({
         params: { provider, profile },
       }),
     }),
-    createMetricsCounter: builder.mutation<void, MetricsCounterCreateRequest>({
+    createMetricsCounter: builder.mutation<MetricsCounterCreateResponse, MetricsCounterCreateRequest>({
       query: (body) => ({
         url: API_ROUTES.METRICS.CREATE_METRICS_COUNTER,
         method: "POST",

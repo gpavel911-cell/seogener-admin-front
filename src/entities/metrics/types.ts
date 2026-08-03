@@ -68,6 +68,12 @@ export type MetricsCounterStatisticsRequest = {
   date2?: string;
 };
 
+export type MetricsCounterCreateResponse = {
+  counterId: string;
+  measurementId?: string | null;
+  installRequired: boolean;
+};
+
 export type MetricsCounterCreateRequest = {
   provider: MetricsProviderType;
   profile: string;
@@ -183,6 +189,8 @@ export type MetricsCounterSingleCreateResponse = {
   status: MetricsCounterImportRowStatus;
   counterId?: string | null;
   errorMessage?: string | null;
+  measurementId?: string | null;
+  installRequired?: boolean | null;
 };
 
 export type MetricsCounterStatisticsRow = {

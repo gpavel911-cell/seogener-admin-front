@@ -25,9 +25,16 @@ const DEFAULT_PROVIDER = MetricsProviderType.YANDEX_METRICA;
 
 type ActionsSectionCreateCounterProps = {
   fixedProfile?: string | null;
+  provider?: MetricsProviderType | null;
+  onRefreshCounters?: () => Promise<unknown> | void;
 };
 
-export const CreateCounter = ({ fixedProfile }: ActionsSectionCreateCounterProps = {}) => {
+export const CreateCounter = ({
+  fixedProfile,
+  provider,
+  onRefreshCounters,
+}: ActionsSectionCreateCounterProps = {}) => {
+  const resolvedProvider = provider ?? DEFAULT_PROVIDER;
   const [counterName, setCounterName] = useState("");
   const [selectedDomain, setSelectedDomain] = useState("");
   const [activeRegistrar, setActiveRegistrar] = useState<RegistrarProviderType | null>(null);
@@ -45,7 +52,7 @@ export const CreateCounter = ({ fixedProfile }: ActionsSectionCreateCounterProps
   } = useMetricsSelectOptions({
     activeProfile: activeMetricaProfile,
     fixedProfile: fixedProfile ?? null,
-    fixedProvider: DEFAULT_PROVIDER,
+    fixedProvider: resolvedProvider,
   });
   const {
     profilesData,
@@ -172,23 +179,41 @@ export const CreateCounter = ({ fixedProfile }: ActionsSectionCreateCounterProps
       showToast({ variant: "error", message: "Выберите домен." });
       return;
     }
-    if (!resolvedMetricaProfile) {
-      showToast({ variant: "error", message: "Выберите профиль Метрики." });
+                if (!resolvedMetricaProfile) {
+      showToast({ variant: "error", message: "Выберите профиль." });
       return;
     }
     try {
-      await createCounter({
-        provider: DEFAULT_PROVIDER,
+      const result = await createCounter({
+        provider: resolvedProvider,
         profile: resolvedMetricaProfile,
         counterName: counterName.trim(),
         siteUrl: selectedDomain,
       }).unwrap();
-      await refetchCounters();
+      if (onRefreshCounters) {
+        await onRefreshCounters();
+      } else {
+        await refetchCounters();
+      }
       setCounterName("");
       setSelectedDomain("");
-      showToast({ variant: "success", message: "Счетчик создан. Выполняется синхронизация." });
-    } catch {
-      showToast({ variant: "error", message: "Ошибка создания счетчика." });
+      if (result.installRequired) {
+        const measurementPart = result.measurementId
+          ? ` Measurement ID: ${result.measurementId}.`
+          : "";
+        showToast({
+          variant: "success",
+          message: `Счетчик создан.${measurementPart} Установите тег на сайт (GTM или snippet), иначе данные не будут собираться.`,
+        });
+      } else {
+        showToast({ variant: "success", message: "Счетчик создан. Выполняется синхронизация." });
+      }
+    } catch (error) {
+      const response = error as { data?: { message?: string } };
+      showToast({
+        variant: "error",
+        message: response.data?.message ?? "Ошибка создания счетчика.",
+      });
     }
   };
 
@@ -210,7 +235,7 @@ export const CreateCounter = ({ fixedProfile }: ActionsSectionCreateCounterProps
             </FormField>
             {!fixedProfile && (
               <FormField>
-                <FieldLabel>Профиль Метрики</FieldLabel>
+                <FieldLabel>Профиль</FieldLabel>
                 <SelectControl
                   value={resolvedMetricaProfile ?? ""}
                   onValueChange={setActiveMetricaProfile}
