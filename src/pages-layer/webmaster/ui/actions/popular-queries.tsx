@@ -44,10 +44,11 @@ const buildDefaultDateRange = () => {
 };
 
 type ActionsSectionWebmasterPopularQueriesProps = {
+  fixedProvider?: WebmasterProviderType | null;
   fixedProfile?: string | null;
 };
 
-export const PopularQueries = ({ fixedProfile }: ActionsSectionWebmasterPopularQueriesProps = {}) => {
+export const PopularQueries = ({ fixedProvider, fixedProfile }: ActionsSectionWebmasterPopularQueriesProps = {}) => {
   const { showToast } = useToast();
   const { dateFrom: defaultFrom, dateTo: defaultTo } = buildDefaultDateRange();
   const [activeProfile, setActiveProfile] = useState<string | null>(null);
@@ -58,6 +59,7 @@ export const PopularQueries = ({ fixedProfile }: ActionsSectionWebmasterPopularQ
     profile: string;
     data: unknown;
   } | null>(null);
+  const provider = fixedProvider ?? DEFAULT_PROVIDER;
 
   const {
     resolvedProfile,
@@ -69,7 +71,7 @@ export const PopularQueries = ({ fixedProfile }: ActionsSectionWebmasterPopularQ
   } = useWebmasterSelectOptions({
     activeProfile,
     fixedProfile: fixedProfile ?? null,
-    fixedProvider: DEFAULT_PROVIDER,
+    fixedProvider: provider,
     activeHostId: hostId,
   });
   const result = useMemo(
@@ -91,7 +93,7 @@ export const PopularQueries = ({ fixedProfile }: ActionsSectionWebmasterPopularQ
     }
     try {
       const response = await loadPopular({
-        provider: DEFAULT_PROVIDER,
+        provider,
         profile: resolvedProfile,
         hostId: resolvedHostId,
         dateFrom,

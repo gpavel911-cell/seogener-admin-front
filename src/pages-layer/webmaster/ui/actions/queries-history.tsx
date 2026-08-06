@@ -48,10 +48,11 @@ const buildDefaultDateRange = () => {
 };
 
 type ActionsSectionWebmasterQueriesHistoryProps = {
+  fixedProvider?: WebmasterProviderType | null;
   fixedProfile?: string | null;
 };
 
-export const QueriesHistory = ({ fixedProfile }: ActionsSectionWebmasterQueriesHistoryProps = {}) => {
+export const QueriesHistory = ({ fixedProvider, fixedProfile }: ActionsSectionWebmasterQueriesHistoryProps = {}) => {
   const { showToast } = useToast();
   const { dateFrom: defaultFrom, dateTo: defaultTo } = buildDefaultDateRange();
   const [activeProfile, setActiveProfile] = useState<string | null>(null);
@@ -64,6 +65,7 @@ export const QueriesHistory = ({ fixedProfile }: ActionsSectionWebmasterQueriesH
     dateFrom: string;
     dateTo: string;
   } | null>(null);
+  const provider = fixedProvider ?? DEFAULT_PROVIDER;
 
   const {
     resolvedProfile,
@@ -75,7 +77,7 @@ export const QueriesHistory = ({ fixedProfile }: ActionsSectionWebmasterQueriesH
   } = useWebmasterSelectOptions({
     activeProfile,
     fixedProfile: fixedProfile ?? null,
-    fixedProvider: DEFAULT_PROVIDER,
+    fixedProvider: provider,
     activeHostId: hostId,
   });
   const result = useMemo(
@@ -135,7 +137,7 @@ export const QueriesHistory = ({ fixedProfile }: ActionsSectionWebmasterQueriesH
 
     try {
       const response = await loadHistory({
-        provider: DEFAULT_PROVIDER,
+        provider,
         profile: resolvedProfile,
         hostId: resolvedHostId,
         dateFrom,

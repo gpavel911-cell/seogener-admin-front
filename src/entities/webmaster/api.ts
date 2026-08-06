@@ -77,9 +77,10 @@ export const webmasterApi = baseApi.injectEndpoints({
       }),
     }),
     createWebmasterHostImport: builder.mutation<WebmasterHostImportDto, CreateWebmasterHostImportPayload>({
-      query: ({ file, profile, name }) => {
+      query: ({ file, provider, profile, name }) => {
         const formData = new FormData();
         formData.append("file", file);
+        formData.append("provider", provider);
         formData.append("profile", profile);
         if (name && name.trim()) {
           formData.append("name", name.trim());
@@ -92,9 +93,9 @@ export const webmasterApi = baseApi.injectEndpoints({
       },
     }),
     getWebmasterHostImports: builder.query<WebmasterHostImportDto[], GetWebmasterHostImportsPayload>({
-      query: ({ profile }) => ({
+      query: ({ provider, profile }) => ({
         url: API_ROUTES.WEBMASTER.GET_WEBMASTER_HOST_IMPORTS,
-        params: { profile },
+        params: { provider, profile },
       }),
     }),
     updateWebmasterHostImport: builder.mutation<WebmasterHostImportDto, UpdateWebmasterHostImportPayload>({

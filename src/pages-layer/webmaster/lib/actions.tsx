@@ -1,4 +1,5 @@
 import { type ReactNode } from "react";
+import { WebmasterProviderType } from "@entities/webmaster/types";
 import { AddHost } from "@pages/webmaster/ui/actions/add-host";
 import { CreateHostsBulk } from "@pages/webmaster/ui/actions/create-hosts-bulk";
 import { PopularQueries } from "@pages/webmaster/ui/actions/popular-queries";
@@ -41,7 +42,29 @@ export const WEBMASTER_ACTION_SECTIONS: WebmasterActionSection[] = [
   },
 ];
 
+const GOOGLE_WEBMASTER_ACTION_SECTIONS: WebmasterActionSection[] = [
+  {
+    title: "Действия",
+    actions: [
+      { id: WebmasterAction.SYNC_WEBMASTER_HOSTS, label: "Сайты" },
+      { id: WebmasterAction.CREATE_WEBMASTER_HOST, label: "Добавить сайт" },
+      { id: WebmasterAction.CREATE_WEBMASTER_HOSTS_BULK, label: "Добавить сайты" },
+      { id: WebmasterAction.VERIFY_WEBMASTER_HOST_DNS_BULK, label: "Проверить права DNS (мн.)" },
+    ],
+  },
+];
+
+export const getWebmasterActionSections = (
+  provider?: WebmasterProviderType | null,
+): WebmasterActionSection[] => {
+  if (provider === WebmasterProviderType.GOOGLE_SEARCH_CONSOLE) {
+    return GOOGLE_WEBMASTER_ACTION_SECTIONS;
+  }
+  return WEBMASTER_ACTION_SECTIONS;
+};
+
 export type WebmasterActionRenderContext = {
+  provider?: WebmasterProviderType | null;
   profile?: string | null;
 };
 
@@ -50,22 +73,22 @@ export const renderWebmasterActionContent = (
   context?: WebmasterActionRenderContext,
 ): ReactNode => {
   if (action === WebmasterAction.CREATE_WEBMASTER_HOST) {
-    return <AddHost fixedProfile={context?.profile} />;
+    return <AddHost fixedProvider={context?.provider} fixedProfile={context?.profile} />;
   }
   if (action === WebmasterAction.CREATE_WEBMASTER_HOSTS_BULK) {
-    return <CreateHostsBulk fixedProfile={context?.profile} />;
+    return <CreateHostsBulk fixedProvider={context?.provider} fixedProfile={context?.profile} />;
   }
   if (action === WebmasterAction.VERIFY_WEBMASTER_HOST_DNS_BULK) {
-    return <VerifyHostDnsBulk fixedProfile={context?.profile} />;
+    return <VerifyHostDnsBulk fixedProvider={context?.provider} fixedProfile={context?.profile} />;
   }
   if (action === WebmasterAction.GET_WEBMASTER_POPULAR_QUERIES) {
-    return <PopularQueries fixedProfile={context?.profile} />;
+    return <PopularQueries fixedProvider={context?.provider} fixedProfile={context?.profile} />;
   }
   if (action === WebmasterAction.GET_WEBMASTER_SEARCH_QUERIES_HISTORY) {
-    return <QueriesHistory fixedProfile={context?.profile} />;
+    return <QueriesHistory fixedProvider={context?.provider} fixedProfile={context?.profile} />;
   }
   if (action === WebmasterAction.GET_WEBMASTER_SEARCH_URLS_IN_SEARCH_SAMPLES) {
-    return <SearchUrls fixedProfile={context?.profile} />;
+    return <SearchUrls fixedProvider={context?.provider} fixedProfile={context?.profile} />;
   }
   return null;
 };

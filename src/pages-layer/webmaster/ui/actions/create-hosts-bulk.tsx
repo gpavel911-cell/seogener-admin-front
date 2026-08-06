@@ -17,6 +17,7 @@ import {
   WebmasterHostImportJobStage,
   WebmasterHostImportJobStatus,
   WebmasterHostImportRowStatus,
+  WebmasterProviderType,
 } from "@entities/webmaster/types";
 import { RegistrarProviderType } from "@entities/registrars/types";
 import { usePagination } from "@shared/lib/use-pagination";
@@ -61,11 +62,16 @@ const extractErrorMessage = (error: unknown, fallback: string): string => {
 };
 
 type CreateHostsBulkProps = {
+  fixedProvider?: WebmasterProviderType | null;
   fixedProfile?: string | null;
   onRefreshHosts?: () => Promise<unknown> | void;
 };
 
-export const CreateHostsBulk = ({ fixedProfile = null, onRefreshHosts }: CreateHostsBulkProps = {}) => {
+export const CreateHostsBulk = ({
+  fixedProvider = null,
+  fixedProfile = null,
+  onRefreshHosts,
+}: CreateHostsBulkProps = {}) => {
   const { page, pageSize, pageSizeOptions, setPage, setPageSize } = usePagination();
   const { showToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -79,10 +85,11 @@ export const CreateHostsBulk = ({ fixedProfile = null, onRefreshHosts }: CreateH
   const [jobId, setJobId] = useState<string | null>(null);
   const [jobImportId, setJobImportId] = useState<string | null>(null);
   const [activeRowIds, setActiveRowIds] = useState<number[]>([]);
+  const provider = fixedProvider ?? WebmasterProviderType.YANDEX_WEBMASTER;
   const profile = fixedProfile ?? null;
 
   const canQuery = Boolean(profile);
-  const importsQueryArgs = canQuery ? { profile: profile as string } : skipToken;
+  const importsQueryArgs = canQuery ? { provider, profile: profile as string } : skipToken;
   const {
     data: importsData,
     isLoading: isImportsLoading,
@@ -213,6 +220,7 @@ export const CreateHostsBulk = ({ fixedProfile = null, onRefreshHosts }: CreateH
     try {
       const created = await createImport({
         file,
+        provider,
         profile,
         name: importName.trim() || undefined,
       }).unwrap();

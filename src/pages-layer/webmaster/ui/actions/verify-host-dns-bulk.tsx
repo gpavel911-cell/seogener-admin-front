@@ -16,6 +16,7 @@ const DEFAULT_PROVIDER = WebmasterProviderType.YANDEX_WEBMASTER;
 const COLUMN_COUNT = 7;
 
 type VerifyHostDnsBulkProps = {
+  fixedProvider?: WebmasterProviderType | null;
   fixedProfile?: string | null;
 };
 
@@ -65,7 +66,7 @@ const VERIFICATION_STATUS_LABELS: Record<string, string> = {
   VERIFICATION_FAILED: "Проверка не пройдена",
 };
 
-export const VerifyHostDnsBulk = ({ fixedProfile }: VerifyHostDnsBulkProps = {}) => {
+export const VerifyHostDnsBulk = ({ fixedProvider, fixedProfile }: VerifyHostDnsBulkProps = {}) => {
   const { showToast } = useToast();
   const { page, pageSize, pageSizeOptions, setPage, setPageSize } = usePagination();
   const { search, setSearch, query } = useDebouncedSearchQuery();
@@ -74,6 +75,7 @@ export const VerifyHostDnsBulk = ({ fixedProfile }: VerifyHostDnsBulkProps = {})
   const [selectedHostIds, setSelectedHostIds] = useState<string[]>([]);
   const [rowStateByHostId, setRowStateByHostId] = useState<RowStateMap>({});
   const [activeRowActionByHostId, setActiveRowActionByHostId] = useState<Record<string, BulkAction | null>>({});
+  const provider = fixedProvider ?? DEFAULT_PROVIDER;
 
   const {
     registrarGroups,
@@ -91,7 +93,7 @@ export const VerifyHostDnsBulk = ({ fixedProfile }: VerifyHostDnsBulkProps = {})
 
   const hostsQueryArgs = fixedProfile && resolvedRegistrar && resolvedRegistrarProfile
     ? {
-        provider: DEFAULT_PROVIDER,
+        provider,
         profile: fixedProfile,
         registrar: resolvedRegistrar,
         registrarProfile: resolvedRegistrarProfile,
@@ -194,7 +196,7 @@ export const VerifyHostDnsBulk = ({ fixedProfile }: VerifyHostDnsBulkProps = {})
       setActiveRowActionByHostId((prev) => ({ ...prev, [rowActionHostId]: action }));
     }
     const request: WebmasterHostBulkDnsRequest = {
-      provider: DEFAULT_PROVIDER,
+      provider,
       profile: fixedProfile,
       registrar: resolvedRegistrar,
       registrarProfile: resolvedRegistrarProfile,
@@ -638,6 +640,14 @@ const BulkDnsTable = styled(Table)`
   ${TableCell}:nth-child(2) {
     white-space: normal;
     word-break: break-word;
+  }
+
+  ${TableHeaderCell}:nth-child(4),
+  ${TableCell}:nth-child(4) {
+    width: 30%;
+    white-space: normal;
+    word-break: break-all;
+    overflow-wrap: anywhere;
   }
 
   ${TableHeaderCell}:nth-child(7),

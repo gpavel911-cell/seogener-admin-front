@@ -18,7 +18,7 @@ import { usePagination } from "@shared/lib/use-pagination";
 import { DomainSearchField, EMPTY_DATA_MESSAGE, IntegrationPageLayout, useToast } from "@shared/ui";
 import { PaginationControls } from "@shared/ui/pagination-controls";
 import {
-  WEBMASTER_ACTION_SECTIONS,
+  getWebmasterActionSections,
   WebmasterAction,
   renderWebmasterActionContent,
 } from "../lib/actions";
@@ -67,7 +67,10 @@ export function WebmasterPage() {
       })),
     [providerGroups],
   );
-  const actionSections = WEBMASTER_ACTION_SECTIONS;
+  const actionSections = useMemo(
+    () => getWebmasterActionSections(activeProvider),
+    [activeProvider],
+  );
   const availableActions = useMemo(
     () => new Set(actionSections.flatMap((section) => section.actions.map((action) => action.id))),
     [actionSections],
@@ -155,6 +158,9 @@ export function WebmasterPage() {
       onSelectProfile={(provider, profile) => {
         setActiveProvider(provider);
         setActiveProfile(profile);
+        if (provider === WebmasterProviderType.GOOGLE_SEARCH_CONSOLE) {
+          setSelectedAction(WebmasterAction.SYNC_WEBMASTER_HOSTS);
+        }
       }}
       actionSections={actionSections}
       activeAction={activeAction}
@@ -172,6 +178,7 @@ export function WebmasterPage() {
       tableToolbarLeftSlot={tableToolbarLeftSlot}
       tableContent={tableContent}
       actionContent={renderWebmasterActionContent(activeAction as WebmasterAction, {
+        provider: resolvedProvider,
         profile: resolvedProfile,
       })}
     />

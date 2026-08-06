@@ -25,15 +25,17 @@ import {
 const DEFAULT_PROVIDER = WebmasterProviderType.YANDEX_WEBMASTER;
 
 type ActionsSectionWebmasterAddHostProps = {
+  fixedProvider?: WebmasterProviderType | null;
   fixedProfile?: string | null;
 };
 
-export const AddHost = ({ fixedProfile }: ActionsSectionWebmasterAddHostProps = {}) => {
+export const AddHost = ({ fixedProvider, fixedProfile }: ActionsSectionWebmasterAddHostProps = {}) => {
   const { showToast } = useToast();
   const [activeProfile, setActiveProfile] = useState<string | null>(null);
   const [activeRegistrar, setActiveRegistrar] = useState<RegistrarProviderType | null>(null);
   const [activeRegistrarProfile, setActiveRegistrarProfile] = useState<string | null>(null);
   const [domain, setDomain] = useState("");
+  const provider = fixedProvider ?? DEFAULT_PROVIDER;
 
   const {
     resolvedProfile,
@@ -42,7 +44,7 @@ export const AddHost = ({ fixedProfile }: ActionsSectionWebmasterAddHostProps = 
   } = useWebmasterSelectOptions({
     activeProfile,
     fixedProfile: fixedProfile ?? null,
-    fixedProvider: DEFAULT_PROVIDER,
+    fixedProvider: provider,
     includeHosts: false,
   });
   const {
@@ -87,7 +89,7 @@ export const AddHost = ({ fixedProfile }: ActionsSectionWebmasterAddHostProps = 
     }
     try {
       await addHost({
-        provider: DEFAULT_PROVIDER,
+        provider,
         profile: resolvedProfile,
         hostUrl,
       }).unwrap();

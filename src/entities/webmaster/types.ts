@@ -3,12 +3,14 @@ import type { RegistrarProviderType } from "@entities/registrars/types";
 
 export enum WebmasterProviderType {
   YANDEX_WEBMASTER = "YANDEX_WEBMASTER",
+  GOOGLE_SEARCH_CONSOLE = "GOOGLE_SEARCH_CONSOLE",
 }
 
 export const WEBMASTER_PROVIDER_TYPES = Object.values(WebmasterProviderType) as WebmasterProviderType[];
 
 export const WEBMASTER_PROVIDER_TYPE_LABELS: Record<WebmasterProviderType, string> = {
   [WebmasterProviderType.YANDEX_WEBMASTER]: "Яндекс Вебмастер",
+  [WebmasterProviderType.GOOGLE_SEARCH_CONSOLE]: "Google Search Console",
 };
 
 export const getWebmasterProviderTypeLabel = (provider: WebmasterProviderType): string =>
@@ -87,6 +89,7 @@ export enum WebmasterHostImportJobStage {
 export type WebmasterHostImportDto = {
   id: string;
   name: string;
+  provider: WebmasterProviderType;
   registrar: RegistrarProviderType;
   registrarProfile: string;
   webmasterProfile: string;
@@ -114,11 +117,13 @@ export type WebmasterHostImportRowDto = {
 
 export type CreateWebmasterHostImportPayload = {
   file: File;
+  provider: WebmasterProviderType;
   profile: string;
   name?: string;
 };
 
 export type GetWebmasterHostImportsPayload = {
+  provider: WebmasterProviderType;
   profile: string;
 };
 
