@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import styled from "styled-components";
-import { FaChartBar, FaChevronLeft, FaChevronRight, FaCompass, FaFolderOpen, FaGlobe, FaServer, FaUpload } from "react-icons/fa";
+import { FaChartBar, FaChevronLeft, FaChevronRight, FaCompass, FaFolderOpen, FaGlobe, FaMagic, FaServer, FaUpload } from "react-icons/fa";
 import { SIDEBAR_ITEMS } from "@shared/config/navigation";
 
 type SidebarProps = {
@@ -65,6 +65,7 @@ const ICONS_BY_ITEM: Record<string, typeof FaCompass> = {
   webmaster: FaGlobe,
   topvisor: FaUpload,
   projects: FaFolderOpen,
+  generator: FaMagic,
 };
 
 const SidebarContainer = styled.aside<{ $collapsed: boolean }>`
