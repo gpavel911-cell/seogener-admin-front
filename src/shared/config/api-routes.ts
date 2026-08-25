@@ -150,4 +150,13 @@ export const API_ROUTES = {
       `/api/v1/seo/generator/projects/${id}/domains/${encodeURIComponent(domain)}/export`,
     ANALYTICS: (id: number | string) => `/api/v1/seo/generator/projects/${id}/analytics`,
   },
+  DOMAIN_HUNTER: {
+    RUN: "/api/v1/seo/domain-hunter/run",
+    STOP: "/api/v1/seo/domain-hunter/stop",
+    STATUS: "/api/v1/seo/domain-hunter/status",
+    LOG: "/api/v1/seo/domain-hunter/log",
+    RESULTS: "/api/v1/seo/domain-hunter/results",
+    RESULT: (filename: string) => `/api/v1/seo/domain-hunter/results/${encodeURIComponent(filename)}`,
+    DOWNLOAD: (filename: string) => `/api/v1/seo/domain-hunter/results/${encodeURIComponent(filename)}/download`,
+  },
 } as const;

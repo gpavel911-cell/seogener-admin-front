@@ -3,6 +3,7 @@ export const ROUTES = {
   DASHBOARD: "/dashboard",
   PROJECTS: "/projects",
   GENERATOR: "/generator",
+  DOMAIN_HUNTER: "/domain-hunter",
   DOMAINS: "/registrars",
   COUNTERS: "/metrics",
   WEBMASTER: "/webmaster",

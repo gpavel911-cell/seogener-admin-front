@@ -9,9 +9,10 @@ export type SidebarItem = {
 export const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: "dashboard", label: "Дашборд", path: ROUTES.DASHBOARD },
   { id: "projects", label: "Проекты", path: ROUTES.PROJECTS },
-  { id: "generator", label: "Генератор", path: ROUTES.GENERATOR },
   { id: "registrars", label: "Регистраторы", path: ROUTES.DOMAINS },
   { id: "metrics", label: "Метрика", path: ROUTES.COUNTERS },
   { id: "webmaster", label: "Вебмастер", path: ROUTES.WEBMASTER },
   { id: "topvisor", label: "Топвизор", path: ROUTES.TOPVISOR },
+  { id: "generator", label: "Генератор", path: ROUTES.GENERATOR },
+  { id: "domain-hunter", label: "Подбор доменов", path: ROUTES.DOMAIN_HUNTER },
 ];
