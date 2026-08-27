@@ -55,8 +55,7 @@ export function ResultsStep({ snapshot }: Props) {
 
   const handleExport = async (domain: string) => {
     try {
-      const blob = await downloadExport({ id: snapshot.id, domain }).unwrap();
-      const url = URL.createObjectURL(blob);
+      const url = await downloadExport({ id: snapshot.id, domain }).unwrap();
       const link = document.createElement("a");
       link.href = url;
       link.download = `${domain}.zip`;

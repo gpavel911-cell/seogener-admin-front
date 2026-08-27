@@ -305,11 +305,14 @@ export const generatorApi = baseApi.injectEndpoints({
       }),
       providesTags: (_r, _e, id) => [{ type: "Generator", id: `${id}-results` }],
     }),
-    downloadGeneratorExport: builder.mutation<Blob, { id: number | string; domain: string }>({
+    downloadGeneratorExport: builder.mutation<string, { id: number | string; domain: string }>({
       query: ({ id, domain }) => ({
         url: API_ROUTES.GENERATOR.EXPORT(id, domain),
         method: "GET",
-        responseHandler: (response) => response.blob(),
+        responseHandler: async (response) => {
+          const blob = await response.blob();
+          return URL.createObjectURL(blob);
+        },
       }),
     }),
     saveGeneratorAnalytics: builder.mutation<

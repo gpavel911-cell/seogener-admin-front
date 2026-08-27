@@ -55,11 +55,14 @@ export const domainHunterApi = baseApi.injectEndpoints({
       }),
       invalidatesTags: [{ type: "DomainHunter", id: "STATUS" }],
     }),
-    downloadDomainHunterCsv: builder.mutation<Blob, string>({
+    downloadDomainHunterCsv: builder.mutation<string, string>({
       query: (filename) => ({
         url: API_ROUTES.DOMAIN_HUNTER.DOWNLOAD(filename),
         method: "GET",
-        responseHandler: (response) => response.blob(),
+        responseHandler: async (response) => {
+          const blob = await response.blob();
+          return URL.createObjectURL(blob);
+        },
       }),
     }),
   }),

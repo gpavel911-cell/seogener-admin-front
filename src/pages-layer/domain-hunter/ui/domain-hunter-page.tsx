@@ -147,8 +147,7 @@ export function DomainHunterPage() {
 
   const handleDownload = async (filename: string) => {
     try {
-      const blob = await downloadCsv(filename).unwrap();
-      const url = URL.createObjectURL(blob);
+      const url = await downloadCsv(filename).unwrap();
       const link = document.createElement("a");
       link.href = url;
       link.download = filename;
