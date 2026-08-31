@@ -19,6 +19,82 @@ export const WIZARD_STEPS: Array<{ id: GeneratorWizardStep; slug: string; label:
   { id: "RESULTS", slug: "results", label: "Результаты" },
 ];
 
+export const WIZARD_STEPPER_STEPS = WIZARD_STEPS.filter((item) => item.id !== "SEO" && item.id !== "RUN");
+
+export const NEXT_WIZARD_STEP: Partial<Record<GeneratorWizardStep, GeneratorWizardStep>> = {
+  PROJECT: "BRIEF",
+  BRIEF: "KEYWORDS",
+  KEYWORDS: "DESIGN",
+  DESIGN: "DOMAINS",
+  DOMAINS: "RESULTS",
+  SEO: "RESULTS",
+  RUN: "RESULTS",
+};
+
+export function isLaunchWizardStep(step: GeneratorWizardStep): boolean {
+  return step === "DOMAINS" || step === "SEO" || step === "RUN";
+}
+
+export function canonicalWizardStep(step: GeneratorWizardStep): GeneratorWizardStep {
+  return isLaunchWizardStep(step) ? "DOMAINS" : step;
+}
+
+const WIZARD_STASH_PREFIX = "generator-wizard-snapshot:";
+
+type WizardStash = {
+  snapshot: GeneratorProjectSnapshot;
+  continuedFrom: GeneratorWizardStep | null;
+};
+
+export function readWizardStash(projectId: number | string | undefined): WizardStash | null {
+  if (!projectId || typeof window === "undefined") {
+    return null;
+  }
+  try {
+    const raw = sessionStorage.getItem(`${WIZARD_STASH_PREFIX}${projectId}`);
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw) as WizardStash;
+    if (!parsed?.snapshot?.id) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+export function writeWizardStash(
+  snapshot: GeneratorProjectSnapshot,
+  continuedFrom: GeneratorWizardStep | null,
+): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+  sessionStorage.setItem(
+    `${WIZARD_STASH_PREFIX}${snapshot.id}`,
+    JSON.stringify({ snapshot, continuedFrom }),
+  );
+}
+
+function wizardProgress(snapshot: GeneratorProjectSnapshot): number {
+  const order = WIZARD_STEPS.map((item) => item.id);
+  const stepIndex = Math.max(0, order.indexOf(snapshot.currentStep));
+  const completedCount = Object.values(snapshot.completedSteps).filter(Boolean).length;
+  return stepIndex * 10 + completedCount;
+}
+
+export function preferFresherSnapshot(
+  current: GeneratorProjectSnapshot | undefined,
+  incoming: GeneratorProjectSnapshot,
+): GeneratorProjectSnapshot {
+  if (!current || current.id !== incoming.id) {
+    return incoming;
+  }
+  return wizardProgress(incoming) >= wizardProgress(current) ? incoming : current;
+}
+
 export const PROJECT_STATUS_LABEL: Record<GeneratorProjectStatus, string> = {
   DRAFT: "Черновик",
   RUNNING: "В процессе",
@@ -52,12 +128,12 @@ export function stepFromSlug(slug: string | undefined): GeneratorWizardStep | nu
 }
 
 export function wizardHref(id: number | string, step: GeneratorWizardStep): string {
-  return `${ROUTES.GENERATOR}/${id}/${stepSlug(step)}`;
+  return `${ROUTES.GENERATOR}/${id}/${stepSlug(canonicalWizardStep(step))}`;
 }
 
 export function continueHref(item: Pick<GeneratorProjectListItem, "id" | "status">): string {
   if (item.status === "RUNNING" || item.status === "ERROR") {
-    return wizardHref(item.id, "RUN");
+    return wizardHref(item.id, "DOMAINS");
   }
   return `${ROUTES.GENERATOR}/${item.id}`;
 }
@@ -95,9 +171,11 @@ export function isStepReachable(snapshot: GeneratorProjectSnapshot | undefined, 
   if (!snapshot) {
     return step === "PROJECT";
   }
-  const order = WIZARD_STEPS.map((item) => item.id);
-  const currentIndex = order.indexOf(snapshot.currentStep);
-  const targetIndex = order.indexOf(step);
+  const target = canonicalWizardStep(step);
+  const current = canonicalWizardStep(snapshot.currentStep);
+  const order = WIZARD_STEPPER_STEPS.map((item) => item.id);
+  const currentIndex = order.indexOf(current);
+  const targetIndex = order.indexOf(target);
   if (targetIndex <= currentIndex) {
     return true;
   }
@@ -112,7 +190,7 @@ export function isStepReachable(snapshot: GeneratorProjectSnapshot | undefined, 
     RUN: flags.seo,
     RESULTS: snapshot.action === "OPEN" || Boolean(snapshot.lastRunAt && !snapshot.running),
   };
-  return completed[step];
+  return completed[target];
 }
 
 export function isStepComplete(snapshot: GeneratorProjectSnapshot, step: GeneratorWizardStep): boolean {

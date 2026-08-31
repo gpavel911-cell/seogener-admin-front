@@ -26,7 +26,7 @@ export function GeneratorProjectRedirectPage() {
       return;
     }
     if (data.status === "RUNNING" || data.status === "ERROR" || data.currentStep === "RESULTS") {
-      router.replace(wizardHref(data.id, "RUN"));
+      router.replace(wizardHref(data.id, "DOMAINS"));
       return;
     }
     router.replace(wizardHref(data.id, data.currentStep));

@@ -1,16 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import styled from "styled-components";
 import {
-  useGetGeneratorDesignPreviewQuery,
-  useGetGeneratorDesignsQuery,
+  useApproveGeneratorDesignMutation,
+  useConfirmGeneratorPrebuiltDesignMutation,
+  useGetGeneratorDesignPageHtmlQuery,
+  useGetGeneratorDesignStateQuery,
   useGetGeneratorPageTypesQuery,
-  useImportGeneratorDesignMutation,
-  useSelectGeneratorDesignMutation,
+  useStartGeneratorTemplateDesignMutation,
+  useUploadGeneratorPrebuiltDesignMutation,
 } from "@entities/generator/api";
-import type { GeneratorProjectSnapshot } from "@entities/generator/types";
-import { Button, PlaceholderText, ResultLoader, useToast } from "@shared/ui";
+import type { GeneratorPrebuiltFile, GeneratorProjectSnapshot } from "@entities/generator/types";
+import { Button, PlaceholderText, ResultLoader, SelectControl, useToast } from "@shared/ui";
 import { apiErrorMessage } from "../../lib/api-error";
 import {
   ConstrainedField,
@@ -20,20 +22,17 @@ import {
   WizardActions,
   WizardFieldLabel,
   WizardFilePicker,
+  WizardHint,
 } from "../fields";
 
 const QUICK_PRESET = ["home", "service", "contacts", "faq"];
+
+type SourceMode = "template" | "prebuilt";
 
 type Props = {
   snapshot: GeneratorProjectSnapshot;
   onSaved: (next: GeneratorProjectSnapshot) => void;
 };
-
-function designStem(filename: string): string {
-  const base = filename.split(/[/\\]/).pop() ?? filename;
-  const dot = base.lastIndexOf(".");
-  return (dot > 0 ? base.slice(0, dot) : base).trim();
-}
 
 function pageCountLabel(count: number): string {
   if (count === 1) {
@@ -45,54 +44,58 @@ function pageCountLabel(count: number): string {
   return `${count} страниц`;
 }
 
-function DesignCard({
-  id,
-  name,
-  selected,
-  disabled,
-  onSelect,
-}: {
-  id: string;
-  name: string;
-  selected: boolean;
-  disabled: boolean;
-  onSelect: () => void;
-}) {
-  const preview = useGetGeneratorDesignPreviewQuery(id);
-  useEffect(() => {
-    return () => {
-      if (preview.data) {
-        URL.revokeObjectURL(preview.data);
-      }
-    };
-  }, [preview.data]);
+function isReadyPhase(phase: string | null | undefined): boolean {
+  const value = (phase ?? "").toLowerCase();
+  return value === "approval" || value === "approved" || value === "built" || value === "ready";
+}
 
+function isBuildingPhase(phase: string | null | undefined): boolean {
+  return (phase ?? "").toLowerCase() === "building";
+}
+
+function DesignPagePreview({
+  projectId,
+  slug,
+  label,
+}: {
+  projectId: number | string;
+  slug: string;
+  label: string;
+}) {
+  const htmlQuery = useGetGeneratorDesignPageHtmlQuery({ id: projectId, slug });
   return (
-    <Card type="button" $selected={selected} disabled={disabled} onClick={onSelect}>
-      {preview.data ? <Preview src={preview.data} alt={name} /> : <PreviewPlaceholder>Нет превью</PreviewPlaceholder>}
-      <CardName>{name}</CardName>
-    </Card>
+    <PreviewCard>
+      <CardName>{label}</CardName>
+      {htmlQuery.isLoading ? <ResultLoader label="Загрузка превью..." /> : null}
+      {htmlQuery.error ? <PlaceholderText>Не удалось загрузить превью.</PlaceholderText> : null}
+      {htmlQuery.data ? <PreviewFrame srcDoc={htmlQuery.data} title={label} sandbox="" /> : null}
+    </PreviewCard>
   );
 }
 
 export function DesignStep({ snapshot, onSaved }: Props) {
   const { showToast } = useToast();
-  const [files, setFiles] = useState<File[]>([]);
-  const [importingName, setImportingName] = useState<string | null>(null);
-  const [selectedDesignId, setSelectedDesignId] = useState(snapshot.design?.id ?? "");
+  const [sourceMode, setSourceMode] = useState<SourceMode>("template");
   const [selectedPageTypes, setSelectedPageTypes] = useState<string[]>(QUICK_PRESET);
-  const designsQuery = useGetGeneratorDesignsQuery();
+  const [templateFiles, setTemplateFiles] = useState<File[]>([]);
+  const [prebuiltFiles, setPrebuiltFiles] = useState<File[]>([]);
+  const [prebuiltPages, setPrebuiltPages] = useState<GeneratorPrebuiltFile[]>([]);
+  const [prebuiltMapping, setPrebuiltMapping] = useState<Record<string, string>>({});
+  const [pollState, setPollState] = useState(false);
   const pageTypesQuery = useGetGeneratorPageTypesQuery();
-  const [importDesign, { isLoading: isImporting }] = useImportGeneratorDesignMutation();
-  const [selectDesign, { isLoading: isSaving }] = useSelectGeneratorDesignMutation();
-  const [generationSucceeded, setGenerationSucceeded] = useState(snapshot.design?.phase === "approved");
+  const designStateQuery = useGetGeneratorDesignStateQuery(snapshot.id, {
+    pollingInterval: pollState ? 2000 : 0,
+  });
+  const [startTemplate, { isLoading: isStartingTemplate }] = useStartGeneratorTemplateDesignMutation();
+  const [uploadPrebuilt, { isLoading: isUploadingPrebuilt }] = useUploadGeneratorPrebuiltDesignMutation();
+  const [confirmPrebuilt, { isLoading: isConfirmingPrebuilt }] = useConfirmGeneratorPrebuiltDesignMutation();
+  const [approveDesign, { isLoading: isApproving }] = useApproveGeneratorDesignMutation();
 
-  useEffect(() => {
-    if (!designsQuery.error) {
-      return;
-    }
-    showToast({ variant: "error", message: apiErrorMessage(designsQuery.error, "Не удалось загрузить дизайны.") });
-  }, [designsQuery.error, showToast]);
+  const phase = designStateQuery.data?.phase ?? snapshot.design?.phase;
+  const pages = designStateQuery.data?.pages ?? [];
+  const approved = (phase ?? "").toLowerCase() === "approved";
+  const readyForPreview = pages.length > 0 && isReadyPhase(phase);
+  const building = pollState || isBuildingPhase(phase) || isStartingTemplate;
 
   useEffect(() => {
     if (!pageTypesQuery.error) {
@@ -101,71 +104,112 @@ export function DesignStep({ snapshot, onSaved }: Props) {
     showToast({ variant: "error", message: apiErrorMessage(pageTypesQuery.error, "Не удалось загрузить типы страниц.") });
   }, [pageTypesQuery.error, showToast]);
 
+  useEffect(() => {
+    const current = (designStateQuery.data?.phase ?? "").toLowerCase();
+    if (current === "building") {
+      setPollState(true);
+    }
+    if (current === "approval" || current === "approved" || current === "error" || current === "built") {
+      setPollState(false);
+    }
+    if (current === "error" && designStateQuery.data?.error) {
+      showToast({ variant: "error", message: designStateQuery.data.error });
+    }
+  }, [designStateQuery.data?.error, designStateQuery.data?.phase, showToast]);
+
+  const pageTypeOptions = useMemo(
+    () => (pageTypesQuery.data?.items ?? []).map((item) => ({ value: item.id, label: item.label })),
+    [pageTypesQuery.data?.items],
+  );
+
   const togglePageType = (id: string) => {
     setSelectedPageTypes((current) =>
       current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
     );
   };
 
-  const applyDesign = async (designId: string) => {
+  const handleStartTemplate = async () => {
     if (!selectedPageTypes.length) {
       showToast({ variant: "error", message: "Выберите хотя бы один тип страницы." });
       return;
     }
-    const next = await selectDesign({
-      id: snapshot.id,
-      designId,
-      pageTypes: selectedPageTypes,
-    }).unwrap();
-    onSaved(next);
-    setGenerationSucceeded(true);
-    showToast({ variant: "success", message: "Дизайн утверждён" });
-  };
-
-  const handleImportFile = async (file: File) => {
-    const resolvedName = designStem(file.name) || file.name;
-    setImportingName(file.name);
-    try {
-      const imported = await importDesign({ file, name: resolvedName }).unwrap();
-      setFiles((current) => current.filter((item) => item !== file));
-      setSelectedDesignId(imported.id);
-      showToast({ variant: "success", message: "Шаблон добавлен в библиотеку" });
-    } catch (err) {
-      showToast({
-        variant: "error",
-        message: apiErrorMessage(err, "Не удалось импортировать шаблон."),
-      });
-    } finally {
-      setImportingName(null);
-    }
-  };
-
-  const handleGenerate = async () => {
-    if (!selectedDesignId) {
-      showToast({ variant: "error", message: "Выберите дизайн из библиотеки или импортируйте файл." });
+    const file = templateFiles[0];
+    if (!file) {
+      showToast({ variant: "error", message: "Загрузите HTML или ZIP шаблона." });
       return;
     }
     try {
-      await applyDesign(selectedDesignId);
+      await startTemplate({ id: snapshot.id, file, pageTypes: selectedPageTypes }).unwrap();
+      setPollState(true);
+      showToast({ variant: "success", message: "Сборка страниц запущена" });
     } catch (err) {
-      showToast({ variant: "error", message: apiErrorMessage(err, "Не удалось сгенерировать дизайн.") });
+      showToast({ variant: "error", message: apiErrorMessage(err, "Не удалось загрузить шаблон.") });
     }
   };
 
-  if (designsQuery.isLoading || pageTypesQuery.isLoading) {
-    return <ResultLoader label="Загрузка дизайнов..." />;
+  const handleUploadPrebuilt = async () => {
+    const file = prebuiltFiles[0];
+    if (!file) {
+      showToast({ variant: "error", message: "Загрузите ZIP готового сайта." });
+      return;
+    }
+    try {
+      const result = await uploadPrebuilt({ id: snapshot.id, file }).unwrap();
+      const files = result.files ?? [];
+      setPrebuiltPages(files);
+      setPrebuiltMapping(
+        Object.fromEntries(files.map((item) => [item.filename, item.suggestedSlug || ""])),
+      );
+      showToast({ variant: "success", message: "ZIP разобран. Сопоставьте файлы со страницами." });
+    } catch (err) {
+      showToast({ variant: "error", message: apiErrorMessage(err, "Не удалось загрузить готовый сайт.") });
+    }
+  };
+
+  const handleConfirmPrebuilt = async () => {
+    const mapping = Object.fromEntries(
+      Object.entries(prebuiltMapping).filter(([, slug]) => slug.trim().length > 0),
+    );
+    if (!Object.keys(mapping).length) {
+      showToast({ variant: "error", message: "Сопоставьте хотя бы один файл со страницей." });
+      return;
+    }
+    const pagesHtml = Object.fromEntries(
+      prebuiltPages.filter((item) => mapping[item.filename]).map((item) => [item.filename, item.html]),
+    );
+    try {
+      const next = await confirmPrebuilt({ id: snapshot.id, mapping, pagesHtml }).unwrap();
+      showToast({ variant: "success", message: "Страницы импортированы. Проверьте превью и утвердите дизайн." });
+      void designStateQuery.refetch();
+      if (next.design?.phase === "approved") {
+        onSaved(next);
+      }
+    } catch (err) {
+      showToast({ variant: "error", message: apiErrorMessage(err, "Не удалось подтвердить импорт.") });
+    }
+  };
+
+  const handleApprove = async () => {
+    try {
+      const next = await approveDesign(snapshot.id).unwrap();
+      onSaved(next);
+      showToast({ variant: "success", message: "Дизайн утверждён" });
+    } catch (err) {
+      showToast({ variant: "error", message: apiErrorMessage(err, "Не удалось утвердить дизайн.") });
+    }
+  };
+
+  if (pageTypesQuery.isLoading) {
+    return <ResultLoader label="Загрузка типов страниц..." />;
   }
 
-  const items = designsQuery.data?.items ?? [];
   const pageTypes = pageTypesQuery.data?.items ?? [];
-  const busy = isSaving || isImporting;
+  const busy = isStartingTemplate || isUploadingPrebuilt || isConfirmingPrebuilt || isApproving || pollState;
 
   return (
     <StepStack>
       <FormSection>
-        <FormSectionHeading tooltip="Отметьте страницы, которые нужно собрать из шаблона. Сборка запускается кнопкой «Сгенерировать».">
-          Типы страниц
-        </FormSectionHeading>
+        <FormSectionHeading>Структура</FormSectionHeading>
         <PageCount>{pageCountLabel(selectedPageTypes.length)}</PageCount>
         <PageTypeList>
           {pageTypes.map((item) => (
@@ -184,75 +228,113 @@ export function DesignStep({ snapshot, onSaved }: Props) {
       </FormSection>
 
       <FormSection>
-        <FormSectionHeading tooltip="ZIP или HTML. Выбор файла не запускает сборку — сначала «Импорт» в библиотеку, затем «Сгенерировать».">
-          Шаблон
-        </FormSectionHeading>
-        <ConstrainedField>
-          <WizardFieldLabel tooltip="Можно выбрать один или несколько файлов. Импорт только добавляет шаблон в библиотеку.">
-            Файл шаблона
-          </WizardFieldLabel>
-          <WizardFilePicker
-            accept=".zip,.html,.htm"
-            multiple
-            disabled={busy}
-            buttonLabel="Выбрать .zip / .html"
-            hideFileHint={files.length > 1}
-            fileNames={files.length === 1 ? files[0].name : undefined}
-            action={
-              files.length === 1 ? (
-                <Button type="button" disabled={busy} onClick={() => void handleImportFile(files[0])}>
-                  {importingName === files[0].name ? "Импорт..." : "Импорт"}
-                </Button>
-              ) : null
-            }
-            onFiles={(next) => setFiles(next)}
-          />
-        </ConstrainedField>
-        {files.length > 1
-          ? files.map((file) => (
-              <SelectedFileRow key={`${file.name}-${file.lastModified}-${file.size}`}>
-                <SelectedFileName title={file.name}>{file.name}</SelectedFileName>
-                <Button type="button" disabled={busy} onClick={() => void handleImportFile(file)}>
-                  {importingName === file.name ? "Импорт..." : "Импорт"}
-                </Button>
-              </SelectedFileRow>
-            ))
-          : null}
-        {items.length ? (
-          <Grid>
-            {items.map((item) => (
-              <DesignCard
-                key={item.id}
-                id={item.id}
-                name={item.name}
-                selected={selectedDesignId === item.id}
+        <FormSectionHeading>Шаблон</FormSectionHeading>
+        <SourceList>
+          <SourceCard type="button" $selected={sourceMode === "template"} disabled={busy} onClick={() => setSourceMode("template")}>
+            Загрузить дизайн (HTML или ZIP)
+          </SourceCard>
+          <SourceCard type="button" $selected={sourceMode === "prebuilt"} disabled={busy} onClick={() => setSourceMode("prebuilt")}>
+            Готовый сайт (все страницы)
+          </SourceCard>
+        </SourceList>
+
+        {sourceMode === "template" ? (
+          <>
+            <ConstrainedField>
+              <WizardFieldLabel>Файл шаблона</WizardFieldLabel>
+              <WizardFilePicker
+                accept=".zip,.html,.htm"
                 disabled={busy}
-                onSelect={() => setSelectedDesignId(item.id)}
+                buttonLabel="Выбрать .zip / .html"
+                fileNames={templateFiles[0]?.name}
+                onFiles={setTemplateFiles}
               />
-            ))}
-          </Grid>
+            </ConstrainedField>
+            <WizardActions>
+              <Button type="button" variant="primary" disabled={busy || !templateFiles[0]} onClick={() => void handleStartTemplate()}>
+                {isStartingTemplate || pollState ? "Сборка..." : "Сгенерировать страницы"}
+              </Button>
+            </WizardActions>
+          </>
         ) : (
-          <PlaceholderText>Нет доступных дизайнов. Загрузите ZIP или HTML выше.</PlaceholderText>
+          <>
+            <ConstrainedField>
+              <WizardFieldLabel>ZIP готового сайта</WizardFieldLabel>
+              <WizardFilePicker
+                accept=".zip"
+                disabled={busy}
+                buttonLabel="Выбрать .zip"
+                fileNames={prebuiltFiles[0]?.name}
+                onFiles={setPrebuiltFiles}
+              />
+            </ConstrainedField>
+            <WizardActions>
+              <Button type="button" disabled={busy || !prebuiltFiles[0]} onClick={() => void handleUploadPrebuilt()}>
+                {isUploadingPrebuilt ? "Разбор ZIP..." : "Загрузить ZIP"}
+              </Button>
+            </WizardActions>
+            {prebuiltPages.length ? (
+              <>
+                {prebuiltPages.map((item) => (
+                  <MappingRow key={item.filename}>
+                    <SelectedFileName title={item.filename}>{item.filename}</SelectedFileName>
+                    <SelectControl
+                      value={prebuiltMapping[item.filename] || "skip"}
+                      onValueChange={(value) =>
+                        setPrebuiltMapping((current) => ({
+                          ...current,
+                          [item.filename]: value === "skip" ? "" : value,
+                        }))
+                      }
+                      options={[{ value: "skip", label: "Не использовать" }, ...pageTypeOptions]}
+                    />
+                  </MappingRow>
+                ))}
+                <WizardActions>
+                  <Button type="button" variant="primary" disabled={busy} onClick={() => void handleConfirmPrebuilt()}>
+                    {isConfirmingPrebuilt ? "Импорт..." : "Импортировать страницы"}
+                  </Button>
+                </WizardActions>
+              </>
+            ) : null}
+          </>
         )}
-        {isImporting ? (
-          <StatusBanner>
-            <ResultLoader label="Добавляем шаблон в библиотеку. ZIP разбирается и тегируется — это может занять несколько минут." />
-          </StatusBanner>
-        ) : null}
-        {isSaving ? (
-          <StatusBanner>
-            <ResultLoader label="Собираем выбранные типы страниц и утверждаем дизайн. Генерация блоков может занять до 10 минут." />
-          </StatusBanner>
-        ) : null}
-        {!isSaving && generationSucceeded ? (
-          <SuccessNote>Дизайн успешно сгенерирован и утверждён.</SuccessNote>
-        ) : null}
-        <WizardActions>
-          <Button type="button" variant="primary" disabled={busy || !selectedDesignId} onClick={() => void handleGenerate()}>
-            {isSaving ? "Генерация..." : "Сгенерировать"}
-          </Button>
-        </WizardActions>
       </FormSection>
+
+      {building ? (
+        <StatusBanner>
+          <ResultLoader
+            label={
+              designStateQuery.data?.buildStatus
+                || "Собираем выбранные типы страниц. Генерация блоков может занять несколько минут."
+            }
+          />
+        </StatusBanner>
+      ) : null}
+
+      {readyForPreview ? (
+        <FormSection>
+          <FormSectionHeading>Утверждение</FormSectionHeading>
+          <PreviewGrid>
+            {pages.map((page) => (
+              <DesignPagePreview key={page.slug} projectId={snapshot.id} slug={page.slug} label={page.label || page.slug} />
+            ))}
+          </PreviewGrid>
+          {approved ? (
+            <SuccessNote>Дизайн утверждён. Можно переходить к доменам.</SuccessNote>
+          ) : (
+            <WizardActions>
+              <Button type="button" variant="primary" disabled={isApproving} onClick={() => void handleApprove()}>
+                {isApproving ? "Утверждение..." : "Утвердить дизайн"}
+              </Button>
+            </WizardActions>
+          )}
+        </FormSection>
+      ) : null}
+
+      {!building && !readyForPreview && designStateQuery.data?.error ? (
+        <WizardHint>{designStateQuery.data.error}</WizardHint>
+      ) : null}
     </StepStack>
   );
 }
@@ -284,12 +366,29 @@ const PageTypeRow = styled.div`
   }
 `;
 
-const SelectedFileRow = styled.div`
+const SourceList = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+`;
+
+const SourceCard = styled.button<{ $selected: boolean }>`
+  border: 1px solid ${({ theme, $selected }) => ($selected ? theme.tokens.color.accent : theme.tokens.color.borderSubtle)};
+  background: ${({ theme, $selected }) => ($selected ? theme.tokens.color.accentMuted : theme.tokens.color.bgSurface)};
+  color: ${({ theme }) => theme.tokens.color.textPrimary};
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 14px;
+  cursor: pointer;
+  text-align: left;
+`;
+
+const MappingRow = styled.div`
   display: flex;
   align-items: center;
   gap: 10px;
   min-height: 34px;
-  width: 500px;
+  width: 640px;
   max-width: 100%;
 `;
 
@@ -317,42 +416,28 @@ const SuccessNote = styled.p`
   color: #15803d;
 `;
 
-const Grid = styled.div`
+const PreviewGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 12px;
 `;
 
-const Card = styled.button<{ $selected: boolean }>`
+const PreviewCard = styled.div`
   display: flex;
   flex-direction: column;
   gap: 8px;
   padding: 10px;
   border-radius: 12px;
-  border: 1px solid ${({ theme, $selected }) => ($selected ? theme.tokens.color.accent : theme.tokens.color.borderSubtle)};
+  border: 1px solid ${({ theme }) => theme.tokens.color.borderSubtle};
   background: ${({ theme }) => theme.tokens.color.bgSurface};
-  cursor: pointer;
-  text-align: left;
 `;
 
-const Preview = styled.img`
+const PreviewFrame = styled.iframe`
   width: 100%;
-  height: 140px;
-  object-fit: cover;
+  height: 220px;
+  border: 0;
   border-radius: 8px;
-  background: #f1f5f9;
-`;
-
-const PreviewPlaceholder = styled.div`
-  width: 100%;
-  height: 140px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #f1f5f9;
-  color: #64748b;
-  font-size: 13px;
+  background: #f8fafc;
 `;
 
 const CardName = styled.div`

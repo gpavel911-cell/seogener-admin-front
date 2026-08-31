@@ -1,25 +1,29 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import {
   useClusterGeneratorKeywordsMutation,
   useCollectGeneratorKeywordsMutation,
   useConfirmGeneratorKeywordsMutation,
   useDeleteGeneratorUploadMutation,
   useGetGeneratorProcessStatusQuery,
+  useGetGeneratorWordstatBulkStatusQuery,
   useImportGeneratorExternalKeywordsMutation,
   useProcessGeneratorKeywordsMutation,
+  useSearchGeneratorWordstatMutation,
   useSetGeneratorKeywordLanguageMutation,
+  useStartGeneratorWordstatBulkMutation,
   useUploadGeneratorKeywordsMutation,
 } from "@entities/generator/api";
 import type {
   GeneratorCluster,
   GeneratorKeywordItem,
   GeneratorKeywordLanguage,
+  GeneratorPageWithoutKeywords,
   GeneratorProjectSnapshot,
   GeneratorUploadType,
 } from "@entities/generator/types";
-import { Button, SelectControl, Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow, TableWrapper, useToast } from "@shared/ui";
+import { Button, ExpandedTableCell, ExpandedTableRow, SelectControl, Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow, TableWrapper, useToast } from "@shared/ui";
 import { apiErrorMessage } from "../../lib/api-error";
 import {
   ConstrainedField,
@@ -73,6 +77,41 @@ function fileNames(files: File[]): string {
   return files.map((file) => file.name).join(", ");
 }
 
+const INTENT_LABEL: Record<string, string> = {
+  commercial: "Коммерческая",
+  informational: "Информационная",
+  h1_cluster: "H1-кластер",
+};
+
+function clusterTitle(cluster: GeneratorCluster, index: number): string {
+  return String(cluster.service ?? cluster.h1_main ?? cluster.h1 ?? `Кластер ${index + 1}`);
+}
+
+function sourcePages(cluster: GeneratorCluster) {
+  return Array.isArray(cluster.source_pages) ? cluster.source_pages : [];
+}
+
+function toSlug(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "");
+}
+
+function pageHeading(page: GeneratorPageWithoutKeywords): string {
+  if (page.h1 && page.h1.trim()) {
+    return page.h1;
+  }
+  if (page.url) {
+    try {
+      return decodeURIComponent(new URL(page.url).pathname).replace(/\/+/g, " ").trim() || page.url;
+    } catch {
+      return page.url;
+    }
+  }
+  return "Страница";
+}
+
 export function KeywordsStep({ snapshot, onSaved, onContinue }: Props) {
   const { showToast } = useToast();
   const [language, setLanguage] = useState<GeneratorKeywordLanguage>(snapshot.keywordLanguage ?? "BOTH");
@@ -83,6 +122,13 @@ export function KeywordsStep({ snapshot, onSaved, onContinue }: Props) {
   const [processStarted, setProcessStarted] = useState(false);
   const [wordstatRows, setWordstatRows] = useState<GeneratorKeywordItem[]>([]);
   const [localClusters, setLocalClusters] = useState<GeneratorCluster[]>([]);
+  const [pagesWithoutKeywords, setPagesWithoutKeywords] = useState<GeneratorPageWithoutKeywords[]>(
+    snapshot.pagesWithoutKeywords ?? [],
+  );
+  const [pageKeywords, setPageKeywords] = useState<Record<string, GeneratorKeywordItem[]>>({});
+  const [expandedClusters, setExpandedClusters] = useState<Record<number, boolean>>({});
+  const [bulkStarted, setBulkStarted] = useState(false);
+  const [checkingPage, setCheckingPage] = useState<string | null>(null);
   const [uploadKeywords, { isLoading: isUploading }] = useUploadGeneratorKeywordsMutation();
   const [deleteUpload] = useDeleteGeneratorUploadMutation();
   const [setKeywordLanguage, { isLoading: isSavingLanguage }] = useSetGeneratorKeywordLanguageMutation();
@@ -91,12 +137,34 @@ export function KeywordsStep({ snapshot, onSaved, onContinue }: Props) {
   const [collectKeywords, { isLoading: isCollecting }] = useCollectGeneratorKeywordsMutation();
   const [confirmKeywords, { isLoading: isConfirming }] = useConfirmGeneratorKeywordsMutation();
   const [importExternalKeywords, { isLoading: isImporting }] = useImportGeneratorExternalKeywordsMutation();
+  const [searchWordstat] = useSearchGeneratorWordstatMutation();
+  const [startWordstatBulk, { isLoading: isStartingBulk }] = useStartGeneratorWordstatBulkMutation();
   const processStatusQuery = useGetGeneratorProcessStatusQuery(snapshot.id, {
     skip: !processStarted,
     pollingInterval: processStarted ? 2000 : 0,
   });
   const processStatus = processStatusQuery.data?.status;
   const processError = processStatusQuery.data?.error;
+  const bulkStatusQuery = useGetGeneratorWordstatBulkStatusQuery(snapshot.id, {
+    skip: !bulkStarted,
+    pollingInterval: bulkStarted ? 1500 : 0,
+  });
+  const bulkStatus = bulkStatusQuery.data?.status;
+  const bulkError = bulkStatusQuery.data?.error;
+
+  useEffect(() => {
+    if (!bulkStarted || (bulkStatus !== "DONE" && bulkStatus !== "ERROR")) {
+      return;
+    }
+    const results = bulkStatusQuery.data?.results ?? {};
+    if (Object.keys(results).length) {
+      setPageKeywords((current) => ({ ...current, ...results }));
+    }
+    setBulkStarted(false);
+    if (bulkStatus === "ERROR") {
+      showToast({ variant: "error", message: bulkError || "Не удалось проверить страницы через Wordstat." });
+    }
+  }, [bulkError, bulkStarted, bulkStatus, bulkStatusQuery.data?.results, showToast]);
 
   const previewClusters = useMemo(() => resolveClusters(localClusters, snapshot), [localClusters, snapshot]);
 
@@ -161,6 +229,8 @@ export function KeywordsStep({ snapshot, onSaved, onContinue }: Props) {
       const next = await clusterKeywordsRequest(snapshot.id).unwrap();
       onSaved(next);
       setLocalClusters([]);
+      setPagesWithoutKeywords(next.pagesWithoutKeywords ?? []);
+      setPageKeywords({});
       showToast({ variant: "success", message: "Кластеры построены" });
     } catch (error) {
       showToast({ variant: "error", message: apiErrorMessage(error, "Не удалось кластеризовать ключи.") });
@@ -192,6 +262,54 @@ export function KeywordsStep({ snapshot, onSaved, onContinue }: Props) {
     setLocalClusters((current) => [...resolveClusters(current, snapshot), added]);
     setWordstatRows([]);
     showToast({ variant: "success", message: "Ключи добавлены в кластер" });
+  };
+
+  const addClusterFromPage = (page: GeneratorPageWithoutKeywords, keywords: GeneratorKeywordItem[]) => {
+    if (!keywords.length) {
+      return;
+    }
+    const heading = pageHeading(page);
+    const added: GeneratorCluster = {
+      service: heading,
+      domain_slug: toSlug(heading) || "cluster",
+      keywords: keywords.map((item) => item.keyword),
+      kw_count: keywords.length,
+      intent: page.intent ?? "commercial",
+      source_pages: page.url
+        ? [{ url: page.url, h1: page.h1 ?? undefined, source_domain: page.sourceDomain ?? undefined }]
+        : [],
+    };
+    setLocalClusters((current) => [...resolveClusters(current, snapshot), added]);
+    showToast({ variant: "success", message: "Страница добавлена как кластер" });
+  };
+
+  const handleCheckPage = async (page: GeneratorPageWithoutKeywords) => {
+    const heading = pageHeading(page);
+    const key = page.url || heading;
+    setCheckingPage(key);
+    try {
+      const result = await searchWordstat({ id: snapshot.id, phrase: heading }).unwrap();
+      setPageKeywords((current) => ({ ...current, [key]: result.keywords ?? [] }));
+    } catch (error) {
+      showToast({ variant: "error", message: apiErrorMessage(error, "Не удалось проверить страницу через Wordstat.") });
+    } finally {
+      setCheckingPage(null);
+    }
+  };
+
+  const handleCheckAllPages = async () => {
+    const pages = pagesWithoutKeywords
+      .filter((page) => pageHeading(page))
+      .map((page) => ({ url: page.url ?? "", h1: pageHeading(page) }));
+    if (!pages.length) {
+      return;
+    }
+    try {
+      await startWordstatBulk({ id: snapshot.id, pages }).unwrap();
+      setBulkStarted(true);
+    } catch (error) {
+      showToast({ variant: "error", message: apiErrorMessage(error, "Не удалось запустить проверку Wordstat.") });
+    }
   };
 
   const handleContinue = async () => {
@@ -394,16 +512,54 @@ export function KeywordsStep({ snapshot, onSaved, onContinue }: Props) {
               <TableHead>
                 <TableRow>
                   <TableHeaderCell>Кластер</TableHeaderCell>
+                  <TableHeaderCell>Тип</TableHeaderCell>
                   <TableHeaderCell>Ключей</TableHeaderCell>
+                  <TableHeaderCell>Источники</TableHeaderCell>
+                  <TableHeaderCell />
                 </TableRow>
               </TableHead>
               <TableBody>
-                {previewClusters.map((cluster, index) => (
-                  <TableRow key={index}>
-                    <TableCell>{String(cluster.service ?? cluster.h1_main ?? cluster.h1 ?? `Кластер ${index + 1}`)}</TableCell>
-                    <TableCell>{clusterKeywords(cluster).length}</TableCell>
-                  </TableRow>
-                ))}
+                {previewClusters.map((cluster, index) => {
+                  const keywords = clusterKeywords(cluster);
+                  const sources = sourcePages(cluster);
+                  const expanded = Boolean(expandedClusters[index]);
+                  return (
+                    <Fragment key={index}>
+                      <TableRow>
+                        <TableCell>{clusterTitle(cluster, index)}</TableCell>
+                        <TableCell>{INTENT_LABEL[cluster.intent ?? ""] || cluster.intent || "—"}</TableCell>
+                        <TableCell>{cluster.kw_count ?? keywords.length}</TableCell>
+                        <TableCell>{sources.length || "—"}</TableCell>
+                        <TableCell>
+                          {keywords.length || sources.length ? (
+                            <Button
+                              type="button"
+                              onClick={() =>
+                                setExpandedClusters((current) => ({ ...current, [index]: !current[index] }))
+                              }
+                            >
+                              {expanded ? "Скрыть" : "Подробнее"}
+                            </Button>
+                          ) : null}
+                        </TableCell>
+                      </TableRow>
+                      {expanded ? (
+                        <ExpandedTableRow>
+                          <ExpandedTableCell colSpan={5}>
+                            {keywords.length ? (
+                              <WizardHint>{keywords.slice(0, 12).join(" · ")}{keywords.length > 12 ? ` и ещё ${keywords.length - 12}` : ""}</WizardHint>
+                            ) : null}
+                            {sources.map((source) => (
+                              <WizardHint key={`${source.url}-${source.h1}`}>
+                                {source.h1 || source.url} {source.source_domain || source.sourceDomain ? `(${source.source_domain || source.sourceDomain})` : ""}
+                              </WizardHint>
+                            ))}
+                          </ExpandedTableCell>
+                        </ExpandedTableRow>
+                      ) : null}
+                    </Fragment>
+                  );
+                })}
               </TableBody>
             </Table>
           </TableWrapper>
@@ -411,6 +567,87 @@ export function KeywordsStep({ snapshot, onSaved, onContinue }: Props) {
           <WizardHint>Кластеры появятся после обработки.</WizardHint>
         )}
       </FormSection>
+
+      {pagesWithoutKeywords.length ? (
+        <FormSection>
+          <FormSectionHeading tooltip="Страницы конкурентов, на которых не нашлось ключей Keys.so. Проверьте их через Wordstat и при необходимости добавьте как отдельные кластеры.">
+            Страницы без ключей
+          </FormSectionHeading>
+          <WizardActions>
+            <Button
+              type="button"
+              disabled={isStartingBulk || bulkStarted}
+              onClick={() => void handleCheckAllPages()}
+            >
+              {bulkStarted
+                ? `Проверяем Wordstat (${bulkStatusQuery.data?.processed ?? 0}/${bulkStatusQuery.data?.total ?? pagesWithoutKeywords.length})`
+                : `Проверить все через Wordstat (${pagesWithoutKeywords.length})`}
+            </Button>
+          </WizardActions>
+          {(["commercial", "informational"] as const).map((intent) => {
+            const group = pagesWithoutKeywords.filter((page) => (page.intent || "commercial") === intent);
+            if (!group.length) {
+              return null;
+            }
+            return (
+              <div key={intent}>
+                <WizardHint>{INTENT_LABEL[intent]}</WizardHint>
+                <TableWrapper>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableHeaderCell>Страница</TableHeaderCell>
+                        <TableHeaderCell>Источник</TableHeaderCell>
+                        <TableHeaderCell>Wordstat</TableHeaderCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {group.map((page) => {
+                        const heading = pageHeading(page);
+                        const key = page.url || heading;
+                        const keywords = pageKeywords[key] ?? (page.url ? pageKeywords[page.url] : undefined) ?? [];
+                        return (
+                          <TableRow key={key}>
+                            <TableCell>
+                              {heading}
+                              {page.url ? <WizardHint>{page.url}</WizardHint> : null}
+                            </TableCell>
+                            <TableCell>{page.sourceDomain || "—"}</TableCell>
+                            <TableCell>
+                              <WizardActions>
+                                <Button
+                                  type="button"
+                                  disabled={checkingPage === key || bulkStarted}
+                                  onClick={() => void handleCheckPage(page)}
+                                >
+                                  {checkingPage === key ? "Проверка..." : "Wordstat"}
+                                </Button>
+                                {keywords.length ? (
+                                  <Button type="button" onClick={() => addClusterFromPage(page, keywords)}>
+                                    Добавить как кластер
+                                  </Button>
+                                ) : null}
+                              </WizardActions>
+                              {keywords.length ? (
+                                <WizardHint>
+                                  {keywords
+                                    .slice(0, 8)
+                                    .map((item) => `${item.keyword}${item.frequency ? ` (${item.frequency})` : ""}`)
+                                    .join(" · ")}
+                                </WizardHint>
+                              ) : null}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </TableWrapper>
+              </div>
+            );
+          })}
+        </FormSection>
+      ) : null}
       <WizardActions>
         <Button type="button" variant="primary" disabled={isConfirming || isSavingLanguage || isImporting} onClick={() => void handleContinue()}>
           Далее

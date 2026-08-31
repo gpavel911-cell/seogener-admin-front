@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useUpdateGeneratorDomainsMutation } from "@entities/generator/api";
+import styled from "styled-components";
+import { useSuggestGeneratorDomainsMutation, useUpdateGeneratorDomainsMutation } from "@entities/generator/api";
 import type { GeneratorCluster, GeneratorProjectSnapshot, GeneratorSiteType } from "@entities/generator/types";
 import { Button, SelectControl, Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow, TableWrapper, useToast } from "@shared/ui";
 import { apiErrorMessage } from "../../lib/api-error";
@@ -29,6 +30,7 @@ type RowState = {
   domain: string;
   siteName: string;
   siteType: GeneratorSiteType;
+  keywords: string[];
 };
 
 function clusterIdOf(cluster: GeneratorCluster, index: number): string {
@@ -37,6 +39,25 @@ function clusterIdOf(cluster: GeneratorCluster, index: number): string {
 
 function clusterH1(cluster: GeneratorCluster): string {
   return String(cluster.h1_main ?? cluster.service ?? cluster.h1 ?? "");
+}
+
+function clusterKeywords(cluster: GeneratorCluster): string[] {
+  const raw = cluster.keywords;
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  return raw
+    .map((item) => {
+      if (typeof item === "string") {
+        return item;
+      }
+      if (item && typeof item === "object") {
+        const record = item as Record<string, unknown>;
+        return String(record.keyword ?? record.key ?? record.phrase ?? "");
+      }
+      return "";
+    })
+    .filter((item) => item.length > 0);
 }
 
 function parseDomainList(value: string): string[] {
@@ -50,11 +71,20 @@ function parseDomainList(value: string): string[] {
   );
 }
 
+function savedProjectDomains(snapshot: GeneratorProjectSnapshot): string[] {
+  if (!snapshot.completedSteps.domains) {
+    return [];
+  }
+  return Array.from(new Set((snapshot.domains ?? []).map((item) => item.domain).filter(Boolean)));
+}
+
 export function DomainsStep({ snapshot, onSaved, onContinue }: Props) {
   const { showToast } = useToast();
-  const existingDomains = snapshot.domains?.map((item) => item.domain).filter(Boolean) ?? [];
-  const [textarea, setTextarea] = useState(existingDomains.join("\n"));
+  const saved = snapshot.completedSteps.domains;
+  const [textarea, setTextarea] = useState("");
+  const [projectDomains, setProjectDomains] = useState<string[]>(() => savedProjectDomains(snapshot));
   const [updateDomains, { isLoading }] = useUpdateGeneratorDomainsMutation();
+  const [suggestDomains, { isLoading: isSuggesting }] = useSuggestGeneratorDomainsMutation();
   const clusters = snapshot.clusters ?? [];
   const [rows, setRows] = useState<RowState[]>(() =>
     clusters.map((cluster, index) => {
@@ -63,14 +93,24 @@ export function DomainsStep({ snapshot, onSaved, onContinue }: Props) {
       return {
         clusterId,
         h1: mapped?.h1 || clusterH1(cluster),
-        domain: mapped?.domain ?? "",
+        domain: saved ? (mapped?.domain ?? "") : "",
         siteName: mapped?.siteName ?? "",
         siteType: mapped?.siteType ?? snapshot.siteType ?? "NICHE",
+        keywords: clusterKeywords(cluster),
       };
     }),
   );
 
-  const domainOptions = useMemo(() => parseDomainList(textarea), [textarea]);
+  const assignedCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    rows.forEach((row) => {
+      if (!row.domain) {
+        return;
+      }
+      counts[row.domain] = (counts[row.domain] ?? 0) + 1;
+    });
+    return counts;
+  }, [rows]);
 
   const handleAdd = () => {
     const domains = parseDomainList(textarea);
@@ -78,12 +118,95 @@ export function DomainsStep({ snapshot, onSaved, onContinue }: Props) {
       showToast({ variant: "error", message: "Укажите хотя бы один домен" });
       return;
     }
-    setRows((current) =>
-      current.map((row, index) => ({
-        ...row,
-        domain: domains[index] ?? row.domain,
-      })),
-    );
+    setProjectDomains((current) => {
+      const next = [...current];
+      domains.forEach((domain) => {
+        if (!next.includes(domain)) {
+          next.push(domain);
+        }
+      });
+      return next;
+    });
+    setTextarea("");
+  };
+
+  const handleRemoveDomain = (domain: string) => {
+    setProjectDomains((current) => current.filter((item) => item !== domain));
+    setRows((current) => current.map((row) => (row.domain === domain ? { ...row, domain: "" } : row)));
+  };
+
+  const handleDistribute = () => {
+    if (!projectDomains.length) {
+      showToast({ variant: "error", message: "Сначала добавьте хотя бы один домен" });
+      return;
+    }
+    const unassigned = rows.filter((row) => !row.domain);
+    if (!unassigned.length) {
+      showToast({ variant: "success", message: "Все кластеры уже привязаны к доменам" });
+      return;
+    }
+    setRows((current) => {
+      let offset = 0;
+      return current.map((row) => {
+        if (row.domain) {
+          return row;
+        }
+        const domain = projectDomains[offset % projectDomains.length];
+        offset += 1;
+        return { ...row, domain };
+      });
+    });
+    showToast({
+      variant: "success",
+      message: `Распределено ${unassigned.length} кластер(ов) по ${projectDomains.length} домен(ам)`,
+    });
+  };
+
+  const handleSuggest = async () => {
+    if (!projectDomains.length) {
+      showToast({ variant: "error", message: "Сначала добавьте хотя бы один домен" });
+      return;
+    }
+    const unassigned = rows.filter((row) => !row.domain);
+    if (!unassigned.length) {
+      showToast({ variant: "success", message: "Все кластеры уже привязаны к доменам" });
+      return;
+    }
+    try {
+      const result = await suggestDomains({
+        id: snapshot.id,
+        domains: projectDomains,
+        clusters: unassigned.map((row) => ({
+          cluster_id: row.clusterId,
+          h1_main: row.h1,
+          keywords: row.keywords,
+        })),
+      }).unwrap();
+      const suggestions = result.suggestions ?? {};
+      let applied = 0;
+      const nextRows = rows.map((row) => {
+        if (row.domain) {
+          return row;
+        }
+        const domain = suggestions[row.clusterId];
+        if (domain && projectDomains.includes(domain)) {
+          applied += 1;
+          return { ...row, domain };
+        }
+        return row;
+      });
+      setRows(nextRows);
+      if (!applied) {
+        showToast({ variant: "success", message: "ИИ не нашёл уверенных соответствий — распределите вручную" });
+        return;
+      }
+      showToast({
+        variant: "success",
+        message: `Подобрано ${applied} домен(ов) по смыслу — проверьте перед сохранением`,
+      });
+    } catch (error) {
+      showToast({ variant: "error", message: apiErrorMessage(error, "Не удалось подсказать домены.") });
+    }
   };
 
   const handleContinue = async () => {
@@ -118,13 +241,9 @@ export function DomainsStep({ snapshot, onSaved, onContinue }: Props) {
   return (
     <StepStack>
       <FormSection>
-        <FormSectionHeading tooltip="Один домен на строку или через запятую. Затем привяжите услугу, домен, тип и название сайта.">
-          Домены проекта
-        </FormSectionHeading>
+        <FormSectionHeading>Домены проекта</FormSectionHeading>
         <ConstrainedField>
-          <WizardFieldLabel tooltip="Можно вставить сразу несколько доменов — по одному на строку или через запятую.">
-            Список доменов
-          </WizardFieldLabel>
+          <WizardFieldLabel>Список доменов</WizardFieldLabel>
           <WizardTextArea
             value={textarea}
             onChange={(event) => setTextarea(event.target.value)}
@@ -133,7 +252,27 @@ export function DomainsStep({ snapshot, onSaved, onContinue }: Props) {
         </ConstrainedField>
         <WizardActions>
           <Button type="button" onClick={handleAdd}>
-            Добавить
+            Добавить домен(ы)
+          </Button>
+        </WizardActions>
+        {projectDomains.length ? (
+          <DomainChips>
+            {projectDomains.map((domain) => (
+              <DomainChip key={domain}>
+                {domain} <ChipCount>({assignedCounts[domain] ?? 0})</ChipCount>
+                <ChipRemove type="button" aria-label={`Удалить ${domain}`} onClick={() => handleRemoveDomain(domain)}>
+                  ×
+                </ChipRemove>
+              </DomainChip>
+            ))}
+          </DomainChips>
+        ) : null}
+        <WizardActions>
+          <Button type="button" disabled={!projectDomains.length} onClick={handleDistribute}>
+            Распределить поровну
+          </Button>
+          <Button type="button" disabled={!projectDomains.length || isSuggesting} onClick={() => void handleSuggest()}>
+            {isSuggesting ? "Подбираю..." : "Подсказать домены по смыслу"}
           </Button>
         </WizardActions>
         <TableWrapper>
@@ -158,28 +297,17 @@ export function DomainsStep({ snapshot, onSaved, onContinue }: Props) {
                     />
                   </TableCell>
                   <TableCell>
-                    {domainOptions.length ? (
-                      <SelectControl
-                        value={row.domain}
-                        onValueChange={(value) =>
-                          setRows((current) => current.map((item, idx) => (idx === index ? { ...item, domain: value } : item)))
-                        }
-                        options={Array.from(new Set([...domainOptions, row.domain].filter(Boolean))).map((domain) => ({
-                          value: domain,
-                          label: domain,
-                        }))}
-                        placeholder="Домен"
-                      />
-                    ) : (
-                      <WizardInput
-                        value={row.domain}
-                        onChange={(event) =>
-                          setRows((current) =>
-                            current.map((item, idx) => (idx === index ? { ...item, domain: event.target.value } : item)),
-                          )
-                        }
-                      />
-                    )}
+                    <SelectControl
+                      value={row.domain}
+                      onValueChange={(value) =>
+                        setRows((current) => current.map((item, idx) => (idx === index ? { ...item, domain: value } : item)))
+                      }
+                      options={Array.from(new Set([...projectDomains, row.domain].filter(Boolean))).map((domain) => ({
+                        value: domain,
+                        label: domain,
+                      }))}
+                      placeholder="— выберите домен —"
+                    />
                   </TableCell>
                   <TableCell>
                     <SelectControl
@@ -213,9 +341,40 @@ export function DomainsStep({ snapshot, onSaved, onContinue }: Props) {
       </FormSection>
       <WizardActions>
         <Button type="button" variant="primary" disabled={isLoading} onClick={() => void handleContinue()}>
-          Далее
+          Сохранить маппинг
         </Button>
       </WizardActions>
     </StepStack>
   );
 }
+
+const DomainChips = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+`;
+
+const DomainChip = styled.span`
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: ${({ theme }) => theme.tokens.color.accentMuted};
+  color: ${({ theme }) => theme.tokens.color.textPrimary};
+  font-size: 13px;
+`;
+
+const ChipCount = styled.span`
+  color: ${({ theme }) => theme.tokens.color.textMuted};
+`;
+
+const ChipRemove = styled.button`
+  border: 0;
+  background: transparent;
+  color: ${({ theme }) => theme.tokens.color.textMuted};
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0;
+`;

@@ -4,49 +4,57 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import styled from "styled-components";
 import { skipToken } from "@reduxjs/toolkit/query";
-import { useGetGeneratorProjectQuery } from "@entities/generator/api";
+import { generatorApi, useGetGeneratorProjectQuery } from "@entities/generator/api";
 import type { GeneratorProjectSnapshot, GeneratorWizardStep } from "@entities/generator/types";
+import { useAppDispatch } from "@shared/store";
 import { Button, PageHeader, PlaceholderText, ResultLoader, useToast } from "@shared/ui";
 import { apiErrorMessage } from "../lib/api-error";
-import { isStepComplete, isStepReachable, stepFromSlug, wizardHref, WIZARD_STEPS } from "../lib/wizard";
+import {
+  canonicalWizardStep,
+  isLaunchWizardStep,
+  isStepComplete,
+  isStepReachable,
+  NEXT_WIZARD_STEP,
+  preferFresherSnapshot,
+  readWizardStash,
+  stepFromSlug,
+  wizardHref,
+  WIZARD_STEPPER_STEPS,
+  writeWizardStash,
+} from "../lib/wizard";
 import { BriefStep } from "./steps/brief-step";
 import { DesignStep } from "./steps/design-step";
-import { DomainsStep } from "./steps/domains-step";
 import { KeywordsStep } from "./steps/keywords-step";
+import { LaunchStep } from "./steps/launch-step";
 import { ProjectStep } from "./steps/project-step";
 import { ResultsStep } from "./steps/results-step";
-import { RunStep } from "./steps/run-step";
-import { SeoStep } from "./steps/seo-step";
 
 type WizardPageProps = {
   mode?: "new" | "existing";
 };
 
-const NEXT_STEP: Partial<Record<GeneratorWizardStep, GeneratorWizardStep>> = {
-  PROJECT: "BRIEF",
-  BRIEF: "KEYWORDS",
-  KEYWORDS: "DESIGN",
-  DESIGN: "DOMAINS",
-  DOMAINS: "SEO",
-  SEO: "RUN",
-  RUN: "RESULTS",
-};
-
 export function GeneratorWizardPage({ mode = "existing" }: WizardPageProps) {
   const params = useParams<{ id?: string; step?: string }>();
   const router = useRouter();
+  const dispatch = useAppDispatch();
   const { showToast } = useToast();
   const isNew = mode === "new";
   const id = isNew ? undefined : params.id;
   const requestedStep = isNew ? "PROJECT" : stepFromSlug(params.step) ?? "PROJECT";
   const query = useGetGeneratorProjectQuery(id ? Number(id) : skipToken);
-  const [localSnapshot, setLocalSnapshot] = useState<GeneratorProjectSnapshot | undefined>(undefined);
-  const [savedStep, setSavedStep] = useState<GeneratorWizardStep | null>(null);
+  const [localSnapshot, setLocalSnapshot] = useState<GeneratorProjectSnapshot | undefined>(
+    () => readWizardStash(id)?.snapshot,
+  );
+  const [savedStep, setSavedStep] = useState<GeneratorWizardStep | null>(
+    () => readWizardStash(id)?.continuedFrom ?? null,
+  );
 
   useEffect(() => {
-    if (!isNew && query.data) {
-      setLocalSnapshot(query.data);
+    if (isNew || !query.data) {
+      return;
     }
+    const incoming = query.data;
+    setLocalSnapshot((current) => preferFresherSnapshot(current, incoming));
   }, [isNew, query.data]);
 
   const snapshot = isNew ? localSnapshot : (localSnapshot ?? query.data);
@@ -60,29 +68,50 @@ export function GeneratorWizardPage({ mode = "existing" }: WizardPageProps) {
   }, [query.error, showToast]);
 
   useEffect(() => {
+    if (isNew || !id) {
+      return;
+    }
+    if (requestedStep === "SEO" || requestedStep === "RUN") {
+      router.replace(wizardHref(id, "DOMAINS"));
+    }
+  }, [id, isNew, requestedStep, router]);
+
+  useEffect(() => {
     if (isNew || !snapshot) {
       return;
     }
-    if (!isStepReachable(snapshot, requestedStep)) {
-      router.replace(wizardHref(snapshot.id, snapshot.currentStep));
+    const displayStep = canonicalWizardStep(requestedStep);
+    if (isStepReachable(snapshot, displayStep)) {
+      return;
     }
-  }, [isNew, requestedStep, router, snapshot]);
+    const continuedFrom = savedStep ?? readWizardStash(id)?.continuedFrom ?? null;
+    if (continuedFrom && NEXT_WIZARD_STEP[canonicalWizardStep(continuedFrom)] === displayStep) {
+      return;
+    }
+    router.replace(wizardHref(snapshot.id, snapshot.currentStep));
+  }, [id, isNew, requestedStep, router, savedStep, snapshot]);
+
+  const applySnapshot = (next: GeneratorProjectSnapshot, continuedFrom: GeneratorWizardStep | null) => {
+    setLocalSnapshot(next);
+    setSavedStep(continuedFrom);
+    writeWizardStash(next, continuedFrom);
+    dispatch(generatorApi.util.updateQueryData("getGeneratorProject", Number(next.id), () => next));
+  };
 
   const handleSaved = (next: GeneratorProjectSnapshot) => {
-    setLocalSnapshot(next);
-    setSavedStep(requestedStep);
+    applySnapshot(next, requestedStep);
   };
 
   const handleContinue = (next: GeneratorProjectSnapshot) => {
-    handleSaved(next);
-    const following = NEXT_STEP[requestedStep];
+    applySnapshot(next, requestedStep);
+    const following = NEXT_WIZARD_STEP[requestedStep];
     if (following) {
       router.push(wizardHref(next.id, following));
     }
   };
 
-  const current = requestedStep;
-  const nextStep = NEXT_STEP[current];
+  const current = canonicalWizardStep(requestedStep);
+  const nextStep = NEXT_WIZARD_STEP[current];
   const showFooterNext = current === "DESIGN";
   const title = snapshot?.niche ? `Генератор — ${snapshot.niche}` : "Генератор";
 
@@ -100,7 +129,7 @@ export function GeneratorWizardPage({ mode = "existing" }: WizardPageProps) {
     <Page>
       <PageHeader title={title} />
       <Stepper>
-        {WIZARD_STEPS.map((item) => {
+        {WIZARD_STEPPER_STEPS.map((item) => {
           const reachable = isNew ? item.id === "PROJECT" : isStepReachable(snapshot, item.id);
           const active = item.id === current;
           return (
@@ -126,10 +155,10 @@ export function GeneratorWizardPage({ mode = "existing" }: WizardPageProps) {
       {current === "PROJECT" ? <ProjectStep snapshot={snapshot} onSaved={handleSaved} onContinue={handleContinue} /> : null}
       {current === "BRIEF" && snapshot ? <BriefStep snapshot={snapshot} onSaved={handleSaved} onContinue={handleContinue} /> : null}
       {current === "KEYWORDS" && snapshot ? <KeywordsStep snapshot={snapshot} onSaved={handleSaved} onContinue={handleContinue} /> : null}
-      {current === "DOMAINS" && snapshot ? <DomainsStep snapshot={snapshot} onSaved={handleSaved} onContinue={handleContinue} /> : null}
       {current === "DESIGN" && snapshot ? <DesignStep snapshot={snapshot} onSaved={handleSaved} /> : null}
-      {current === "SEO" && snapshot ? <SeoStep snapshot={snapshot} onSaved={handleSaved} onContinue={handleContinue} /> : null}
-      {current === "RUN" && snapshot ? <RunStep snapshot={snapshot} onSaved={handleSaved} /> : null}
+      {isLaunchWizardStep(current) && snapshot ? (
+        <LaunchStep snapshot={snapshot} requestedStep={requestedStep} onSaved={handleSaved} />
+      ) : null}
       {current === "RESULTS" && snapshot ? <ResultsStep snapshot={snapshot} /> : null}
       {showFooterNext && nextStep ? (
         <Footer>

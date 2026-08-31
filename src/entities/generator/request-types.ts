@@ -65,9 +65,31 @@ export type GeneratorDomainsUpdateRequest = {
   mappings: GeneratorDomainMappingRequest[];
 };
 
+export type GeneratorSuggestDomainMappingRequest = {
+  domains: string[];
+  clusters: Array<{
+    cluster_id: string;
+    h1_main: string;
+    keywords: string[];
+  }>;
+};
+
 export type GeneratorDesignSelectRequest = {
   designId: string;
   pageTypes: string[];
+};
+
+export type GeneratorWordstatSearchRequest = {
+  phrase: string;
+};
+
+export type GeneratorWordstatBulkRequest = {
+  pages: Array<{ url?: string; h1: string }>;
+};
+
+export type GeneratorPrebuiltConfirmRequest = {
+  mapping: Record<string, string>;
+  pagesHtml: Record<string, string>;
 };
 
 export type GeneratorSeoConfigRequest = {

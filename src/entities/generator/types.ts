@@ -69,6 +69,14 @@ export type GeneratorCta = {
   url: string | null;
 };
 
+export type GeneratorSourcePage = {
+  url?: string;
+  h1?: string;
+  source_domain?: string;
+  sourceDomain?: string;
+  status?: string;
+};
+
 export type GeneratorCluster = {
   service?: string;
   h1_main?: string;
@@ -76,8 +84,18 @@ export type GeneratorCluster = {
   cluster_id?: string | number;
   clusterId?: string;
   domain_slug?: string;
+  domain?: string;
   kw_count?: number;
+  intent?: string;
   keywords?: unknown;
+  source_pages?: GeneratorSourcePage[];
+};
+
+export type GeneratorPageWithoutKeywords = {
+  url: string | null;
+  h1: string | null;
+  sourceDomain: string | null;
+  intent: string | null;
 };
 
 export type GeneratorExclusionPage = {
@@ -131,6 +149,7 @@ export type GeneratorProjectSnapshot = GeneratorProjectListItem & {
   competitors: GeneratorCompetitor[];
   clusters: GeneratorCluster[];
   rawClusters: GeneratorCluster[];
+  pagesWithoutKeywords?: GeneratorPageWithoutKeywords[];
   keywordLanguage: GeneratorKeywordLanguage;
   domains: GeneratorDomain[];
   design: GeneratorDesign | null;
@@ -162,6 +181,34 @@ export type GeneratorPageType = {
   label: string;
   required: string[];
   optional: string[];
+};
+
+export type GeneratorWordstatBulkStatus = {
+  status: GeneratorKeywordProcessStatus;
+  processed: number;
+  total: number;
+  results: Record<string, GeneratorKeywordItem[]>;
+  error: string | null;
+};
+
+export type GeneratorDesignState = {
+  phase: string | null;
+  sourceType: string | null;
+  buildStatus: string | null;
+  error: string | null;
+  pages: GeneratorDesignPage[];
+};
+
+export type GeneratorDesignPage = {
+  slug: string;
+  label: string;
+  approved: boolean;
+};
+
+export type GeneratorPrebuiltFile = {
+  filename: string;
+  html: string;
+  suggestedSlug: string | null;
 };
 
 export type GeneratorStreamTicket = {

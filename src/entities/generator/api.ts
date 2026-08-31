@@ -7,6 +7,9 @@ import type {
   GeneratorCreateProjectRequest,
   GeneratorDesignSelectRequest,
   GeneratorDomainsUpdateRequest,
+  GeneratorPrebuiltConfirmRequest,
+  GeneratorWordstatBulkRequest,
+  GeneratorWordstatSearchRequest,
   GeneratorKeywordCollectRequest,
   GeneratorKeywordConfirmRequest,
   GeneratorExternalKeywordsRequest,
@@ -15,14 +18,19 @@ import type {
   GeneratorProjectsListRequest,
   GeneratorRunRequest,
   GeneratorSeoConfigRequest,
+  GeneratorSuggestDomainMappingRequest,
   GeneratorUpdateProjectRequest,
 } from "./request-types";
 import type {
   GeneratorDesignListItem,
+  GeneratorDesignState,
   GeneratorBriefAnalyzeResponse,
+  GeneratorKeywordItem,
   GeneratorKeywordProcessStatusDto,
   GeneratorPageType,
+  GeneratorPrebuiltFile,
   GeneratorProjectSnapshot,
+  GeneratorWordstatBulkStatus,
   GeneratorProjectsListResponse,
   GeneratorResults,
   GeneratorStreamTicket,
@@ -165,6 +173,31 @@ export const generatorApi = baseApi.injectEndpoints({
       }),
       invalidatesTags: (_r, _e, arg) => [{ type: "Generator", id: String(arg.id) }],
     }),
+    searchGeneratorWordstat: builder.mutation<
+      { keywords: GeneratorKeywordItem[]; count: number },
+      { id: number | string } & GeneratorWordstatSearchRequest
+    >({
+      query: ({ id, ...body }) => ({
+        url: API_ROUTES.GENERATOR.WORDSTAT_SEARCH(id),
+        method: "POST",
+        body,
+      }),
+    }),
+    startGeneratorWordstatBulk: builder.mutation<
+      GeneratorWordstatBulkStatus,
+      { id: number | string } & GeneratorWordstatBulkRequest
+    >({
+      query: ({ id, ...body }) => ({
+        url: API_ROUTES.GENERATOR.WORDSTAT_BULK(id),
+        method: "POST",
+        body,
+      }),
+    }),
+    getGeneratorWordstatBulkStatus: builder.query<GeneratorWordstatBulkStatus, number | string>({
+      query: (id) => ({
+        url: API_ROUTES.GENERATOR.WORDSTAT_BULK_STATUS(id),
+      }),
+    }),
     confirmGeneratorKeywords: builder.mutation<
       GeneratorProjectSnapshot,
       { id: number | string } & GeneratorKeywordConfirmRequest
@@ -196,10 +229,28 @@ export const generatorApi = baseApi.injectEndpoints({
         method: "PUT",
         body,
       }),
+      async onQueryStarted({ id }, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          patchCachedGeneratorProject(dispatch, id, data);
+        } catch {
+          // keep the previous snapshot until the next fetch
+        }
+      },
       invalidatesTags: (_r, _e, arg) => [
         { type: "Generator", id: "LIST" },
         { type: "Generator", id: String(arg.id) },
       ],
+    }),
+    suggestGeneratorDomains: builder.mutation<
+      { suggestions: Record<string, string> },
+      { id: number | string } & GeneratorSuggestDomainMappingRequest
+    >({
+      query: ({ id, ...body }) => ({
+        url: API_ROUTES.GENERATOR.SUGGEST_DOMAINS(id),
+        method: "POST",
+        body,
+      }),
     }),
     getGeneratorDesigns: builder.query<{ items: GeneratorDesignListItem[] }, void>({
       query: () => ({
@@ -245,6 +296,80 @@ export const generatorApi = baseApi.injectEndpoints({
       }),
       invalidatesTags: (_r, _e, arg) => [{ type: "Generator", id: String(arg.id) }],
     }),
+    getGeneratorDesignState: builder.query<GeneratorDesignState, number | string>({
+      query: (id) => ({
+        url: API_ROUTES.GENERATOR.DESIGN_STATE(id),
+      }),
+      providesTags: (_r, _e, id) => [{ type: "Generator", id: `${id}-design-state` }],
+    }),
+    startGeneratorTemplateDesign: builder.mutation<
+      GeneratorProjectSnapshot,
+      { id: number | string; file: File; pageTypes: string[] }
+    >({
+      query: ({ id, file, pageTypes }) => {
+        const body = new FormData();
+        body.append("file", file);
+        pageTypes.forEach((type) => body.append("pageTypes", type));
+        return {
+          url: API_ROUTES.GENERATOR.DESIGN_TEMPLATE(id),
+          method: "POST",
+          body,
+        };
+      },
+      invalidatesTags: (_r, _e, arg) => [
+        { type: "Generator", id: String(arg.id) },
+        { type: "Generator", id: `${arg.id}-design-state` },
+      ],
+    }),
+    uploadGeneratorPrebuiltDesign: builder.mutation<
+      { files: GeneratorPrebuiltFile[] },
+      { id: number | string; file: File }
+    >({
+      query: ({ id, file }) => {
+        const body = new FormData();
+        body.append("file", file);
+        return {
+          url: API_ROUTES.GENERATOR.DESIGN_PREBUILT(id),
+          method: "POST",
+          body,
+        };
+      },
+    }),
+    confirmGeneratorPrebuiltDesign: builder.mutation<
+      GeneratorProjectSnapshot,
+      { id: number | string } & GeneratorPrebuiltConfirmRequest
+    >({
+      query: ({ id, ...body }) => ({
+        url: API_ROUTES.GENERATOR.DESIGN_PREBUILT_CONFIRM(id),
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (_r, _e, arg) => [
+        { type: "Generator", id: String(arg.id) },
+        { type: "Generator", id: `${arg.id}-design-state` },
+      ],
+    }),
+    approveGeneratorDesign: builder.mutation<GeneratorProjectSnapshot, number | string>({
+      query: (id) => ({
+        url: API_ROUTES.GENERATOR.DESIGN_APPROVE(id),
+        method: "POST",
+      }),
+      invalidatesTags: (_r, _e, id) => [
+        { type: "Generator", id: String(id) },
+        { type: "Generator", id: `${id}-design-state` },
+      ],
+    }),
+    getGeneratorDesignPageHtml: builder.query<string, { id: number | string; slug: string }>({
+      query: ({ id, slug }) => ({
+        url: API_ROUTES.GENERATOR.DESIGN_PAGE_HTML(id, slug),
+        responseHandler: async (response) => {
+          if (!response.ok) {
+            throw new Error("Не удалось загрузить превью");
+          }
+          return response.text();
+        },
+      }),
+    }),
     saveGeneratorSeoConfig: builder.mutation<
       GeneratorProjectSnapshot,
       { id: number | string } & GeneratorSeoConfigRequest
@@ -254,6 +379,14 @@ export const generatorApi = baseApi.injectEndpoints({
         method: "PUT",
         body,
       }),
+      async onQueryStarted({ id }, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          patchCachedGeneratorProject(dispatch, id, data);
+        } catch {
+          // keep the previous snapshot until the next fetch
+        }
+      },
       invalidatesTags: (_r, _e, arg) => [{ type: "Generator", id: String(arg.id) }],
     }),
     runGeneratorProject: builder.mutation<GeneratorProjectSnapshot, { id: number | string } & GeneratorRunRequest>({
@@ -344,14 +477,24 @@ export const {
   useClusterGeneratorKeywordsMutation,
   useSetGeneratorKeywordLanguageMutation,
   useCollectGeneratorKeywordsMutation,
+  useSearchGeneratorWordstatMutation,
+  useStartGeneratorWordstatBulkMutation,
+  useGetGeneratorWordstatBulkStatusQuery,
   useConfirmGeneratorKeywordsMutation,
   useImportGeneratorExternalKeywordsMutation,
   useUpdateGeneratorDomainsMutation,
+  useSuggestGeneratorDomainsMutation,
   useGetGeneratorDesignsQuery,
   useGetGeneratorPageTypesQuery,
   useGetGeneratorDesignPreviewQuery,
   useImportGeneratorDesignMutation,
   useSelectGeneratorDesignMutation,
+  useGetGeneratorDesignStateQuery,
+  useStartGeneratorTemplateDesignMutation,
+  useUploadGeneratorPrebuiltDesignMutation,
+  useConfirmGeneratorPrebuiltDesignMutation,
+  useApproveGeneratorDesignMutation,
+  useGetGeneratorDesignPageHtmlQuery,
   useSaveGeneratorSeoConfigMutation,
   useRunGeneratorProjectMutation,
   useStopGeneratorProjectMutation,
