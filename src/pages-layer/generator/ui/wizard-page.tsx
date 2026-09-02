@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import styled from "styled-components";
 import { skipToken } from "@reduxjs/toolkit/query";
-import { generatorApi, useGetGeneratorProjectQuery } from "@entities/generator/api";
+import { generatorApi, useApproveGeneratorDesignMutation, useGetGeneratorProjectQuery } from "@entities/generator/api";
 import type { GeneratorProjectSnapshot, GeneratorWizardStep } from "@entities/generator/types";
 import { useAppDispatch } from "@shared/store";
 import { Button, PageHeader, PlaceholderText, ResultLoader, useToast } from "@shared/ui";
@@ -48,6 +48,11 @@ export function GeneratorWizardPage({ mode = "existing" }: WizardPageProps) {
   const [savedStep, setSavedStep] = useState<GeneratorWizardStep | null>(
     () => readWizardStash(id)?.continuedFrom ?? null,
   );
+  const [designReady, setDesignReady] = useState(false);
+  const [approveDesign, { isLoading: isApprovingDesign }] = useApproveGeneratorDesignMutation();
+  const handleDesignReady = useCallback((ready: boolean) => {
+    setDesignReady(ready);
+  }, []);
 
   useEffect(() => {
     if (isNew || !query.data) {
@@ -113,7 +118,24 @@ export function GeneratorWizardPage({ mode = "existing" }: WizardPageProps) {
   const current = canonicalWizardStep(requestedStep);
   const nextStep = NEXT_WIZARD_STEP[current];
   const showFooterNext = current === "DESIGN";
+  const canContinueDesign = saved || designReady;
   const title = snapshot?.niche ? `Генератор — ${snapshot.niche}` : "Генератор";
+
+  const handleDesignNext = async () => {
+    if (!snapshot || !nextStep) {
+      return;
+    }
+    if (snapshot.completedSteps.design) {
+      handleContinue(snapshot);
+      return;
+    }
+    try {
+      const next = await approveDesign(snapshot.id).unwrap();
+      handleContinue(next);
+    } catch (err) {
+      showToast({ variant: "error", message: apiErrorMessage(err, "Не удалось утвердить дизайн.") });
+    }
+  };
 
   if (!isNew && query.isLoading) {
     return <ResultLoader label="Загрузка проекта..." />;
@@ -155,7 +177,9 @@ export function GeneratorWizardPage({ mode = "existing" }: WizardPageProps) {
       {current === "PROJECT" ? <ProjectStep snapshot={snapshot} onSaved={handleSaved} onContinue={handleContinue} /> : null}
       {current === "BRIEF" && snapshot ? <BriefStep snapshot={snapshot} onSaved={handleSaved} onContinue={handleContinue} /> : null}
       {current === "KEYWORDS" && snapshot ? <KeywordsStep snapshot={snapshot} onSaved={handleSaved} onContinue={handleContinue} /> : null}
-      {current === "DESIGN" && snapshot ? <DesignStep snapshot={snapshot} onSaved={handleSaved} /> : null}
+      {current === "DESIGN" && snapshot ? (
+        <DesignStep snapshot={snapshot} onSaved={handleSaved} onCanContinueChange={handleDesignReady} />
+      ) : null}
       {isLaunchWizardStep(current) && snapshot ? (
         <LaunchStep snapshot={snapshot} requestedStep={requestedStep} onSaved={handleSaved} />
       ) : null}
@@ -165,15 +189,10 @@ export function GeneratorWizardPage({ mode = "existing" }: WizardPageProps) {
           <Button
             type="button"
             variant="primary"
-            disabled={!saved || (isNew && !snapshot)}
-            onClick={() => {
-              if (!snapshot) {
-                return;
-              }
-              router.push(wizardHref(snapshot.id, nextStep));
-            }}
+            disabled={!canContinueDesign || isApprovingDesign || (isNew && !snapshot)}
+            onClick={() => void handleDesignNext()}
           >
-            Далее
+            {isApprovingDesign ? "Утверждение..." : "Далее"}
           </Button>
         </Footer>
       ) : null}

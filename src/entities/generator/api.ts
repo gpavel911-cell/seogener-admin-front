@@ -303,13 +303,12 @@ export const generatorApi = baseApi.injectEndpoints({
       providesTags: (_r, _e, id) => [{ type: "Generator", id: `${id}-design-state` }],
     }),
     startGeneratorTemplateDesign: builder.mutation<
-      GeneratorProjectSnapshot,
-      { id: number | string; file: File; pageTypes: string[] }
+      GeneratorDesignState,
+      { id: number | string; file: File }
     >({
-      query: ({ id, file, pageTypes }) => {
+      query: ({ id, file }) => {
         const body = new FormData();
         body.append("file", file);
-        pageTypes.forEach((type) => body.append("pageTypes", type));
         return {
           url: API_ROUTES.GENERATOR.DESIGN_TEMPLATE(id),
           method: "POST",
@@ -319,6 +318,26 @@ export const generatorApi = baseApi.injectEndpoints({
       invalidatesTags: (_r, _e, arg) => [
         { type: "Generator", id: String(arg.id) },
         { type: "Generator", id: `${arg.id}-design-state` },
+      ],
+    }),
+    buildGeneratorDesign: builder.mutation<GeneratorProjectSnapshot, number | string>({
+      query: (id) => ({
+        url: API_ROUTES.GENERATOR.DESIGN_BUILD(id),
+        method: "POST",
+      }),
+      invalidatesTags: (_r, _e, id) => [
+        { type: "Generator", id: String(id) },
+        { type: "Generator", id: `${id}-design-state` },
+      ],
+    }),
+    resetGeneratorDesign: builder.mutation<GeneratorProjectSnapshot, number | string>({
+      query: (id) => ({
+        url: API_ROUTES.GENERATOR.DESIGN_RESET(id),
+        method: "POST",
+      }),
+      invalidatesTags: (_r, _e, id) => [
+        { type: "Generator", id: String(id) },
+        { type: "Generator", id: `${id}-design-state` },
       ],
     }),
     uploadGeneratorPrebuiltDesign: builder.mutation<
@@ -491,6 +510,8 @@ export const {
   useSelectGeneratorDesignMutation,
   useGetGeneratorDesignStateQuery,
   useStartGeneratorTemplateDesignMutation,
+  useBuildGeneratorDesignMutation,
+  useResetGeneratorDesignMutation,
   useUploadGeneratorPrebuiltDesignMutation,
   useConfirmGeneratorPrebuiltDesignMutation,
   useApproveGeneratorDesignMutation,

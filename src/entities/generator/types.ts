@@ -197,6 +197,13 @@ export type GeneratorDesignState = {
   buildStatus: string | null;
   error: string | null;
   pages: GeneratorDesignPage[];
+  analyzed: boolean;
+  foundBlocks: string[];
+  foundBlocksByPage: Record<string, string[]>;
+  fileName: string | null;
+  hasTemplate: boolean;
+  buildDone: number;
+  buildTotal: number;
 };
 
 export type GeneratorDesignPage = {
