@@ -12,10 +12,10 @@ type IntegrationPageLayoutProps<TProvider extends string> = {
   activeProfile: string | null;
   isProfilesFetching: boolean;
   onSelectProfile: (group: TProvider, profile: string) => void;
-  actionSections: SidebarSection[];
-  activeAction: string | null;
-  onSelectAction: (action: string) => void;
-  tableActionId: string;
+  actionSections?: SidebarSection[];
+  activeAction?: string | null;
+  onSelectAction?: (action: string) => void;
+  tableActionId?: string;
   onSync: () => void;
   isSyncLoading: boolean;
   syncDisabled: boolean;
@@ -24,9 +24,11 @@ type IntegrationPageLayoutProps<TProvider extends string> = {
   showTableEmptyState: boolean;
   tableEmptyMessage: string;
   tableToolbarLeftSlot?: ReactNode;
+  tableToolbarRightSlot?: ReactNode;
   tableContent: ReactNode;
   tableDetailsContent?: ReactNode;
-  actionContent: ReactNode;
+  actionContent?: ReactNode;
+  tableOnly?: boolean;
 };
 
 export const IntegrationPageLayout = <TProvider extends string>({
@@ -36,9 +38,9 @@ export const IntegrationPageLayout = <TProvider extends string>({
   activeProfile,
   isProfilesFetching,
   onSelectProfile,
-  actionSections,
-  activeAction,
-  onSelectAction,
+  actionSections = [],
+  activeAction = null,
+  onSelectAction = () => undefined,
   tableActionId,
   onSync,
   isSyncLoading,
@@ -48,10 +50,53 @@ export const IntegrationPageLayout = <TProvider extends string>({
   showTableEmptyState,
   tableEmptyMessage,
   tableToolbarLeftSlot,
+  tableToolbarRightSlot,
   tableContent,
   tableDetailsContent,
   actionContent,
+  tableOnly = false,
 }: IntegrationPageLayoutProps<TProvider>) => {
+  const showTable = tableOnly
+    ? Boolean(activeProfile)
+    : Boolean(activeProfile && activeAction === tableActionId);
+
+  let mainContent: ReactNode;
+  if (showTable) {
+    mainContent = (
+      <TableSection>
+        <TableSyncPanel
+          onSync={onSync}
+          isLoading={isSyncLoading}
+          disabled={syncDisabled}
+          leftSlot={tableToolbarLeftSlot}
+          rightSlot={tableToolbarRightSlot}
+        />
+        {showProfilesEmptyState ? (
+          <SelectionState>{profilesEmptyMessage}</SelectionState>
+        ) : showTableEmptyState ? (
+          <SelectionState>{tableEmptyMessage}</SelectionState>
+        ) : (
+          tableContent
+        )}
+        {tableDetailsContent}
+      </TableSection>
+    );
+  } else if (tableOnly) {
+    mainContent = (
+      <SelectionState>
+        {showProfilesEmptyState ? profilesEmptyMessage : "Выберите профиль в верхнем сайдбаре."}
+      </SelectionState>
+    );
+  } else if (activeProfile && !activeAction) {
+    mainContent = <SelectionState>Выберите действие в нижнем сайдбаре.</SelectionState>;
+  } else if (!activeProfile && activeAction) {
+    mainContent = <SelectionState>Выберите профиль в верхнем сайдбаре.</SelectionState>;
+  } else if (!activeProfile && !activeAction) {
+    mainContent = <SelectionState>Выберите профиль и действие.</SelectionState>;
+  } else {
+    mainContent = <ActionBlock>{actionContent}</ActionBlock>;
+  }
+
   return (
     <Wrapper>
       <PageHeader title={title} />
@@ -64,40 +109,15 @@ export const IntegrationPageLayout = <TProvider extends string>({
             isLoading={isProfilesFetching}
             onSelect={onSelectProfile}
           />
-          <ActionsSidebar
-            sections={actionSections}
-            activeAction={activeAction}
-            onSelect={onSelectAction}
-          />
+          {!tableOnly ? (
+            <ActionsSidebar
+              sections={actionSections}
+              activeAction={activeAction}
+              onSelect={onSelectAction}
+            />
+          ) : null}
         </LeftColumn>
-        <Main>
-          {activeProfile && !activeAction ? (
-            <SelectionState>Выберите действие в нижнем сайдбаре.</SelectionState>
-          ) : !activeProfile && activeAction ? (
-            <SelectionState>Выберите профиль в верхнем сайдбаре.</SelectionState>
-          ) : !activeProfile && !activeAction ? (
-            <SelectionState>Выберите профиль и действие.</SelectionState>
-          ) : activeAction === tableActionId ? (
-            <TableSection>
-              <TableSyncPanel
-                onSync={onSync}
-                isLoading={isSyncLoading}
-                disabled={syncDisabled}
-                leftSlot={tableToolbarLeftSlot}
-              />
-              {showProfilesEmptyState ? (
-                <SelectionState>{profilesEmptyMessage}</SelectionState>
-              ) : showTableEmptyState ? (
-                <SelectionState>{tableEmptyMessage}</SelectionState>
-              ) : (
-                tableContent
-              )}
-              {tableDetailsContent}
-            </TableSection>
-          ) : (
-            <ActionBlock>{actionContent}</ActionBlock>
-          )}
-        </Main>
+        <Main>{mainContent}</Main>
       </Body>
     </Wrapper>
   );

@@ -125,9 +125,14 @@ const getRowStatusVariant = (status?: DomainMatrixRowStatus): "neutral" | "succe
 type DomainMatrixPageProps = {
   fixedProfileId?: string | null;
   hideTitle?: boolean;
+  onNestedDialogOpenChange?: (open: boolean) => void;
 };
 
-export function DomainMatrixPage({ fixedProfileId = null, hideTitle = false }: DomainMatrixPageProps) {
+export function DomainMatrixPage({
+  fixedProfileId = null,
+  hideTitle = false,
+  onNestedDialogOpenChange,
+}: DomainMatrixPageProps) {
   const { page, pageSize, pageSizeOptions, setPage, setPageSize } = usePagination();
   const [file, setFile] = useState<File | null>(null);
   const [importName, setImportName] = useState("");
@@ -144,7 +149,14 @@ export function DomainMatrixPage({ fixedProfileId = null, hideTitle = false }: D
   const finishedJobRef = useRef<string | null>(null);
   const finishedPurchaseJobRef = useRef<string | null>(null);
   const addImportFileInputRef = useRef<HTMLInputElement>(null);
+  const onNestedDialogOpenChangeRef = useRef(onNestedDialogOpenChange);
+  onNestedDialogOpenChangeRef.current = onNestedDialogOpenChange;
   const { showToast } = useToast();
+
+  useEffect(() => {
+    onNestedDialogOpenChangeRef.current?.(isAddDialogOpen || isEditDialogOpen);
+    return () => onNestedDialogOpenChangeRef.current?.(false);
+  }, [isAddDialogOpen, isEditDialogOpen]);
 
   const profilesQuery = useGetRegistrarProfilesQuery();
   const {
@@ -482,8 +494,8 @@ export function DomainMatrixPage({ fixedProfileId = null, hideTitle = false }: D
       {!hideTitle ? <PageTitle>Генерация доменов</PageTitle> : null}
       <FormStack>
         <FormCard>
-          <ControlsRow>
-            <LeftControls>
+          <ControlsStack>
+            <ImportRow>
               <ImportSelectorWrap>
                 <FieldLabel>Импорт</FieldLabel>
                 <SelectControl
@@ -511,8 +523,8 @@ export function DomainMatrixPage({ fixedProfileId = null, hideTitle = false }: D
               >
                 Добавить импорт
               </Button>
-            </LeftControls>
-            <RightControls>
+            </ImportRow>
+            <ActionsRow>
               <Button
                 type="button"
                 variant="primary"
@@ -537,8 +549,8 @@ export function DomainMatrixPage({ fixedProfileId = null, hideTitle = false }: D
               >
                 {isPurchasingImport ? "Запуск..." : "Купить некупленные домены"}
               </Button>
-            </RightControls>
-          </ControlsRow>
+            </ActionsRow>
+          </ControlsStack>
         </FormCard>
 
         {isProgressVisible ? (
@@ -778,32 +790,35 @@ const PageRoot = styled.div`
   gap: 16px;
 `;
 
-const ControlsRow = styled.div`
+const ControlsStack = styled.div`
   display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
+  flex-direction: column;
   gap: 12px;
 `;
 
-const LeftControls = styled.div`
+const ImportRow = styled.div`
   display: flex;
   align-items: flex-end;
   gap: 8px;
   min-width: 0;
-  flex: 1;
 `;
 
 const ImportSelectorWrap = styled(FormField)`
   max-width: 420px;
   width: 100%;
+  min-width: 0;
 `;
 
-const RightControls = styled.div`
-  display: flex;
+const ActionsRow = styled.div`
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
-  justify-content: flex-end;
-  align-items: flex-end;
-  flex-shrink: 0;
+
+  button {
+    width: 100%;
+    min-width: 0;
+    white-space: nowrap;
+  }
 `;
 
 const ProgressBlock = styled.div`

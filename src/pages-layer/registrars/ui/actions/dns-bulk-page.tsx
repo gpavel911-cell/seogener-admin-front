@@ -59,9 +59,16 @@ type DnsBulkPageProps = {
   fixedRegistrar?: RegistrarProviderType | null;
   fixedProfile?: string | null;
   hideTitle?: boolean;
+  onNestedDialogOpenChange?: (open: boolean) => void;
 };
 
-export function DnsBulkPage({ recordType, fixedRegistrar = null, fixedProfile = null, hideTitle = false }: DnsBulkPageProps) {
+export function DnsBulkPage({
+  recordType,
+  fixedRegistrar = null,
+  fixedProfile = null,
+  hideTitle = false,
+  onNestedDialogOpenChange,
+}: DnsBulkPageProps) {
   const { page, pageSize, pageSizeOptions, setPage, setPageSize } = usePagination();
   const [activeRegistrar, setActiveRegistrar] = useState<RegistrarProviderType | null>(null);
   const [activeProfile, setActiveProfile] = useState<string | null>(null);
@@ -75,6 +82,8 @@ export function DnsBulkPage({ recordType, fixedRegistrar = null, fixedProfile = 
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editImportName, setEditImportName] = useState("");
+  const onNestedDialogOpenChangeRef = useRef(onNestedDialogOpenChange);
+  onNestedDialogOpenChangeRef.current = onNestedDialogOpenChange;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { showToast } = useToast();
 
@@ -147,6 +156,11 @@ export function DnsBulkPage({ recordType, fixedRegistrar = null, fixedProfile = 
   const status = statusQuery.data;
   const currentStatus = status && jobId && status.jobId === jobId ? status : undefined;
   const isJobActive = isJobInProgress(currentStatus?.status);
+
+  useEffect(() => {
+    onNestedDialogOpenChangeRef.current?.(isAddDialogOpen || isEditDialogOpen);
+    return () => onNestedDialogOpenChangeRef.current?.(false);
+  }, [isAddDialogOpen, isEditDialogOpen]);
 
   useEffect(() => {
     if (!status || !jobId || status.jobId !== jobId) return;

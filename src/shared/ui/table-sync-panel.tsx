@@ -9,6 +9,7 @@ type TableSyncPanelProps = {
   disabled?: boolean;
   label?: string;
   leftSlot?: ReactNode;
+  rightSlot?: ReactNode;
 };
 
 export function TableSyncPanel({
@@ -17,6 +18,7 @@ export function TableSyncPanel({
   disabled = false,
   label = "Синхронизировать",
   leftSlot,
+  rightSlot,
 }: TableSyncPanelProps) {
   return (
     <Panel>
@@ -34,7 +36,7 @@ export function TableSyncPanel({
           <span>{label}</span>
         </SyncButton>
       </CenterSlot>
-      <Slot aria-hidden="true" />
+      <RightSlot aria-hidden={!rightSlot}>{rightSlot}</RightSlot>
     </Panel>
   );
 }
@@ -63,6 +65,12 @@ const Slot = styled.div`
   min-width: 0;
   display: flex;
   align-items: center;
+`;
+
+const RightSlot = styled(Slot)`
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
 `;
 
 const CenterSlot = styled.div`
