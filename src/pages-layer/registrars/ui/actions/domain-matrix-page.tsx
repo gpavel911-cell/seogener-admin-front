@@ -1,6 +1,6 @@
 "use client";
 
-import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { skipToken } from "@reduxjs/toolkit/query";
 import { FaArrowsRotate, FaCartPlus } from "react-icons/fa6";
 import styled from "styled-components";
@@ -35,6 +35,7 @@ import {
   FormCard,
   FormField,
   FormStack,
+  ImportXlsxField,
   PageTitle,
   PlaceholderText,
   SelectControl,
@@ -148,7 +149,6 @@ export function DomainMatrixPage({
   const [purchasingRowIds, setPurchasingRowIds] = useState<number[]>([]);
   const finishedJobRef = useRef<string | null>(null);
   const finishedPurchaseJobRef = useRef<string | null>(null);
-  const addImportFileInputRef = useRef<HTMLInputElement>(null);
   const onNestedDialogOpenChangeRef = useRef(onNestedDialogOpenChange);
   onNestedDialogOpenChangeRef.current = onNestedDialogOpenChange;
   const { showToast } = useToast();
@@ -320,18 +320,6 @@ export function DomainMatrixPage({
     }
     clearActivePurchaseState();
   }, [purchaseJobId, purchaseStatusQuery.error]);
-
-  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const nextFile = event.target.files?.[0];
-    if (!nextFile) return;
-    if (!nextFile.name.toLowerCase().endsWith(".xlsx")) {
-      showToast({ variant: "error", message: "Поддерживаются только .xlsx файлы." });
-      event.target.value = "";
-      return;
-    }
-    setFile(nextFile);
-    event.target.value = "";
-  };
 
   const handleUpload = async () => {
     if (!file) {
@@ -678,13 +666,6 @@ export function DomainMatrixPage({
         contentWidth="480px"
       >
         <CompactModalBody>
-          <HiddenFileInput
-            ref={addImportFileInputRef}
-            type="file"
-            accept=".xlsx"
-            onChange={handleFileChange}
-            disabled={isUploading}
-          />
           <CompactField>
             <FieldLabel>Название импорта (опционально)</FieldLabel>
             <ModalNameInput
@@ -694,19 +675,12 @@ export function DomainMatrixPage({
               disabled={isUploading}
             />
           </CompactField>
-          <CompactField>
-            <FieldLabel>Excel-файл</FieldLabel>
-            <ModalFilePickerRow>
-              <Button
-                type="button"
-                onClick={() => addImportFileInputRef.current?.click()}
-                disabled={isUploading}
-              >
-                Выбрать .xlsx
-              </Button>
-              <ModalHint>{file ? file.name : "Файл не выбран"}</ModalHint>
-            </ModalFilePickerRow>
-          </CompactField>
+          <ImportXlsxField
+            templateFilename="registrars-generate-domains-template.xlsx"
+            file={file}
+            onFileChange={setFile}
+            disabled={isUploading}
+          />
           <DialogActions>
             <Button
               type="button"
@@ -873,22 +847,6 @@ const CompactField = styled.div`
 
 const ModalNameInput = styled(StyledInput)`
   width: 300px;
-`;
-
-const HiddenFileInput = styled.input`
-  display: none;
-`;
-
-const ModalFilePickerRow = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 34px;
-`;
-
-const ModalHint = styled.div`
-  font-size: 12px;
-  color: ${({ theme }) => theme.tokens.color.textSecondary};
 `;
 
 const EditDialogActions = styled.div`

@@ -1,6 +1,6 @@
 "use client";
 
-import { type ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { skipToken } from "@reduxjs/toolkit/query";
 import { FaPlus } from "react-icons/fa6";
 import styled from "styled-components";
@@ -30,6 +30,7 @@ import {
   FormCard,
   FormField,
   FormStack,
+  ImportXlsxField,
   PageTitle,
   PlaceholderText,
   SelectControl,
@@ -43,6 +44,12 @@ import {
   TableWrapper,
   useToast,
 } from "@shared/ui";
+
+const DNS_IMPORT_TEMPLATES: Record<DnsBulkRecordType, string> = {
+  [DnsBulkRecordType.A]: "registrars-create-dns-records-a-template.xlsx",
+  [DnsBulkRecordType.NS]: "registrars-create-dns-records-ns-template.xlsx",
+  [DnsBulkRecordType.TXT]: "registrars-create-dns-records-txt-template.xlsx",
+};
 
 const STAGE_LABELS: Record<DnsBulkJobStage, string> = {
   [DnsBulkJobStage.VALIDATING]: "Валидация",
@@ -84,7 +91,6 @@ export function DnsBulkPage({
   const [editImportName, setEditImportName] = useState("");
   const onNestedDialogOpenChangeRef = useRef(onNestedDialogOpenChange);
   onNestedDialogOpenChangeRef.current = onNestedDialogOpenChange;
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const { showToast } = useToast();
 
   const {
@@ -218,18 +224,6 @@ export function DnsBulkPage({
   const handleProfileChange = (value: string) => {
     setActiveProfile(value || null);
     setSelectedImportId("");
-  };
-
-  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const nextFile = event.target.files?.[0];
-    if (!nextFile) return;
-    if (!nextFile.name.toLowerCase().endsWith(".xlsx")) {
-      showToast({ variant: "error", message: "Поддерживаются только .xlsx файлы." });
-      event.target.value = "";
-      return;
-    }
-    setFile(nextFile);
-    event.target.value = "";
   };
 
   const handleCreateImport = async () => {
@@ -597,7 +591,6 @@ export function DnsBulkPage({
         contentWidth="480px"
       >
         <AddModalBody>
-          <HiddenFileInput ref={fileInputRef} type="file" accept=".xlsx" onChange={handleFileChange} disabled={isAddImportLoading} />
           <AddModalField>
             <FieldLabel>Название импорта (опционально)</FieldLabel>
             <AddModalNameInput
@@ -607,15 +600,12 @@ export function DnsBulkPage({
               disabled={isAddImportLoading}
             />
           </AddModalField>
-          <AddModalField>
-            <FieldLabel>Excel-файл</FieldLabel>
-            <AddModalFilePickerRow>
-              <Button type="button" onClick={() => fileInputRef.current?.click()} disabled={isAddImportLoading}>
-                Выбрать .xlsx
-              </Button>
-              <AddModalHint>{file ? file.name : "Файл не выбран"}</AddModalHint>
-            </AddModalFilePickerRow>
-          </AddModalField>
+          <ImportXlsxField
+            templateFilename={DNS_IMPORT_TEMPLATES[recordType]}
+            file={file}
+            onFileChange={setFile}
+            disabled={isAddImportLoading}
+          />
           <DialogActions>
             <Button
               type="button"
@@ -765,10 +755,6 @@ const AddModalBody = styled.div`
   gap: 6px;
 `;
 
-const HiddenFileInput = styled.input`
-  display: none;
-`;
-
 const AddModalField = styled.div`
   display: flex;
   flex-direction: column;
@@ -777,18 +763,6 @@ const AddModalField = styled.div`
 
 const AddModalNameInput = styled(StyledInput)`
   width: 300px;
-`;
-
-const AddModalFilePickerRow = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 34px;
-`;
-
-const AddModalHint = styled.div`
-  font-size: 12px;
-  color: ${({ theme }) => theme.tokens.color.textSecondary};
 `;
 
 const DialogActions = styled.div`

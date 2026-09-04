@@ -1,4 +1,4 @@
-import { type ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { skipToken } from "@reduxjs/toolkit/query";
 import { FaPlus } from "react-icons/fa6";
 import styled from "styled-components";
@@ -29,6 +29,7 @@ import {
   FormCard,
   FormField,
   FormStack,
+  ImportXlsxField,
   PlaceholderText,
   SelectControl,
   StyledInput,
@@ -74,7 +75,6 @@ export const CreateHostsBulk = ({
 }: CreateHostsBulkProps = {}) => {
   const { page, pageSize, pageSizeOptions, setPage, setPageSize } = usePagination();
   const { showToast } = useToast();
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [selectedImportId, setSelectedImportId] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -195,18 +195,6 @@ export const CreateHostsBulk = ({
   useEffect(() => {
     setPage(0);
   }, [effectiveSelectedImportId, setPage]);
-
-  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const nextFile = event.target.files?.[0];
-    if (!nextFile) return;
-    if (!nextFile.name.toLowerCase().endsWith(".xlsx")) {
-      showToast({ variant: "error", message: "Поддерживаются только .xlsx файлы." });
-      event.target.value = "";
-      return;
-    }
-    setFile(nextFile);
-    event.target.value = "";
-  };
 
   const handleCreateImport = async () => {
     if (!file) {
@@ -491,7 +479,6 @@ export const CreateHostsBulk = ({
         contentWidth="480px"
       >
         <AddModalBody>
-          <HiddenFileInput ref={fileInputRef} type="file" accept=".xlsx" onChange={handleFileChange} disabled={isCreateImportLoading} />
           <AddModalField>
             <FieldLabel>Название импорта (опционально)</FieldLabel>
             <AddModalNameInput
@@ -501,15 +488,12 @@ export const CreateHostsBulk = ({
               disabled={isCreateImportLoading}
             />
           </AddModalField>
-          <AddModalField>
-            <FieldLabel>Excel-файл</FieldLabel>
-            <AddModalFilePickerRow>
-              <Button type="button" onClick={() => fileInputRef.current?.click()} disabled={isCreateImportLoading}>
-                Выбрать .xlsx
-              </Button>
-              <AddModalHint>{file ? file.name : "Файл не выбран"}</AddModalHint>
-            </AddModalFilePickerRow>
-          </AddModalField>
+          <ImportXlsxField
+            templateFilename="webmaster-add-sites-template.xlsx"
+            file={file}
+            onFileChange={setFile}
+            disabled={isCreateImportLoading}
+          />
           <DialogActions>
             <Button
               type="button"
@@ -696,10 +680,6 @@ const AddModalBody = styled.div`
   gap: 6px;
 `;
 
-const HiddenFileInput = styled.input`
-  display: none;
-`;
-
 const AddModalField = styled.div`
   display: flex;
   flex-direction: column;
@@ -708,18 +688,6 @@ const AddModalField = styled.div`
 
 const AddModalNameInput = styled(StyledInput)`
   width: 300px;
-`;
-
-const AddModalFilePickerRow = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 34px;
-`;
-
-const AddModalHint = styled.div`
-  font-size: 12px;
-  color: ${({ theme }) => theme.tokens.color.textSecondary};
 `;
 
 const DialogActions = styled.div`
