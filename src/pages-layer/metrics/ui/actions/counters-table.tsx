@@ -1,26 +1,48 @@
 import styled from "styled-components";
+import { FaChartColumn, FaFlag } from "react-icons/fa6";
 import type { MetricsCounterDto } from "@entities/metrics/types";
-import { EMPTY_DATA_MESSAGE, ResultLoader, Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow, TableWrapper } from "@shared/ui";
+import {
+  Button,
+  EMPTY_DATA_MESSAGE,
+  ResultLoader,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeaderCell,
+  TableRow,
+  TableWrapper,
+} from "@shared/ui";
 import { formatDateTime } from "../../lib/formatters";
 
 type CountersTableProps = {
   items: MetricsCounterDto[];
   isLoading: boolean;
   pageSize: number;
+  showRowActions?: boolean;
+  onViewStatistics?: (counterId: string) => void;
+  onViewGoals?: (counterId: string) => void;
 };
 
-const COLUMN_COUNT = 6;
+export const CountersTable = ({
+  items,
+  isLoading,
+  pageSize,
+  showRowActions = false,
+  onViewStatistics,
+  onViewGoals,
+}: CountersTableProps) => {
+  const columnCount = showRowActions ? 7 : 6;
 
-export const CountersTable = ({ items, isLoading, pageSize }: CountersTableProps) => {
   if (isLoading) {
     return <ResultLoader label="Загрузка счетчиков..." />;
   }
 
-  const fillerCount = !isLoading && items.length > 0 ? Math.max(pageSize - items.length, 0) : 0;
+  const fillerCount = items.length > 0 ? Math.max(pageSize - items.length, 0) : 0;
 
   return (
     <TableWrapper>
-      <Table>
+      <CountersTableRoot $hasActions={showRowActions}>
         <TableHead>
           <TableRow>
             <TableHeaderCell>Номер счетчика</TableHeaderCell>
@@ -29,42 +51,88 @@ export const CountersTable = ({ items, isLoading, pageSize }: CountersTableProps
             <TableHeaderCell>Статус</TableHeaderCell>
             <TableHeaderCell>Наличие</TableHeaderCell>
             <TableHeaderCell>Время последнего обновления</TableHeaderCell>
+            {showRowActions ? <TableHeaderCell /> : null}
           </TableRow>
         </TableHead>
         <TableBody>
-          {!isLoading && items.length === 0 && (
+          {items.length === 0 && (
             <TableRow>
-              <TableCell colSpan={COLUMN_COUNT}>{EMPTY_DATA_MESSAGE}</TableCell>
+              <TableCell colSpan={columnCount}>{EMPTY_DATA_MESSAGE}</TableCell>
             </TableRow>
           )}
-          {!isLoading &&
-            items.length > 0 &&
+          {items.length > 0 &&
             items.map((item) => (
-              <TableRow key={item.id}>
-                <TableCell>{item.counterId}</TableCell>
-                <TableCell>{item.counterName ?? "—"}</TableCell>
-                <TableCell>{item.siteUrl ?? "—"}</TableCell>
-                <TableCell>
-                  <Badge data-variant={item.status ?? "UNKNOWN"}>{formatStatus(item.status)}</Badge>
-                </TableCell>
-                <TableCell>
-                  <Badge data-variant={item.presence ?? "UNKNOWN"}>{formatPresence(item.presence)}</Badge>
-                </TableCell>
-                <TableCell>{formatDateTime(item.updatedAt)}</TableCell>
-              </TableRow>
+              <CounterRow
+                key={item.id}
+                item={item}
+                showRowActions={showRowActions}
+                onViewStatistics={onViewStatistics}
+                onViewGoals={onViewGoals}
+              />
             ))}
-          {!isLoading &&
-            fillerCount > 0 &&
+          {fillerCount > 0 &&
             Array.from({ length: fillerCount }, (_, index) => (
               <PlaceholderRow key={`counter-placeholder-${index}`}>
-                <TableCell colSpan={COLUMN_COUNT}>&nbsp;</TableCell>
+                <TableCell colSpan={columnCount}>&nbsp;</TableCell>
               </PlaceholderRow>
             ))}
         </TableBody>
-      </Table>
+      </CountersTableRoot>
     </TableWrapper>
   );
 };
+
+function CounterRow({
+  item,
+  showRowActions,
+  onViewStatistics,
+  onViewGoals,
+}: {
+  item: MetricsCounterDto;
+  showRowActions: boolean;
+  onViewStatistics?: (counterId: string) => void;
+  onViewGoals?: (counterId: string) => void;
+}) {
+  const counterId = item.counterId;
+  return (
+    <TableRow>
+      <TableCell>{counterId}</TableCell>
+      <TableCell>{item.counterName ?? "—"}</TableCell>
+      <TableCell>{item.siteUrl ?? "—"}</TableCell>
+      <TableCell>
+        <Badge data-variant={item.status ?? "UNKNOWN"}>{formatStatus(item.status)}</Badge>
+      </TableCell>
+      <TableCell>
+        <Badge data-variant={item.presence ?? "UNKNOWN"}>{formatPresence(item.presence)}</Badge>
+      </TableCell>
+      <TableCell>{formatDateTime(item.updatedAt)}</TableCell>
+      {showRowActions ? (
+        <TableCell>
+          {counterId ? (
+            <ActionsCell>
+              <IconButton
+                type="button"
+                onClick={() => onViewStatistics?.(counterId)}
+                data-tooltip="Посмотреть статистику"
+                aria-label="Посмотреть статистику"
+              >
+                <FaChartColumn />
+              </IconButton>
+              <IconButton
+                type="button"
+                onClick={() => onViewGoals?.(counterId)}
+                data-tooltip="Посмотреть цели"
+                aria-label="Посмотреть цели"
+              >
+                <FaFlag />
+              </IconButton>
+            </ActionsCell>
+          ) : null}
+        </TableCell>
+      ) : null}
+    </TableRow>
+  );
+}
 
 const formatStatus = (status?: string | null) => {
   if (!status) {
@@ -79,6 +147,18 @@ const formatPresence = (presence?: string | null) => {
   }
   return presence === "MISSING" ? "Отсутствует" : "Присутствует";
 };
+
+const CountersTableRoot = styled(Table)<{ $hasActions: boolean }>`
+  ${({ $hasActions }) =>
+    $hasActions
+      ? `
+    ${TableHeaderCell}:last-child,
+    ${TableCell}:last-child {
+      width: 120px;
+    }
+  `
+      : ""}
+`;
 
 const Badge = styled.span`
   display: inline-flex;
@@ -101,4 +181,47 @@ const Badge = styled.span`
 
 const PlaceholderRow = styled(TableRow)`
   pointer-events: none;
+`;
+
+const ActionsCell = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
+  align-items: center;
+  gap: 8px;
+`;
+
+const IconButton = styled(Button)`
+  position: relative;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  &::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 8px);
+    transform: translateX(-50%) translateY(4px);
+    background: #0f172a;
+    color: #f8fafc;
+    font-size: 12px;
+    line-height: 1;
+    border-radius: 8px;
+    padding: 6px 8px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.14s ease, transform 0.14s ease;
+    z-index: 10;
+  }
+
+  &:hover::after,
+  &:focus-visible::after {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
 `;

@@ -55,12 +55,14 @@ type CreateCountersBulkProps = {
   fixedProfile?: string | null;
   provider?: MetricsProviderType | null;
   onRefreshCounters?: () => Promise<unknown> | void;
+  onNestedDialogOpenChange?: (open: boolean) => void;
 };
 
 export const CreateCountersBulk = ({
   fixedProfile = null,
   provider: providerProp = null,
   onRefreshCounters,
+  onNestedDialogOpenChange,
 }: CreateCountersBulkProps = {}) => {
   const { page, pageSize, pageSizeOptions, setPage, setPageSize } = usePagination();
   const { showToast } = useToast();
@@ -76,6 +78,8 @@ export const CreateCountersBulk = ({
   const [jobImportId, setJobImportId] = useState<string | null>(null);
   const [activeRowIds, setActiveRowIds] = useState<number[]>([]);
   const handledJobResultRef = useRef<string | null>(null);
+  const onNestedDialogOpenChangeRef = useRef(onNestedDialogOpenChange);
+  onNestedDialogOpenChangeRef.current = onNestedDialogOpenChange;
 
   const profile = fixedProfile ?? null;
   const provider = providerProp ?? MetricsProviderType.YANDEX_METRICA;
@@ -129,6 +133,11 @@ export const CreateCountersBulk = ({
   const statusError = statusQuery.error as { status?: number; data?: { message?: string } } | undefined;
   const currentStatus = status && jobId && status.jobId === jobId ? status : undefined;
   const isJobActive = isJobInProgress(currentStatus?.status);
+
+  useEffect(() => {
+    onNestedDialogOpenChangeRef.current?.(isAddDialogOpen || isEditDialogOpen);
+    return () => onNestedDialogOpenChangeRef.current?.(false);
+  }, [isAddDialogOpen, isEditDialogOpen]);
 
   useEffect(() => {
     if (!status || !jobId || status.jobId !== jobId) return;

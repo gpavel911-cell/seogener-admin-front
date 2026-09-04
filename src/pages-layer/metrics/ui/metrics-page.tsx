@@ -16,21 +16,33 @@ import {
 import { useDebouncedSearchQuery } from "@shared/lib/use-debounced-search-query";
 import { usePagination } from "@shared/lib/use-pagination";
 import {
+  Button,
   DomainSearchField,
   EMPTY_DATA_MESSAGE,
   IntegrationPageLayout,
   useToast,
 } from "@shared/ui";
 import { PaginationControls } from "@shared/ui/pagination-controls";
-import { MetricsAction, getMetricsActionSections, renderMetricsActionContent } from "../lib/actions";
+import { ModalDialog } from "@shared/ui-kit/modal-dialog";
+import {
+  getMetricsOverlayTitle,
+  isWideMetricsOverlay,
+  METRICS_WIDE_OVERLAY_WIDTH,
+  type MetricsOverlay,
+} from "../lib/overlay";
 import { CountersTable } from "./actions/counters-table";
+import { CreateCounter } from "./actions/create-counter";
+import { CreateCountersBulk } from "./actions/create-counters-bulk";
+import { ViewCounterGoals } from "./actions/view-counter-goals";
+import { ViewCounterStatistics } from "./actions/view-counter-statistics";
 
 export function MetricsPage() {
   const { showToast } = useToast();
   const { page, pageSize, pageSizeOptions, setPage, setPageSize } = usePagination();
   const [activeProvider, setActiveProvider] = useState<MetricsProviderType | null>(null);
   const [activeProfile, setActiveProfile] = useState<string | null>(null);
-  const [selectedAction, setSelectedAction] = useState<MetricsAction | null>(null);
+  const [overlay, setOverlay] = useState<MetricsOverlay | null>(null);
+  const [isNestedDialogOpen, setIsNestedDialogOpen] = useState(false);
   const { search, setSearch, query } = useDebouncedSearchQuery();
 
   const metricaProfilesQuery = useGetMetricsProfilesQuery();
@@ -45,37 +57,23 @@ export function MetricsPage() {
     [metricaProfilesQuery.data],
   );
 
-  const providerGroups = useMemo(
-    () =>
-      METRICS_PROVIDER_TYPES.map((provider) => ({
-        provider,
-        label: getMetricsProviderTypeLabel(provider),
-        profiles: (profilesByProvider.get(provider) ?? []).map((profile) => profile.profile),
-      })),
-    [profilesByProvider],
-  );
-
   const allProfiles = useMemo(
     () => Array.from(profilesByProvider.values()).flat(),
     [profilesByProvider],
   );
   const profileGroups = useMemo(
     () =>
-      providerGroups.map((group) => ({
-        id: group.provider,
-        label: group.label,
-        profiles: group.profiles,
+      METRICS_PROVIDER_TYPES.map((provider) => ({
+        id: provider,
+        label: getMetricsProviderTypeLabel(provider),
+        profiles: (profilesByProvider.get(provider) ?? []).map((profile) => profile.profile),
       })),
-    [providerGroups],
+    [profilesByProvider],
   );
   const resolvedProvider = activeProvider;
   const resolvedProfile = activeProfile;
-  const actionSections = useMemo(() => getMetricsActionSections(resolvedProvider), [resolvedProvider]);
-  const availableActions = useMemo(
-    () => new Set(actionSections.flatMap((section) => section.actions.map((action) => action.id))),
-    [actionSections],
-  );
-  const activeAction = selectedAction && availableActions.has(selectedAction) ? selectedAction : null;
+  const canOpenOverlays = Boolean(resolvedProvider && resolvedProfile);
+  const showYandexRowActions = resolvedProvider === MetricsProviderType.YANDEX_METRICA && canOpenOverlays;
 
   const isProfilesFetching = metricaProfilesQuery.isFetching;
   const countersQueryArgs = resolvedProvider && resolvedProfile
@@ -105,6 +103,34 @@ export function MetricsPage() {
   useEffect(() => {
     setPage(0);
   }, [resolvedProvider, resolvedProfile, query, setPage]);
+
+  const closeOverlay = () => {
+    setOverlay(null);
+    setIsNestedDialogOpen(false);
+  };
+
+  const openOverlay = (next: MetricsOverlay) => {
+    if (!canOpenOverlays) {
+      return;
+    }
+    setIsNestedDialogOpen(false);
+    setOverlay(next);
+  };
+
+  const handleOverlayOpenChange = (open: boolean) => {
+    if (!open && isNestedDialogOpen) {
+      return;
+    }
+    if (!open) {
+      closeOverlay();
+    }
+  };
+
+  const handleSelectProfile = (provider: MetricsProviderType, profile: string) => {
+    setActiveProvider(provider);
+    setActiveProfile(profile);
+    closeOverlay();
+  };
 
   const handleSyncCounters = async () => {
     if (!resolvedProvider || !resolvedProfile) {
@@ -138,6 +164,9 @@ export function MetricsPage() {
         items={counters}
         isLoading={isLoading}
         pageSize={pageSize}
+        showRowActions={showYandexRowActions}
+        onViewStatistics={(counterId) => openOverlay({ type: "statistics", counterId })}
+        onViewGoals={(counterId) => openOverlay({ type: "goals", counterId })}
       />
       <PaginationControls
         page={page}
@@ -157,44 +186,89 @@ export function MetricsPage() {
       onChange={setSearch}
     />
   );
+  const tableToolbarRightSlot = (
+    <>
+      <Button
+        type="button"
+        disabled={!canOpenOverlays}
+        onClick={() => openOverlay({ type: "create-counter" })}
+      >
+        Создать счетчик
+      </Button>
+      <Button
+        type="button"
+        disabled={!canOpenOverlays}
+        onClick={() => openOverlay({ type: "create-counters-bulk" })}
+      >
+        Создать счетчики
+      </Button>
+    </>
+  );
+
+  const overlayTitle = overlay ? getMetricsOverlayTitle(overlay) : "Метрика";
+  const isWideOverlay = overlay ? isWideMetricsOverlay(overlay) : false;
 
   return (
-    <IntegrationPageLayout
-      title="Метрика"
-      profileGroups={profileGroups}
-      activeGroup={resolvedProvider}
-      activeProfile={resolvedProfile}
-      isProfilesFetching={isProfilesFetching}
-      onSelectProfile={(provider, profile) => {
-        setActiveProvider(provider);
-        setActiveProfile(profile);
-        if (provider === MetricsProviderType.GOOGLE_ANALYTICS) {
-          setSelectedAction(MetricsAction.SYNC_METRICS_COUNTERS);
-        }
-      }}
-      actionSections={actionSections}
-      activeAction={activeAction}
-      onSelectAction={(action) => {
-        setSelectedAction(action as MetricsAction);
-      }}
-      tableActionId={MetricsAction.SYNC_METRICS_COUNTERS}
-      onSync={handleSyncCounters}
-      isSyncLoading={isSyncingCounters}
-      syncDisabled={!resolvedProvider || !resolvedProfile}
-      showProfilesEmptyState={shouldShowProfilesEmptyState}
-      profilesEmptyMessage="Нет доступных профилей. Проверьте конфигурацию."
-      showTableEmptyState={shouldShowEmptyState}
-      tableEmptyMessage={EMPTY_DATA_MESSAGE}
-      tableToolbarLeftSlot={tableToolbarLeftSlot}
-      tableContent={tableContent}
-      actionContent={renderMetricsActionContent(activeAction as MetricsAction, {
-        provider: resolvedProvider,
-        profile: resolvedProfile,
-        onRefreshCounters: refreshCountersAfterBulk,
-        onRefreshCountersList: async () => {
-          await refetch();
-        },
-      })}
-    />
+    <>
+      <IntegrationPageLayout
+        title="Метрика"
+        tableOnly
+        profileGroups={profileGroups}
+        activeGroup={resolvedProvider}
+        activeProfile={resolvedProfile}
+        isProfilesFetching={isProfilesFetching}
+        onSelectProfile={handleSelectProfile}
+        onSync={handleSyncCounters}
+        isSyncLoading={isSyncingCounters}
+        syncDisabled={!resolvedProvider || !resolvedProfile}
+        showProfilesEmptyState={shouldShowProfilesEmptyState}
+        profilesEmptyMessage="Нет доступных профилей. Проверьте конфигурацию."
+        showTableEmptyState={shouldShowEmptyState}
+        tableEmptyMessage={EMPTY_DATA_MESSAGE}
+        tableToolbarLeftSlot={tableToolbarLeftSlot}
+        tableToolbarRightSlot={tableToolbarRightSlot}
+        tableContent={tableContent}
+      />
+      <ModalDialog
+        open={overlay !== null}
+        onOpenChange={handleOverlayOpenChange}
+        title={overlayTitle}
+        contentWidth={isWideOverlay ? METRICS_WIDE_OVERLAY_WIDTH : undefined}
+      >
+        {overlay?.type === "create-counter" && resolvedProvider && resolvedProfile ? (
+          <CreateCounter
+            fixedProfile={resolvedProfile}
+            provider={resolvedProvider}
+            onRefreshCounters={async () => {
+              await refetch();
+            }}
+          />
+        ) : null}
+        {overlay?.type === "create-counters-bulk" && resolvedProvider && resolvedProfile ? (
+          <CreateCountersBulk
+            fixedProfile={resolvedProfile}
+            provider={resolvedProvider}
+            onRefreshCounters={refreshCountersAfterBulk}
+            onNestedDialogOpenChange={setIsNestedDialogOpen}
+          />
+        ) : null}
+        {overlay?.type === "statistics" && resolvedProvider && resolvedProfile ? (
+          <ViewCounterStatistics
+            key={overlay.counterId}
+            provider={resolvedProvider}
+            profile={resolvedProfile}
+            counterId={overlay.counterId}
+          />
+        ) : null}
+        {overlay?.type === "goals" && resolvedProvider && resolvedProfile ? (
+          <ViewCounterGoals
+            key={overlay.counterId}
+            provider={resolvedProvider}
+            profile={resolvedProfile}
+            counterId={overlay.counterId}
+          />
+        ) : null}
+      </ModalDialog>
+    </>
   );
 }

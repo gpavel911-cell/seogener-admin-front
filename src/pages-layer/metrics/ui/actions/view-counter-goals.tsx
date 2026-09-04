@@ -1,10 +1,9 @@
 import { useState } from "react";
 import styled from "styled-components";
 import { useLazyGetMetricsGoalsQuery } from "@entities/metrics/api";
-import { useMetricsSelectOptions } from "@entities/metrics/select-options";
 import {
-  MetricsProviderType,
   type MetricsGoalDto,
+  type MetricsProviderType,
 } from "@entities/metrics/types";
 import {
   Button,
@@ -20,12 +19,10 @@ import {
   PlaceholderText,
   ResultLoader,
   ResultCard,
-  SelectControl,
   useToast,
 } from "@shared/ui";
 import { GoalInfo } from "./components/goal-info";
 
-const DEFAULT_PROVIDER = MetricsProviderType.YANDEX_METRICA;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const formatDate = (value: Date) => value.toISOString().slice(0, 10);
@@ -37,59 +34,35 @@ const buildDefaultDateRange = () => {
   return { date1, date2 };
 };
 
-type ActionsSectionViewCounterGoalsProps = {
-  fixedProfile?: string | null;
+type ViewCounterGoalsProps = {
+  profile: string;
+  counterId: string;
+  provider: MetricsProviderType;
 };
 
-export const ViewCounterGoals = ({ fixedProfile }: ActionsSectionViewCounterGoalsProps = {}) => {
+export const ViewCounterGoals = ({
+  profile,
+  counterId,
+  provider,
+}: ViewCounterGoalsProps) => {
   const { date1: defaultDate1, date2: defaultDate2 } = buildDefaultDateRange();
-  const [counterId, setCounterId] = useState("");
   const [date1, setDate1] = useState(defaultDate1);
   const [date2, setDate2] = useState(defaultDate2);
   const [goals, setGoals] = useState<MetricsGoalDto[] | null>(null);
-  const [activeProfile, setActiveProfile] = useState<string | null>(null);
 
   const { showToast } = useToast();
-  const {
-    resolvedProfile,
-    isProfilesFetching: isAccountsFetching,
-    isCountersFetching,
-    resolvedCounterId,
-    profileOptions,
-    counterOptions: counterSelectOptions,
-  } = useMetricsSelectOptions({
-    activeProfile,
-    fixedProfile: fixedProfile ?? null,
-    fixedProvider: DEFAULT_PROVIDER,
-    activeCounterId: counterId,
-  });
-  const effectiveCounterId = resolvedCounterId || counterId;
   const [loadGoals, { isFetching: isGoalsLoading }] = useLazyGetMetricsGoalsQuery();
 
-  const handleProfileChange = (value: string) => {
-    setActiveProfile(value || null);
-    setCounterId("");
-    setGoals(null);
-  };
-
   const handleLoadGoals = async () => {
-    if (!effectiveCounterId) {
-      showToast({ variant: "error", message: "Выберите счетчик." });
-      return;
-    }
-    if (!resolvedProfile) {
-      showToast({ variant: "error", message: "Выберите профиль Метрики." });
-      return;
-    }
     if (!isValidOneMonthRange(date1, date2)) {
       showToast({ variant: "error", message: "Период не может превышать 1 месяц." });
       return;
     }
     try {
       const response = await loadGoals({
-        counterId: effectiveCounterId,
-        provider: DEFAULT_PROVIDER,
-        profile: resolvedProfile,
+        counterId,
+        provider,
+        profile,
         date1,
         date2,
       }).unwrap();
@@ -104,28 +77,6 @@ export const ViewCounterGoals = ({ fixedProfile }: ActionsSectionViewCounterGoal
       <FormCard>
         <FormRow>
           <FormFields>
-            {!fixedProfile && (
-              <FormField>
-                <FieldLabel>Профиль Метрики</FieldLabel>
-                <SelectControl
-                  value={resolvedProfile ?? ""}
-                  onValueChange={handleProfileChange}
-                  disabled={isAccountsFetching}
-                  options={profileOptions}
-                  placeholder="Выберите профиль"
-                />
-              </FormField>
-            )}
-            <FormField>
-              <FieldLabel>Счетчик</FieldLabel>
-              <SelectControl
-                  value={effectiveCounterId}
-                onValueChange={setCounterId}
-                disabled={isCountersFetching}
-                options={counterSelectOptions}
-                placeholder="Выберите счетчик"
-              />
-            </FormField>
             <FormField>
               <FieldLabel>Дата начала</FieldLabel>
               <DateInput value={date1} max={date2} onChange={(event) => setDate1(event.target.value)} />

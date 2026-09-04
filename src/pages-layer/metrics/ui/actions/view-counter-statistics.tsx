@@ -1,8 +1,7 @@
 import { useState } from "react";
 import styled from "styled-components";
 import { useLazyGetMetricsStatisticsQuery } from "@entities/metrics/api";
-import { useMetricsSelectOptions } from "@entities/metrics/select-options";
-import { MetricsProviderType, type MetricsCounterStatisticsResponse } from "@entities/metrics/types";
+import { type MetricsCounterStatisticsResponse, type MetricsProviderType } from "@entities/metrics/types";
 import {
   Button,
   CenteredState,
@@ -17,7 +16,6 @@ import {
   PlaceholderText,
   ResultLoader,
   ResultCard,
-  SelectControl,
   Table,
   TableBody,
   TableCell,
@@ -29,8 +27,6 @@ import {
 } from "@shared/ui";
 import { formatDecimal, formatDurationSeconds } from "../../lib/formatters";
 
-const DEFAULT_PROVIDER = MetricsProviderType.YANDEX_METRICA;
-
 const formatDate = (value: Date) => value.toISOString().slice(0, 10);
 
 const buildDefaultDateRange = () => {
@@ -40,55 +36,31 @@ const buildDefaultDateRange = () => {
   return { date1, date2 };
 };
 
-type ActionsSectionViewCounterStatisticsProps = {
-  fixedProfile?: string | null;
+type ViewCounterStatisticsProps = {
+  profile: string;
+  counterId: string;
+  provider: MetricsProviderType;
 };
 
-export const ViewCounterStatistics = ({ fixedProfile }: ActionsSectionViewCounterStatisticsProps = {}) => {
+export const ViewCounterStatistics = ({
+  profile,
+  counterId,
+  provider,
+}: ViewCounterStatisticsProps) => {
   const { date1: defaultDate1, date2: defaultDate2 } = buildDefaultDateRange();
-  const [counterId, setCounterId] = useState("");
   const [date1, setDate1] = useState(defaultDate1);
   const [date2, setDate2] = useState(defaultDate2);
   const [statistics, setStatistics] = useState<MetricsCounterStatisticsResponse | null>(null);
-  const [activeProfile, setActiveProfile] = useState<string | null>(null);
 
   const { showToast } = useToast();
   const [loadStatistics, { isFetching: isStatisticsLoading }] = useLazyGetMetricsStatisticsQuery();
-  const {
-    resolvedProfile,
-    resolvedCounterId,
-    profileOptions,
-    counterOptions: counterSelectOptions,
-    isProfilesFetching: isAccountsFetching,
-    isCountersFetching,
-  } = useMetricsSelectOptions({
-    activeProfile,
-    fixedProfile: fixedProfile ?? null,
-    fixedProvider: DEFAULT_PROVIDER,
-    activeCounterId: counterId,
-  });
-  const effectiveCounterId = resolvedCounterId || counterId;
-
-  const handleProfileChange = (value: string) => {
-    setActiveProfile(value || null);
-    setCounterId("");
-    setStatistics(null);
-  };
 
   const handleStatistics = async () => {
-    if (!effectiveCounterId) {
-      showToast({ variant: "error", message: "Выберите счетчик." });
-      return;
-    }
-    if (!resolvedProfile) {
-      showToast({ variant: "error", message: "Выберите профиль Метрики." });
-      return;
-    }
     try {
       const response = await loadStatistics({
-        counterId: effectiveCounterId,
-        provider: DEFAULT_PROVIDER,
-        profile: resolvedProfile,
+        counterId,
+        provider,
+        profile,
         date1,
         date2,
       }).unwrap();
@@ -103,28 +75,6 @@ export const ViewCounterStatistics = ({ fixedProfile }: ActionsSectionViewCounte
       <FormCard>
         <FormRow>
           <FormFields>
-            {!fixedProfile && (
-              <FormField>
-                <FieldLabel>Профиль Метрики</FieldLabel>
-                <SelectControl
-                  value={resolvedProfile ?? ""}
-                  onValueChange={handleProfileChange}
-                  disabled={isAccountsFetching}
-                  options={profileOptions}
-                  placeholder="Выберите профиль"
-                />
-              </FormField>
-            )}
-            <FormField>
-              <FieldLabel>Счетчик</FieldLabel>
-              <SelectControl
-                value={effectiveCounterId}
-                onValueChange={setCounterId}
-                disabled={isCountersFetching}
-                options={counterSelectOptions}
-                placeholder="Выберите счетчик"
-              />
-            </FormField>
             <FormField>
               <FieldLabel>Дата начала</FieldLabel>
               <DateInput value={date1} onChange={(event) => setDate1(event.target.value)} />

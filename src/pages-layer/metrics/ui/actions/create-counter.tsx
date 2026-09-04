@@ -6,14 +6,13 @@ import type { RegistrarProviderType } from "@entities/registrars/types";
 import { useMetricsSelectOptions } from "@entities/metrics/select-options";
 import { useRegistrarSelectOptions } from "@entities/registrars/select-options";
 import { resolveRegistrarProfile, resolveRegistrarProvider } from "@shared/lib/registrars";
+import styled from "styled-components";
 import {
   Button,
   FieldLabel,
   FormActions,
   FormCard,
   FormField,
-  FormFields,
-  FormRow,
   FormStack,
   InlineHint,
   SelectControl,
@@ -223,68 +222,79 @@ export const CreateCounter = ({
   return (
     <FormStack>
       <FormCard>
-        <FormRow>
-          <FormFields>
-            <FormField>
-              <FieldLabel>Название</FieldLabel>
-              <TextInput
-                value={counterName}
-                onChange={(event) => setCounterName(event.target.value)}
-                placeholder="Например, Hotel Official"
-              />
-            </FormField>
-            {!fixedProfile && (
-              <FormField>
-                <FieldLabel>Профиль</FieldLabel>
-                <SelectControl
-                  value={resolvedMetricaProfile ?? ""}
-                  onValueChange={setActiveMetricaProfile}
-                  disabled={isAccountsFetching}
-                  options={metricaProfileOptions}
-                  placeholder="Выберите профиль"
-                />
-              </FormField>
-            )}
-            <FormField>
-              <FieldLabel>Регистратор</FieldLabel>
-              <SelectControl
-                value={resolvedRegistrar ?? ""}
-                onValueChange={(value) => handleRegistrarChange(value as RegistrarProviderType)}
-                options={registrarOptions}
-                placeholder="Выберите регистратора"
-              />
-            </FormField>
-            <FormField>
+        <VerticalFields>
+          <FullWidthField>
+            <FieldLabel>Название</FieldLabel>
+            <TextInput
+              value={counterName}
+              onChange={(event) => setCounterName(event.target.value)}
+              placeholder="Например, Hotel Official"
+            />
+          </FullWidthField>
+          {!fixedProfile && (
+            <FullWidthField>
               <FieldLabel>Профиль</FieldLabel>
               <SelectControl
-                value={resolvedProfile ?? ""}
-                onValueChange={handleProfileChange}
-                disabled={!resolvedRegistrar}
-                options={profileSelectOptions}
+                value={resolvedMetricaProfile ?? ""}
+                onValueChange={setActiveMetricaProfile}
+                disabled={isAccountsFetching}
+                options={metricaProfileOptions}
                 placeholder="Выберите профиль"
               />
-            </FormField>
-            <FormField>
-              <FieldLabel>Домен</FieldLabel>
-              <SelectControl
-                value={selectedDomain}
-                onValueChange={setSelectedDomain}
-                disabled={isDomainsFetching || isLoadingAllDomains || domainOptions.length === 0}
-                options={domainOptions}
-                placeholder="Выберите домен"
-              />
-            </FormField>
-          </FormFields>
-          <FormActions>
-            <Button type="button" variant="primary" onClick={handleSubmit} disabled={isCreateLoading}>
-              {isCreateLoading ? "Создание..." : "Создать"}
-            </Button>
-          </FormActions>
-        </FormRow>
+            </FullWidthField>
+          )}
+          <FullWidthField>
+            <FieldLabel>Регистратор</FieldLabel>
+            <SelectControl
+              value={resolvedRegistrar ?? ""}
+              onValueChange={(value) => handleRegistrarChange(value as RegistrarProviderType)}
+              options={registrarOptions}
+              placeholder="Выберите регистратора"
+            />
+          </FullWidthField>
+          <FullWidthField>
+            <FieldLabel>Профиль</FieldLabel>
+            <SelectControl
+              value={resolvedProfile ?? ""}
+              onValueChange={handleProfileChange}
+              disabled={!resolvedRegistrar}
+              options={profileSelectOptions}
+              placeholder="Выберите профиль"
+            />
+          </FullWidthField>
+          <FullWidthField>
+            <FieldLabel>Домен</FieldLabel>
+            <SelectControl
+              value={selectedDomain}
+              onValueChange={setSelectedDomain}
+              disabled={isDomainsFetching || isLoadingAllDomains || domainOptions.length === 0}
+              options={domainOptions}
+              placeholder="Выберите домен"
+            />
+          </FullWidthField>
+        </VerticalFields>
+        <FormActions>
+          <Button type="button" variant="primary" onClick={handleSubmit} disabled={isCreateLoading}>
+            {isCreateLoading ? "Создание..." : "Создать"}
+          </Button>
+        </FormActions>
       </FormCard>
       {showDomainsEmptyHint && <InlineHint>Нет доменов для выбранного профиля.</InlineHint>}
       {showProfilesEmptyHint && <InlineHint>Сначала синхронизируйте домены.</InlineHint>}
     </FormStack>
   );
 };
+
+const VerticalFields = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+`;
+
+const FullWidthField = styled(FormField)`
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+`;
 
