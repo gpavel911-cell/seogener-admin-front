@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import styled from "styled-components";
 import {
   useCheckNameSiloProfileMutation,
   useGetNameSiloSettingsQuery,
@@ -99,7 +100,7 @@ export function NameSiloSettings({ onSaved }: { onSaved: () => Promise<unknown> 
           </Button>
         </div>
       ))}
-      <FormField>
+      <SettingsField>
         <FieldLabel id="namesilo-profile-label">Профиль</FieldLabel>
         <StyledInput
           id="namesilo-profile"
@@ -117,8 +118,8 @@ export function NameSiloSettings({ onSaved }: { onSaved: () => Promise<unknown> 
         <PlaceholderText>
           1–64 символа: a–z, 0–9, _ и -. Первый символ — буква или цифра.
         </PlaceholderText>
-      </FormField>
-      <FormField>
+      </SettingsField>
+      <SettingsField>
         <FieldLabel id="namesilo-api-key-label">API ключ NameSilo</FieldLabel>
         <StyledInput
           id="namesilo-api-key"
@@ -129,7 +130,7 @@ export function NameSiloSettings({ onSaved }: { onSaved: () => Promise<unknown> 
           disabled={busy}
           onChange={(event) => setApiKey(event.target.value)}
         />
-      </FormField>
+      </SettingsField>
       <Button
         type="button"
         variant="primary"
@@ -141,3 +142,11 @@ export function NameSiloSettings({ onSaved }: { onSaved: () => Promise<unknown> 
     </FormStack>
   );
 }
+
+// FormField reserves horizontal width with flex-basis; this form stacks vertically.
+const SettingsField = styled(FormField)`
+  flex: 0 0 auto;
+  width: min(100%, 420px);
+  min-width: 0;
+  max-width: none;
+`;
