@@ -50,33 +50,46 @@ const executeBaseQuery = (
   return (isAuthEndpoint(args) ? unauthenticatedBaseQuery : authenticatedBaseQuery)(args, api, extraOptions);
 };
 
-const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError, { skipReauthRetry?: boolean }> = async (
+const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError, { skipReauthRetry?: boolean; refreshBeforeRequest?: boolean }> = async (
   args,
   api,
   extraOptions,
 ) => {
+  const refreshSession = async () => {
+    const refreshData = await runSingleFlightRefresh(async () => {
+      const refreshResult = await unauthenticatedBaseQuery(
+        {
+          url: API_ROUTES.AUTH.REFRESH,
+          method: "POST",
+        },
+        api,
+        extraOptions,
+      );
+
+      if (!refreshResult.data) {
+        throw refreshResult.error ?? new Error("Refresh failed");
+      }
+
+      return refreshResult.data as AuthResponse;
+    });
+    api.dispatch(setCredentials(refreshData));
+  };
+
+  // Refresh before credential submission so the sensitive request is sent once.
+  if (extraOptions?.refreshBeforeRequest && !isAuthEndpoint(args)) {
+    try {
+      await refreshSession();
+    } catch {
+      api.dispatch(clearCredentials());
+      return { error: { status: 401, data: { code: "SESSION_REFRESH_REQUIRED" } } };
+    }
+  }
+
   let result = await executeBaseQuery(args, api, extraOptions);
 
   if (result.error && result.error.status === 401 && !isAuthEndpoint(args) && !extraOptions?.skipReauthRetry) {
     try {
-      const refreshData = await runSingleFlightRefresh(async () => {
-        const refreshResult = await unauthenticatedBaseQuery(
-          {
-            url: API_ROUTES.AUTH.REFRESH,
-            method: "POST",
-          },
-          api,
-          extraOptions,
-        );
-
-        if (!refreshResult.data) {
-          throw refreshResult.error ?? new Error("Refresh failed");
-        }
-
-        return refreshResult.data as AuthResponse;
-      });
-
-      api.dispatch(setCredentials(refreshData));
+      await refreshSession();
       result = await executeBaseQuery(args, api, extraOptions);
     } catch {
       api.dispatch(clearCredentials());
