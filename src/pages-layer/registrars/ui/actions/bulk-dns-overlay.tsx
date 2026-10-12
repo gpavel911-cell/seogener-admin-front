@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import styled from "styled-components";
-import { DnsBulkRecordType, type RegistrarProviderType } from "@entities/registrars/types";
+import { DnsBulkRecordType, RegistrarProviderType } from "@entities/registrars/types";
 import { DnsBulkPage } from "./dns-bulk-page";
 import { RECORD_TYPE_TABS, RecordTypeTabs } from "./record-type-tabs";
 
@@ -14,6 +14,8 @@ type BulkDnsOverlayProps = {
 
 export function BulkDnsOverlay({ registrar, profile, onNestedDialogOpenChange }: BulkDnsOverlayProps) {
   const [recordType, setRecordType] = useState(DnsBulkRecordType.A);
+
+  if (registrar === RegistrarProviderType.NAME_SILO) return <p>Массовое создание DNS-записей для NameSilo недоступно. Используйте подтверждение Google Search Console.</p>;
 
   return (
     <Stack>

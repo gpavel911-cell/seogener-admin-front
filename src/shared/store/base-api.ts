@@ -50,14 +50,14 @@ const executeBaseQuery = (
   return (isAuthEndpoint(args) ? unauthenticatedBaseQuery : authenticatedBaseQuery)(args, api, extraOptions);
 };
 
-const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> = async (
+const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError, { skipReauthRetry?: boolean }> = async (
   args,
   api,
   extraOptions,
 ) => {
   let result = await executeBaseQuery(args, api, extraOptions);
 
-  if (result.error && result.error.status === 401 && !isAuthEndpoint(args)) {
+  if (result.error && result.error.status === 401 && !isAuthEndpoint(args) && !extraOptions?.skipReauthRetry) {
     try {
       const refreshData = await runSingleFlightRefresh(async () => {
         const refreshResult = await unauthenticatedBaseQuery(

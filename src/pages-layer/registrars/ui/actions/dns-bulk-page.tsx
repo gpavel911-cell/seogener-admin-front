@@ -20,7 +20,7 @@ import {
   useUpdateDnsBulkImportMutation,
 } from "@entities/registrars/api";
 import { useRegistrarSelectOptions } from "@entities/registrars/select-options";
-import { DnsBulkJobStage, DnsBulkJobStatus, DnsBulkRecordType, DnsBulkRowStatus, type RegistrarProviderType } from "@entities/registrars/types";
+import { DnsBulkJobStage, DnsBulkJobStatus, DnsBulkRecordType, DnsBulkRowStatus, RegistrarProviderType } from "@entities/registrars/types";
 import { usePagination } from "@shared/lib/use-pagination";
 import { PaginationControls } from "@shared/ui/pagination-controls";
 import { ModalDialog } from "@shared/ui-kit/modal-dialog";
@@ -108,7 +108,7 @@ export function DnsBulkPage({
     includeDomains: false,
   });
 
-  const importsQueryArgs = resolvedRegistrar && resolvedProfile
+  const importsQueryArgs = resolvedRegistrar && resolvedRegistrar !== RegistrarProviderType.NAME_SILO && resolvedProfile
     ? { registrar: resolvedRegistrar, profileId: resolvedProfile, recordType }
     : skipToken;
   const {
@@ -417,6 +417,8 @@ export function DnsBulkPage({
     setFile(null);
     setImportName("");
   };
+
+  if (resolvedRegistrar === RegistrarProviderType.NAME_SILO) return <PlaceholderText>Массовое создание DNS-записей для NameSilo недоступно.</PlaceholderText>;
 
   return (
     <PageRoot>
