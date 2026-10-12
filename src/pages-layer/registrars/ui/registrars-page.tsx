@@ -189,7 +189,7 @@ export function RegistrarsPage() {
   return (
     <>
       <Button type="button" onClick={() => setSettingsOpen(true)}>Настройки NameSilo</Button>
-      <ModalDialog open={settingsOpen} onOpenChange={setSettingsOpen} title="Настройки NameSilo">
+      <ModalDialog open={settingsOpen} onOpenChange={setSettingsOpen} title="Настройки NameSilo" contentWidth="640px">
         {settingsOpen ? <NameSiloSettings onSaved={() => registrarProfilesQuery.refetch()} /> : null}
       </ModalDialog>
       <IntegrationPageLayout
