@@ -35,11 +35,18 @@ export function NameSiloSettings({ onSaved }: { onSaved: () => Promise<unknown> 
       await save({ profile, apiKey: key }).unwrap();
       await Promise.all([settings.refetch(), onSaved()]);
       showToast({ variant: "success", message: "Профиль NameSilo сохранён." });
-    } catch {
+    } catch (error: unknown) {
+      const status = error && typeof error === "object" && "status" in error ? error.status : null;
       showToast({
         variant: "error",
         message:
-          "Не удалось сохранить профиль NameSilo. Проверьте доступ и состояние профиля перед повтором.",
+          status === 401
+            ? "Сессия истекла. Войдите в админку и сохраните ключ ещё раз."
+            : status === 403
+              ? "Сохранять ключ NameSilo может только настроенный оператор."
+              : status === 400
+                ? "Проверьте название профиля и формат API ключа NameSilo."
+                : "Не удалось сохранить профиль NameSilo. Проверьте состояние профиля перед повтором.",
       });
     } finally {
       saveState.reset();

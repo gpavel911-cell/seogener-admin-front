@@ -54,7 +54,7 @@ export const domainsApi = baseApi.injectEndpoints({
         method: "PUT",
         body: { apiKey },
       }),
-      extraOptions: { skipReauthRetry: true },
+      extraOptions: { skipReauthRetry: true, refreshBeforeRequest: true },
     }),
     checkNameSiloProfile: builder.mutation<{ connected: boolean; domainCount: number }, string>({
       query: (profile) => ({
