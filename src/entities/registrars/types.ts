@@ -7,12 +7,14 @@ export enum RegistrarDomainPresence {
 
 export enum RegistrarProviderType {
   REG_RU = "REG_RU",
+  NAME_SILO = "NAME_SILO",
 }
 
 export const REGISTRAR_PROVIDER_TYPES = Object.values(RegistrarProviderType) as RegistrarProviderType[];
 
 export const REGISTRAR_PROVIDER_TYPE_LABELS: Record<RegistrarProviderType, string> = {
   [RegistrarProviderType.REG_RU]: "Рег.ру",
+  [RegistrarProviderType.NAME_SILO]: "NameSilo",
 };
 
 export const getRegistrarProviderTypeLabel = (registrar: RegistrarProviderType): string =>

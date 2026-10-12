@@ -102,7 +102,10 @@ export const VerifyHostDnsBulk = ({ fixedProvider, fixedProfile }: VerifyHostDns
         query,
       }
     : undefined;
-  const { data, isLoading, isFetching } = useGetWebmasterHostsBulkDnsPageQuery(hostsQueryArgs!, { skip: !hostsQueryArgs });
+  const { currentData: data, isLoading, isFetching } = useGetWebmasterHostsBulkDnsPageQuery(hostsQueryArgs!, { skip: !hostsQueryArgs });
+  const actionScope = `${provider}:${fixedProfile ?? ""}:${resolvedRegistrar ?? ""}:${resolvedRegistrarProfile ?? ""}`;
+  const actionScopeRef = useRef(actionScope);
+  actionScopeRef.current = actionScope;
   const [loadBulkStatus, { isLoading: isStatusLoading }] = useGetWebmasterHostsBulkDnsStatusMutation();
   const [createBulkTxt, { isLoading: isCreateTxtLoading }] = useCreateWebmasterHostsBulkTxtMutation();
   const [startBulkVerification, { isLoading: isStartVerificationLoading }] = useStartWebmasterHostsBulkDnsVerificationMutation();
@@ -142,7 +145,9 @@ export const VerifyHostDnsBulk = ({ fixedProvider, fixedProfile }: VerifyHostDns
 
   useEffect(() => {
     setSelectedHostIds([]);
-  }, [page, pageSize, fixedProfile, query]);
+    setRowStateByHostId({});
+    setActiveRowActionByHostId({});
+  }, [page, pageSize, fixedProfile, query, provider, resolvedRegistrar, resolvedRegistrarProfile]);
 
   useEffect(() => {
     setPage(0);
@@ -185,6 +190,7 @@ export const VerifyHostDnsBulk = ({ fixedProvider, fixedProfile }: VerifyHostDns
   const isActionRunning = isStatusLoading || isCreateTxtLoading || isStartVerificationLoading;
 
   const runAction = async (action: BulkAction, hostIds: string[], rowActionHostId?: string) => {
+    const requestScope = actionScope;
     if (!fixedProfile || !resolvedRegistrar || !resolvedRegistrarProfile) {
       showToast({ variant: "error", message: "Сначала выберите профиль регистратора." });
       return;
@@ -210,6 +216,7 @@ export const VerifyHostDnsBulk = ({ fixedProvider, fixedProfile }: VerifyHostDns
           ? createBulkTxt(request)
           : startBulkVerification(request)
       ).unwrap();
+      if (actionScopeRef.current !== requestScope) return;
       setRowStateByHostId((prev) => ({ ...prev, ...indexRows(rows) }));
       const failures = rows.filter((row) => row.error);
       if (failures.length > 0) {
@@ -218,9 +225,10 @@ export const VerifyHostDnsBulk = ({ fixedProvider, fixedProfile }: VerifyHostDns
         showToast({ variant: "success", message: BULK_ACTION_CONFIG[action].successMessage(hostIds.length) });
       }
     } catch {
+      if (actionScopeRef.current !== requestScope) return;
       showToast({ variant: "error", message: BULK_ACTION_CONFIG[action].failureMessage });
     } finally {
-      if (rowActionHostId) {
+      if (rowActionHostId && actionScopeRef.current === requestScope) {
         setActiveRowActionByHostId((prev) => ({ ...prev, [rowActionHostId]: null }));
       }
     }

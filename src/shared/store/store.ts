@@ -12,6 +12,16 @@ export const store = configureStore({
     toast: toastReducer,
   },
   middleware: (getDefaultMiddleware) => getDefaultMiddleware().concat(baseApi.middleware),
+  devTools: {
+    actionSanitizer: (action) => {
+      const sensitive = action as typeof action & {
+        meta?: { arg?: { endpointName?: string; originalArgs?: unknown }; baseQueryMeta?: unknown };
+      };
+      if (sensitive.meta?.arg?.endpointName !== "saveNameSiloProfile") return action;
+      // RTK action metadata contains mutation arguments; omit credential-bearing metadata from DevTools.
+      return { ...action, payload: undefined, error: undefined, meta: { arg: { endpointName: "saveNameSiloProfile" } } };
+    },
+  },
 });
 
 setupListeners(store.dispatch);
