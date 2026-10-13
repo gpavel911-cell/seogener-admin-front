@@ -32,8 +32,37 @@ import type {
   UpdateWebmasterHostImportPayload,
 } from "./types";
 
+export type GoogleSitemapStatus = {
+  domain: string;
+  propertyUrl: string;
+  sitemapUrl: string;
+  propertyPresent: boolean;
+  verified: boolean;
+  submitted: boolean;
+  pending: boolean;
+  errors: number;
+  warnings: number;
+  lastSubmitted: string | null;
+  sha256: string | null;
+  urlCount: number | null;
+  ready: boolean;
+  message: string;
+};
+
+type GoogleSitemapRequest = { profile: string; domain: string };
+
 export const webmasterApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
+    getGoogleSitemapStatus: builder.query<GoogleSitemapStatus, GoogleSitemapRequest>({
+      query: (params) => ({ url: "/api/v1/webmaster/google/sitemap", params }),
+    }),
+    previewGoogleSitemap: builder.query<GoogleSitemapStatus, GoogleSitemapRequest>({
+      query: (params) => ({ url: "/api/v1/webmaster/google/sitemap/preview", params }),
+    }),
+    submitGoogleSitemap: builder.mutation<GoogleSitemapStatus, GoogleSitemapRequest & { expectedSha256: string }>({
+      query: (body) => ({ url: "/api/v1/webmaster/google/sitemap", method: "POST", body }),
+      extraOptions: { skipReauthRetry: true, refreshBeforeRequest: true },
+    }),
     getWebmasterProfiles: builder.query<WebmasterProfileDto[], void>({
       query: () => ({
         url: API_ROUTES.WEBMASTER.GET_WEBMASTER_PROFILES,
@@ -185,6 +214,9 @@ export const webmasterApi = baseApi.injectEndpoints({
 });
 
 export const {
+  useGetGoogleSitemapStatusQuery,
+  useLazyPreviewGoogleSitemapQuery,
+  useSubmitGoogleSitemapMutation,
   useGetWebmasterProfilesQuery,
   useSyncWebmasterHostsMutation,
   useGetWebmasterHostsQuery,

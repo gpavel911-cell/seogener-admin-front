@@ -102,7 +102,10 @@ export const VerifyHostDnsBulk = ({ fixedProvider, fixedProfile }: VerifyHostDns
         query,
       }
     : undefined;
-  const { data, isLoading, isFetching } = useGetWebmasterHostsBulkDnsPageQuery(hostsQueryArgs!, { skip: !hostsQueryArgs });
+  const { currentData: data, isLoading, isFetching } = useGetWebmasterHostsBulkDnsPageQuery(hostsQueryArgs!, { skip: !hostsQueryArgs });
+  const actionScope = `${provider}:${fixedProfile ?? ""}:${resolvedRegistrar ?? ""}:${resolvedRegistrarProfile ?? ""}`;
+  const actionScopeRef = useRef(actionScope);
+  actionScopeRef.current = actionScope;
   const [loadBulkStatus, { isLoading: isStatusLoading }] = useGetWebmasterHostsBulkDnsStatusMutation();
   const [createBulkTxt, { isLoading: isCreateTxtLoading }] = useCreateWebmasterHostsBulkTxtMutation();
   const [startBulkVerification, { isLoading: isStartVerificationLoading }] = useStartWebmasterHostsBulkDnsVerificationMutation();
@@ -142,7 +145,9 @@ export const VerifyHostDnsBulk = ({ fixedProvider, fixedProfile }: VerifyHostDns
 
   useEffect(() => {
     setSelectedHostIds([]);
-  }, [page, pageSize, fixedProfile, query]);
+    setRowStateByHostId({});
+    setActiveRowActionByHostId({});
+  }, [page, pageSize, fixedProfile, query, provider, resolvedRegistrar, resolvedRegistrarProfile]);
 
   useEffect(() => {
     setPage(0);
@@ -185,6 +190,7 @@ export const VerifyHostDnsBulk = ({ fixedProvider, fixedProfile }: VerifyHostDns
   const isActionRunning = isStatusLoading || isCreateTxtLoading || isStartVerificationLoading;
 
   const runAction = async (action: BulkAction, hostIds: string[], rowActionHostId?: string) => {
+    const requestScope = actionScope;
     if (!fixedProfile || !resolvedRegistrar || !resolvedRegistrarProfile) {
       showToast({ variant: "error", message: "Сначала выберите профиль регистратора." });
       return;
@@ -210,6 +216,7 @@ export const VerifyHostDnsBulk = ({ fixedProvider, fixedProfile }: VerifyHostDns
           ? createBulkTxt(request)
           : startBulkVerification(request)
       ).unwrap();
+      if (actionScopeRef.current !== requestScope) return;
       setRowStateByHostId((prev) => ({ ...prev, ...indexRows(rows) }));
       const failures = rows.filter((row) => row.error);
       if (failures.length > 0) {
@@ -218,9 +225,10 @@ export const VerifyHostDnsBulk = ({ fixedProvider, fixedProfile }: VerifyHostDns
         showToast({ variant: "success", message: BULK_ACTION_CONFIG[action].successMessage(hostIds.length) });
       }
     } catch {
+      if (actionScopeRef.current !== requestScope) return;
       showToast({ variant: "error", message: BULK_ACTION_CONFIG[action].failureMessage });
     } finally {
-      if (rowActionHostId) {
+      if (rowActionHostId && actionScopeRef.current === requestScope) {
         setActiveRowActionByHostId((prev) => ({ ...prev, [rowActionHostId]: null }));
       }
     }
@@ -334,10 +342,10 @@ export const VerifyHostDnsBulk = ({ fixedProvider, fixedProfile }: VerifyHostDns
                         />
                       </TableHeaderCell>
                       <TableHeaderCell>Сайт</TableHeaderCell>
-                      <TableHeaderCell>Состояние</TableHeaderCell>
+                      <TableHeaderCell>{provider === WebmasterProviderType.GOOGLE_SEARCH_CONSOLE ? "Права Google" : "Состояние"}</TableHeaderCell>
                       <TableHeaderCell>Verification UIN</TableHeaderCell>
                       <TableHeaderCell>TXT-запись</TableHeaderCell>
-                      <TableHeaderCell>Статус</TableHeaderCell>
+                      <TableHeaderCell>{provider === WebmasterProviderType.GOOGLE_SEARCH_CONSOLE ? "Этап проверки прав" : "Статус"}</TableHeaderCell>
                       <TableHeaderCell />
                     </TableRow>
                   </TableHead>
@@ -511,6 +519,7 @@ function resolveStatusVariant(state: WebmasterHostBulkDnsRowResponse | undefined
 function formatVerificationState(state: WebmasterHostBulkDnsRowResponse | undefined) {
   if (isVerifiedState(state)) return "Подтверждено";
   if (state?.error) return "Ошибка";
+  if (!state || state.verified == null) return "Нет данных";
   return "Не подтверждено";
 }
 
@@ -559,6 +568,12 @@ const Root = styled.div`
   flex-direction: column;
   gap: 12px;
   min-height: 0;
+  min-width: 0;
+
+  @media (max-width: 1000px) {
+    ${FormRow}, ${FormFields} { flex-wrap: wrap; min-width: 0; }
+    ${FormField} { flex: 1 1 260px; width: 100%; min-width: 0; max-width: 100%; }
+  }
 `;
 
 const ContentSection = styled.div`
@@ -599,6 +614,7 @@ const Checkbox = styled.input`
 
 const TableLoadingWrap = styled.div`
   position: relative;
+  min-width: 0;
 `;
 
 const TableLoadingOverlay = styled.div`
@@ -617,7 +633,9 @@ const TableLoadingOverlay = styled.div`
 `;
 
 const TableShell = styled.div`
-  overflow-x: hidden;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
   background: #ffffff;
   border-radius: 14px;
   border: 1px solid #dbe5f3;
@@ -626,7 +644,7 @@ const TableShell = styled.div`
 
 const BulkDnsTable = styled(Table)`
   table-layout: fixed;
-  min-width: 0;
+  min-width: 960px;
 
   ${TableHeaderCell}:nth-child(1),
   ${TableCell}:nth-child(1) {

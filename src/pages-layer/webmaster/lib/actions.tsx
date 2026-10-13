@@ -6,8 +6,10 @@ import { PopularQueries } from "@pages/webmaster/ui/actions/popular-queries";
 import { QueriesHistory } from "@pages/webmaster/ui/actions/queries-history";
 import { SearchUrls } from "@pages/webmaster/ui/actions/search-urls";
 import { VerifyHostDnsBulk } from "@pages/webmaster/ui/actions/verify-host-dns-bulk";
+import { GoogleSitemap } from "@pages/webmaster/ui/actions/google-sitemap";
 
 export enum WebmasterAction {
+  GOOGLE_SITEMAP = "GOOGLE_SITEMAP",
   SYNC_WEBMASTER_HOSTS = "SYNC_WEBMASTER_HOSTS",
   CREATE_WEBMASTER_HOST = "CREATE_WEBMASTER_HOST",
   CREATE_WEBMASTER_HOSTS_BULK = "CREATE_WEBMASTER_HOSTS_BULK",
@@ -46,6 +48,7 @@ const GOOGLE_WEBMASTER_ACTION_SECTIONS: WebmasterActionSection[] = [
   {
     title: "Действия",
     actions: [
+      { id: WebmasterAction.GOOGLE_SITEMAP, label: "Sitemap и этапы" },
       { id: WebmasterAction.SYNC_WEBMASTER_HOSTS, label: "Сайты" },
       { id: WebmasterAction.CREATE_WEBMASTER_HOST, label: "Добавить сайт" },
       { id: WebmasterAction.CREATE_WEBMASTER_HOSTS_BULK, label: "Добавить сайты" },
@@ -72,6 +75,9 @@ export const renderWebmasterActionContent = (
   action: WebmasterAction,
   context?: WebmasterActionRenderContext,
 ): ReactNode => {
+  if (action === WebmasterAction.GOOGLE_SITEMAP && context?.provider === WebmasterProviderType.GOOGLE_SEARCH_CONSOLE) {
+    return <GoogleSitemap key={context.profile} fixedProfile={context.profile} />;
+  }
   if (action === WebmasterAction.CREATE_WEBMASTER_HOST) {
     return <AddHost fixedProvider={context?.provider} fixedProfile={context?.profile} />;
   }

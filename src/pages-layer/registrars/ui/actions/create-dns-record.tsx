@@ -6,7 +6,7 @@ import {
   useCreateRegistrarNsRecordMutation,
   useCreateRegistrarTxtRecordMutation,
 } from "@entities/registrars/api";
-import { DnsBulkRecordType, type RegistrarProviderType } from "@entities/registrars/types";
+import { DnsBulkRecordType, RegistrarProviderType } from "@entities/registrars/types";
 import {
   Button,
   CenteredState,
@@ -38,7 +38,8 @@ const apiErrorMessage = (error: unknown, fallback: string) => {
 };
 
 export function CreateDnsRecord({ registrar, profile, domain }: CreateDnsRecordProps) {
-  const [recordType, setRecordType] = useState(DnsBulkRecordType.A);
+  const isNameSilo = registrar === RegistrarProviderType.NAME_SILO;
+  const [recordType, setRecordType] = useState(isNameSilo ? DnsBulkRecordType.TXT : DnsBulkRecordType.A);
   const [aHost, setAHost] = useState("@");
   const [ipv4, setIpv4] = useState("");
   const [txtHost, setTxtHost] = useState("@");
@@ -52,6 +53,10 @@ export function CreateDnsRecord({ registrar, profile, domain }: CreateDnsRecordP
   const isCreateLoading = isCreateALoading || isCreateNsLoading || isCreateTxtLoading;
 
   const handleCreate = async () => {
+    if (isNameSilo && (recordType !== DnsBulkRecordType.TXT || !/^google-site-verification=[A-Za-z0-9_-]+$/.test(text.trim()))) {
+      showToast({ variant: "error", message: "Укажите google-site-verification= с токеном Google. NameSilo поддерживает только TXT в корне домена." });
+      return;
+    }
     if (recordType === DnsBulkRecordType.A && !ipv4.trim()) {
       showToast({ variant: "error", message: "Укажите IPv4." });
       return;
@@ -80,9 +85,15 @@ export function CreateDnsRecord({ registrar, profile, domain }: CreateDnsRecordP
           registrar,
           profileId: profile,
           domain,
-          subdomain: txtHost.trim() || "@",
+          subdomain: isNameSilo ? "@" : txtHost.trim() || "@",
           text: text.trim(),
         }).unwrap();
+        if (isNameSilo && response.result !== "success") {
+          const message = response.errorText || "NameSilo TXT not confirmed. Read DNS before retrying.";
+          setResultMessage(message);
+          showToast({ variant: "error", message });
+          return;
+        }
         const message = `TXT-запись создана${noteSuffix(response.note)}.`;
         setResultMessage(message);
         showToast({ variant: "success", message });
@@ -109,7 +120,8 @@ export function CreateDnsRecord({ registrar, profile, domain }: CreateDnsRecordP
 
   return (
     <FormStack>
-      <RecordTypeTabs value={recordType} onChange={setRecordType} />
+      {isNameSilo ? <PlaceholderText>NameSilo: только корневая TXT-запись для подтверждения Google Search Console. Хост: @.</PlaceholderText>
+        : <RecordTypeTabs value={recordType} onChange={setRecordType} />}
       <FormCard>
         <FormRow>
           <FormFields>
@@ -129,11 +141,11 @@ export function CreateDnsRecord({ registrar, profile, domain }: CreateDnsRecordP
               <>
                 <FormField>
                   <FieldLabel>Хост (поддомен)</FieldLabel>
-                  <StyledInput value={txtHost} onChange={(event) => setTxtHost(event.target.value)} placeholder="@" />
+                  <StyledInput value={isNameSilo ? "@" : txtHost} disabled={isNameSilo} onChange={(event) => setTxtHost(event.target.value)} placeholder="@" />
                 </FormField>
                 <FormField>
                   <FieldLabel>Текст</FieldLabel>
-                  <StyledInput value={text} onChange={(event) => setText(event.target.value)} placeholder="TXT" />
+                  <StyledInput value={text} onChange={(event) => setText(event.target.value)} placeholder={isNameSilo ? "google-site-verification=..." : "TXT"} />
                 </FormField>
               </>
             ) : null}

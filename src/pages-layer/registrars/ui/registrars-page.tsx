@@ -24,11 +24,13 @@ import { CreateDnsRecord } from "./actions/create-dns-record";
 import { DomainMatrixPage } from "./actions/domain-matrix-page";
 import { DomainTable } from "./actions/domain-table";
 import { ViewDnsRecords } from "./actions/view-dns-records";
+import { NameSiloSettings } from "./actions/namesilo-settings";
 
 export function RegistrarsPage() {
   const { showToast } = useToast();
   const { page, pageSize, pageSizeOptions, setPage, setPageSize } = usePagination();
   const [activeRegistrar, setActiveRegistrar] = useState<RegistrarProviderType | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [activeProfile, setActiveProfile] = useState<string | null>(null);
   const [overlay, setOverlay] = useState<RegistrarsOverlay | null>(null);
   const [nestedDialogs, setNestedDialogs] = useState<NestedDialogState>(EMPTY_NESTED_DIALOGS);
@@ -109,6 +111,7 @@ export function RegistrarsPage() {
   };
 
   const openOverlay = (next: RegistrarsOverlay) => {
+    if (activeRegistrar === RegistrarProviderType.NAME_SILO && (next.type === "bulk-dns" || next.type === "generate")) return;
     setNestedDialogs(EMPTY_NESTED_DIALOGS);
     setOverlay(next);
   };
@@ -171,10 +174,10 @@ export function RegistrarsPage() {
   );
   const tableToolbarRightSlot = (
     <>
-      <Button type="button" onClick={() => openOverlay({ type: "bulk-dns" })}>
+      <Button type="button" disabled={resolvedProvider === RegistrarProviderType.NAME_SILO} onClick={() => openOverlay({ type: "bulk-dns" })}>
         Создать DNS записи
       </Button>
-      <Button type="button" onClick={() => openOverlay({ type: "generate" })}>
+      <Button type="button" disabled={resolvedProvider === RegistrarProviderType.NAME_SILO} onClick={() => openOverlay({ type: "generate" })}>
         Генерация доменов
       </Button>
     </>
@@ -185,6 +188,10 @@ export function RegistrarsPage() {
 
   return (
     <>
+      <Button type="button" onClick={() => setSettingsOpen(true)}>Настройки NameSilo</Button>
+      <ModalDialog open={settingsOpen} onOpenChange={setSettingsOpen} title="Настройки NameSilo" contentWidth="640px">
+        {settingsOpen ? <NameSiloSettings onSaved={() => registrarProfilesQuery.refetch()} /> : null}
+      </ModalDialog>
       <IntegrationPageLayout
         title="Регистраторы"
         tableOnly
@@ -226,7 +233,7 @@ export function RegistrarsPage() {
             domain={overlay.domain}
           />
         ) : null}
-        {overlay?.type === "bulk-dns" && resolvedProvider && resolvedProfile ? (
+        {overlay?.type === "bulk-dns" && resolvedProvider && resolvedProvider !== RegistrarProviderType.NAME_SILO && resolvedProfile ? (
           <BulkDnsOverlay
             registrar={resolvedProvider}
             profile={resolvedProfile}
@@ -235,7 +242,7 @@ export function RegistrarsPage() {
             }}
           />
         ) : null}
-        {overlay?.type === "generate" && resolvedProfile ? (
+        {overlay?.type === "generate" && resolvedProvider === RegistrarProviderType.REG_RU && resolvedProfile ? (
           <DomainMatrixPage
             fixedProfileId={resolvedProfile}
             hideTitle

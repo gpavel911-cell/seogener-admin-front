@@ -134,13 +134,20 @@ const Wrapper = styled.div`
 
 const Body = styled.div`
   display: grid;
-  grid-template-columns: 250px 1fr;
+  grid-template-columns: 250px minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
   gap: 14px;
   align-items: stretch;
   flex: 1;
   height: 100%;
   min-height: 0;
+  min-width: 0;
+
+  @media (max-width: 1000px) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    height: auto;
+  }
 `;
 
 const LeftColumn = styled.div`
@@ -148,6 +155,11 @@ const LeftColumn = styled.div`
   flex-direction: column;
   gap: 12px;
   width: 250px;
+  min-width: 0;
+
+  @media (max-width: 1000px) {
+    width: 100%;
+  }
 `;
 
 const Main = styled.div`

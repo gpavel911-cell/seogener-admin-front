@@ -45,6 +45,23 @@ import type {
 
 export const domainsApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
+    getNameSiloSettings: builder.query<{ enabled: boolean; profiles: Array<{ profile: string; configured: boolean }> }, void>({
+      query: () => "/api/v1/registrars/namesilo/settings",
+    }),
+    saveNameSiloProfile: builder.mutation<{ profile: string; configured: boolean }, { profile: string; apiKey: string }>({
+      query: ({ profile, apiKey }) => ({
+        url: `/api/v1/registrars/namesilo/profiles/${encodeURIComponent(profile)}`,
+        method: "PUT",
+        body: { apiKey },
+      }),
+      extraOptions: { skipReauthRetry: true, refreshBeforeRequest: true },
+    }),
+    checkNameSiloProfile: builder.mutation<{ connected: boolean; domainCount: number }, string>({
+      query: (profile) => ({
+        url: `/api/v1/registrars/namesilo/profiles/${encodeURIComponent(profile)}/check`,
+        method: "POST",
+      }),
+    }),
     getRegistrarProfiles: builder.query<RegistrarDomainProfileDto[], void>({
       query: () => ({
         url: API_ROUTES.REGISTRARS.GET_REGISTRAR_PROFILES,
@@ -275,6 +292,9 @@ export const domainsApi = baseApi.injectEndpoints({
 });
 
 export const {
+  useGetNameSiloSettingsQuery,
+  useSaveNameSiloProfileMutation,
+  useCheckNameSiloProfileMutation,
   useGetRegistrarProfilesQuery,
   useSyncRegistrarDomainsMutation,
   useGetRegistrarDomainsQuery,
