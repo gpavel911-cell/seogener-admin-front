@@ -3,6 +3,8 @@ import styled from "styled-components";
 export const EMPTY_DATA_MESSAGE = "Нет данных для отображения.";
 
 export const TableWrapper = styled.div`
+  min-width: 0;
+  max-width: 100%;
   overflow-x: auto;
   background: #ffffff;
   border-radius: 14px;

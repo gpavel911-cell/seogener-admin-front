@@ -342,10 +342,10 @@ export const VerifyHostDnsBulk = ({ fixedProvider, fixedProfile }: VerifyHostDns
                         />
                       </TableHeaderCell>
                       <TableHeaderCell>Сайт</TableHeaderCell>
-                      <TableHeaderCell>Состояние</TableHeaderCell>
+                      <TableHeaderCell>{provider === WebmasterProviderType.GOOGLE_SEARCH_CONSOLE ? "Права Google" : "Состояние"}</TableHeaderCell>
                       <TableHeaderCell>Verification UIN</TableHeaderCell>
                       <TableHeaderCell>TXT-запись</TableHeaderCell>
-                      <TableHeaderCell>Статус</TableHeaderCell>
+                      <TableHeaderCell>{provider === WebmasterProviderType.GOOGLE_SEARCH_CONSOLE ? "Этап проверки прав" : "Статус"}</TableHeaderCell>
                       <TableHeaderCell />
                     </TableRow>
                   </TableHead>
@@ -519,6 +519,7 @@ function resolveStatusVariant(state: WebmasterHostBulkDnsRowResponse | undefined
 function formatVerificationState(state: WebmasterHostBulkDnsRowResponse | undefined) {
   if (isVerifiedState(state)) return "Подтверждено";
   if (state?.error) return "Ошибка";
+  if (!state || state.verified == null) return "Нет данных";
   return "Не подтверждено";
 }
 
@@ -567,6 +568,12 @@ const Root = styled.div`
   flex-direction: column;
   gap: 12px;
   min-height: 0;
+  min-width: 0;
+
+  @media (max-width: 1000px) {
+    ${FormRow}, ${FormFields} { flex-wrap: wrap; min-width: 0; }
+    ${FormField} { flex: 1 1 260px; width: 100%; min-width: 0; max-width: 100%; }
+  }
 `;
 
 const ContentSection = styled.div`
@@ -607,6 +614,7 @@ const Checkbox = styled.input`
 
 const TableLoadingWrap = styled.div`
   position: relative;
+  min-width: 0;
 `;
 
 const TableLoadingOverlay = styled.div`
@@ -625,7 +633,9 @@ const TableLoadingOverlay = styled.div`
 `;
 
 const TableShell = styled.div`
-  overflow-x: hidden;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
   background: #ffffff;
   border-radius: 14px;
   border: 1px solid #dbe5f3;
@@ -634,7 +644,7 @@ const TableShell = styled.div`
 
 const BulkDnsTable = styled(Table)`
   table-layout: fixed;
-  min-width: 0;
+  min-width: 960px;
 
   ${TableHeaderCell}:nth-child(1),
   ${TableCell}:nth-child(1) {
