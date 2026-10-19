@@ -151,10 +151,15 @@ export function MetricsPage() {
       return;
     }
     try {
-      await syncCounters({ provider: resolvedProvider, profile: resolvedProfile }).unwrap();
+      // Google create already persists the returned stream snapshot. Do not
+      // enumerate every property/stream after each row and exhaust its quota.
+      // Explicit full-account synchronization remains on its separate button.
+      if (resolvedProvider !== MetricsProviderType.GOOGLE_ANALYTICS) {
+        await syncCounters({ provider: resolvedProvider, profile: resolvedProfile }).unwrap();
+      }
       await refetch();
     } catch {
-      showToast({ variant: "error", message: "Ошибка синхронизации счетчиков после массового создания." });
+      showToast({ variant: "error", message: "Не удалось обновить список счетчиков после создания." });
     }
   }, [refetch, resolvedProfile, resolvedProvider, showToast, syncCounters]);
 
