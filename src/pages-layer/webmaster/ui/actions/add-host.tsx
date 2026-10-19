@@ -94,8 +94,12 @@ export const AddHost = ({ fixedProvider, fixedProfile }: ActionsSectionWebmaster
         hostUrl,
       }).unwrap();
       showToast({ variant: "success", message: "Сайт добавлен." });
-    } catch {
-      showToast({ variant: "error", message: "Ошибка добавления сайта." });
+    } catch (error) {
+      const message =
+        typeof error === "object" && error !== null && "data" in error
+          ? (error as { data?: { message?: string } }).data?.message
+          : undefined;
+      showToast({ variant: "error", message: message || "Ошибка добавления сайта." });
     }
   };
 
