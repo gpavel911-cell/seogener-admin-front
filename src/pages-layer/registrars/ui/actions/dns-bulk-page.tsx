@@ -19,6 +19,7 @@ import {
   useGetDnsBulkJobStatusQuery,
   useUpdateDnsBulkImportMutation,
 } from "@entities/registrars/api";
+import { defaultNameservers, parseNameservers, validNameservers } from "@entities/registrars/nameservers";
 import { useRegistrarSelectOptions } from "@entities/registrars/select-options";
 import { DnsBulkJobStage, DnsBulkJobStatus, DnsBulkRecordType, DnsBulkRowStatus, RegistrarProviderType } from "@entities/registrars/types";
 import { usePagination } from "@shared/lib/use-pagination";
@@ -81,6 +82,7 @@ export function DnsBulkPage({
   const [activeProfile, setActiveProfile] = useState<string | null>(null);
   const [selectedImportId, setSelectedImportId] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [customNameservers, setCustomNameservers] = useState<string | null>(null);
   const [importName, setImportName] = useState("");
   const [jobId, setJobId] = useState<string | null>(null);
   const [jobImportId, setJobImportId] = useState<string | null>(null);
@@ -108,7 +110,7 @@ export function DnsBulkPage({
     includeDomains: false,
   });
 
-  const importsQueryArgs = resolvedRegistrar && resolvedRegistrar !== RegistrarProviderType.NAME_SILO && resolvedProfile
+  const importsQueryArgs = resolvedRegistrar && resolvedProfile
     ? { registrar: resolvedRegistrar, profileId: resolvedProfile, recordType }
     : skipToken;
   const {
@@ -216,6 +218,7 @@ export function DnsBulkPage({
       return;
     }
     const nextGroup = registrarGroups.find((group) => group.registrar === value);
+    setCustomNameservers(null);
     setActiveRegistrar(value);
     setActiveProfile(nextGroup?.profiles[0] ?? null);
     setSelectedImportId("");
@@ -235,8 +238,13 @@ export function DnsBulkPage({
       showToast({ variant: "error", message: "Выберите регистратора и профиль." });
       return;
     }
+    if (recordType === DnsBulkRecordType.NS && !validNameservers(parseNameservers(customNameservers ?? defaultNameservers(resolvedRegistrar).join(",")), resolvedRegistrar)) {
+      showToast({ variant: "error", message: resolvedRegistrar === RegistrarProviderType.NAME_SILO ? "Укажите от 2 до 13 корректных NS-серверов через запятую." : "Укажите два корректных NS-сервера через запятую." });
+      return;
+    }
     try {
       const created = await createImport({
+        nameservers: recordType === DnsBulkRecordType.NS ? parseNameservers(customNameservers ?? defaultNameservers(resolvedRegistrar).join(",")) : undefined,
         file,
         registrar: resolvedRegistrar,
         profileId: resolvedProfile,
@@ -354,6 +362,7 @@ export function DnsBulkPage({
         registrar: resolvedRegistrar,
         profileId: resolvedProfile,
         recordType,
+        nameservers: recordType === DnsBulkRecordType.NS ? (selectedImport?.nameservers ?? defaultNameservers(resolvedRegistrar)) : undefined,
         rows: [
           {
             domain: row.domain,
@@ -418,11 +427,13 @@ export function DnsBulkPage({
     setImportName("");
   };
 
-  if (resolvedRegistrar === RegistrarProviderType.NAME_SILO) return <PlaceholderText>Массовое создание DNS-записей для NameSilo недоступно.</PlaceholderText>;
 
   return (
     <PageRoot>
       {!hideTitle ? <PageTitle>{actionTitle}</PageTitle> : null}
+      {resolvedRegistrar === RegistrarProviderType.NAME_SILO && recordType === DnsBulkRecordType.TXT ? (
+        <PlaceholderText>NameSilo: TXT только в корне домена (@), значение google-site-verification= с токеном Google.</PlaceholderText>
+      ) : null}
       <FormStack>
         <FormCard>
           <ControlsRow>
@@ -548,7 +559,7 @@ export function DnsBulkPage({
                           <TableCell>{row.domain}</TableCell>
                           {supportsIpv4 ? <TableCell>{row.ipv4 ?? "—"}</TableCell> : null}
                           {supportsText ? <TableCell>{row.text ?? "—"}</TableCell> : null}
-                          <TableCell>{recordType === DnsBulkRecordType.NS ? "ns1.reg.ru, ns2.reg.ru" : row.host}</TableCell>
+                          <TableCell>{recordType === DnsBulkRecordType.NS ? (selectedImport?.nameservers ?? defaultNameservers(resolvedRegistrar)).join(", ") : row.host}</TableCell>
                           <TableCell>
                             <StatusBadge data-created={isRecordCreated ? "true" : "false"} title={row.lastError ?? undefined}>
                               {rowStatusLabel}
@@ -602,6 +613,12 @@ export function DnsBulkPage({
               disabled={isAddImportLoading}
             />
           </AddModalField>
+          {recordType === DnsBulkRecordType.NS ? (
+            <AddModalField>
+              <FieldLabel>NS-серверы (через запятую)</FieldLabel>
+              <StyledInput value={customNameservers ?? defaultNameservers(resolvedRegistrar).join(", ")} onChange={(event) => setCustomNameservers(event.target.value)} disabled={isAddImportLoading} />
+            </AddModalField>
+          ) : null}
           <ImportXlsxField
             templateFilename={DNS_IMPORT_TEMPLATES[recordType]}
             file={file}

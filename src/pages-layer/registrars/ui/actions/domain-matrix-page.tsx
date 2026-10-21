@@ -125,17 +125,22 @@ const getRowStatusVariant = (status?: DomainMatrixRowStatus): "neutral" | "succe
 
 type DomainMatrixPageProps = {
   fixedProfileId?: string | null;
+  fixedRegistrar?: RegistrarProviderType;
   hideTitle?: boolean;
   onNestedDialogOpenChange?: (open: boolean) => void;
 };
 
 export function DomainMatrixPage({
   fixedProfileId = null,
+  fixedRegistrar = RegistrarProviderType.REG_RU,
   hideTitle = false,
   onNestedDialogOpenChange,
 }: DomainMatrixPageProps) {
   const { page, pageSize, pageSizeOptions, setPage, setPageSize } = usePagination();
   const [file, setFile] = useState<File | null>(null);
+  const isNameSilo = fixedRegistrar === RegistrarProviderType.NAME_SILO;
+  const [zone, setZone] = useState("");
+  const [maxPrice, setMaxPrice] = useState("");
   const [importName, setImportName] = useState("");
   const [selectedImportId, setSelectedImportId] = useState("");
   const [jobId, setJobId] = useState<string | null>(() => readActiveGeneration()?.jobId ?? null);
@@ -192,9 +197,9 @@ export function DomainMatrixPage({
   const profileOptions = useMemo(
     () =>
       (profilesQuery.data ?? [])
-        .filter((item) => item.registrar === RegistrarProviderType.REG_RU)
+        .filter((item) => item.registrar === fixedRegistrar)
         .map((item) => ({ value: item.profile, label: item.profile })),
-    [profilesQuery.data],
+    [profilesQuery.data, fixedRegistrar],
   );
   const effectiveSelectedProfileId = useMemo(() => {
     if (fixedProfileId) return fixedProfileId;
@@ -203,8 +208,8 @@ export function DomainMatrixPage({
 
   const imports = useMemo(() => importsData ?? [], [importsData]);
   const importsForProfile = useMemo(
-    () => imports.filter((item) => item.profile === effectiveSelectedProfileId && item.registrar === RegistrarProviderType.REG_RU),
-    [effectiveSelectedProfileId, imports],
+    () => imports.filter((item) => item.profile === effectiveSelectedProfileId && item.registrar === fixedRegistrar),
+    [effectiveSelectedProfileId, imports, fixedRegistrar],
   );
   const effectiveSelectedImportId = useMemo(
     () => {
@@ -327,11 +332,22 @@ export function DomainMatrixPage({
       return;
     }
     if (!effectiveSelectedProfileId) {
-      showToast({ variant: "error", message: "Выберите профиль Reg.ru." });
+      showToast({ variant: "error", message: "Выберите профиль регистратора." });
+      return;
+    }
+    if (!/^[a-z]{2,63}$/.test(zone.trim().replace(/^\./, "") || (isNameSilo ? "com" : "ru"))) {
+      showToast({ variant: "error", message: "Укажите доменную зону латиницей, например com." });
+      return;
+    }
+    if (maxPrice.trim() && (!Number.isFinite(Number(maxPrice)) || Number(maxPrice) <= 0)) {
+      showToast({ variant: "error", message: "Лимит цены должен быть положительным числом." });
       return;
     }
     try {
       const created = await createImport({
+        registrar: fixedRegistrar,
+        zone: zone.trim().replace(/^\./, "") || (isNameSilo ? "com" : "ru"),
+        maxPrice: maxPrice.trim() ? Number(maxPrice) : undefined,
         file,
         profileId: effectiveSelectedProfileId,
         name: importName.trim() || undefined,
@@ -512,6 +528,10 @@ export function DomainMatrixPage({
                 Добавить импорт
               </Button>
             </ImportRow>
+            {selectedImport ? <PlaceholderText>
+              Зона: .{selectedImport.zone ?? (isNameSilo ? "com" : "ru")}
+              {selectedImport.maxPrice != null ? ` · Лимит за домен: ${formatMoney(selectedImport.maxPrice, isNameSilo)}` : ""}
+            </PlaceholderText> : null}
             <ActionsRow>
               <Button
                 type="button"
@@ -588,7 +608,7 @@ export function DomainMatrixPage({
                     <TableHeaderCell>Фраза 1</TableHeaderCell>
                     <TableHeaderCell>Фраза 2</TableHeaderCell>
                     <TableHeaderCell>{`Домен (${resolvedAvailableCount}/${totalCount})`}</TableHeaderCell>
-                    <TableHeaderCell>{`Цена (${formatMoney(totalPrice)})`}</TableHeaderCell>
+                    <TableHeaderCell>{`Цена (${formatMoney(totalPrice, isNameSilo)})`}</TableHeaderCell>
                     <TableHeaderCell>Статус</TableHeaderCell>
                     <TableHeaderCell>Действие</TableHeaderCell>
                   </TableRow>
@@ -610,7 +630,7 @@ export function DomainMatrixPage({
                           <TableCell>{row.phrase1}</TableCell>
                           <TableCell>{row.phrase2}</TableCell>
                           <TableCell>{hasResolvedDomain ? row.domain : "—"}</TableCell>
-                          <TableCell>{row.price == null ? "—" : formatMoney(row.price)}</TableCell>
+                          <TableCell>{row.price == null ? "—" : formatMoney(row.price, isNameSilo)}</TableCell>
                           <TableCell>
                             <RowStatusBadge data-variant={getRowStatusVariant(row.rowStatus)}>
                               {getRowStatusLabel(row.rowStatus)}
@@ -675,6 +695,18 @@ export function DomainMatrixPage({
               disabled={isUploading}
             />
           </CompactField>
+          {isNameSilo ? (
+            <>
+              <CompactField>
+                <FieldLabel>Доменная зона</FieldLabel>
+                <ModalNameInput value={zone} onChange={(event) => setZone(event.target.value.toLowerCase())} placeholder="com" disabled={isUploading} />
+              </CompactField>
+              <CompactField>
+                <FieldLabel>Максимальная цена домена (USD)</FieldLabel>
+                <ModalNameInput type="number" min="0.01" step="0.01" value={maxPrice} onChange={(event) => setMaxPrice(event.target.value)} placeholder="Лимит по умолчанию" disabled={isUploading} />
+              </CompactField>
+            </>
+          ) : null}
           <ImportXlsxField
             templateFilename="registrars-generate-domains-template.xlsx"
             file={file}
@@ -752,11 +784,11 @@ export function DomainMatrixPage({
   );
 }
 
-const formatMoney = (value: number): string =>
+const formatMoney = (value: number, usd = false): string =>
   `${value.toLocaleString("ru-RU", {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
-  })} ₽`;
+  })} ${usd ? "USD" : "₽"}`;
 
 const PageRoot = styled.div`
   display: flex;

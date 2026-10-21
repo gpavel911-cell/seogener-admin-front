@@ -15,7 +15,6 @@ type BulkDnsOverlayProps = {
 export function BulkDnsOverlay({ registrar, profile, onNestedDialogOpenChange }: BulkDnsOverlayProps) {
   const [recordType, setRecordType] = useState(DnsBulkRecordType.A);
 
-  if (registrar === RegistrarProviderType.NAME_SILO) return <p>Массовое создание DNS-записей для NameSilo недоступно. Используйте подтверждение Google Search Console.</p>;
 
   return (
     <Stack>

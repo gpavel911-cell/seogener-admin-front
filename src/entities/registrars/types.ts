@@ -122,6 +122,7 @@ export type CreateTxtRecordResponse = {
 };
 
 export type CreateNsRecordRequest = {
+  nameservers?: string[];
   registrar: RegistrarProviderType;
   profileId: string;
   domain: string;
@@ -162,6 +163,7 @@ export enum DnsBulkJobStage {
 }
 
 export type DnsBulkImportDto = {
+  nameservers?: string[];
   id: string;
   name: string;
   registrar: RegistrarProviderType;
@@ -190,6 +192,7 @@ export type DnsBulkImportRowDto = {
 };
 
 export type CreateDnsBulkImportPayload = {
+  nameservers?: string[];
   file: File;
   registrar: RegistrarProviderType;
   profileId: string;
@@ -198,6 +201,7 @@ export type CreateDnsBulkImportPayload = {
 };
 
 export type DnsBulkCreateRecordsPayload = {
+  nameservers?: string[];
   registrar: RegistrarProviderType;
   profileId: string;
   recordType: DnsBulkRecordType;
@@ -297,6 +301,9 @@ export type DomainMatrixStatusResponse = {
 };
 
 export type DomainMatrixImportDto = {
+  zone?: string;
+  maxPrice?: number;
+  currency?: string;
   id: string;
   name: string;
   registrar: RegistrarProviderType;
@@ -327,6 +334,9 @@ export enum DomainMatrixRowStatus {
 }
 
 export type CreateDomainMatrixImportPayload = {
+  registrar?: RegistrarProviderType;
+  zone?: string;
+  maxPrice?: number;
   file: File;
   profileId: string;
   name?: string;

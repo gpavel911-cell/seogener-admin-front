@@ -130,12 +130,13 @@ export const domainsApi = baseApi.injectEndpoints({
       }),
     }),
     createDnsBulkImport: builder.mutation<DnsBulkImportDto, CreateDnsBulkImportPayload>({
-      query: ({ file, registrar, profileId, recordType, name }) => {
+      query: ({ file, registrar, profileId, recordType, name, nameservers }) => {
         const formData = new FormData();
         formData.append("file", file);
         formData.append("registrar", registrar);
         formData.append("profileId", profileId);
         formData.append("recordType", recordType);
+        if (nameservers?.length) formData.append("nameservers", nameservers.join(","));
         if (name && name.trim()) {
           formData.append("name", name.trim());
         }
@@ -220,10 +221,13 @@ export const domainsApi = baseApi.injectEndpoints({
       }),
     }),
     createDomainMatrixImport: builder.mutation<DomainMatrixImportDto, CreateDomainMatrixImportPayload>({
-      query: ({ file, profileId, name }) => {
+      query: ({ file, profileId, name, registrar = "REG_RU", zone, maxPrice }) => {
         const formData = new FormData();
         formData.append("file", file);
         formData.append("profileId", profileId);
+        formData.append("registrar", registrar);
+        if (zone) formData.append("zone", zone);
+        if (maxPrice != null) formData.append("maxPrice", String(maxPrice));
         if (name && name.trim()) {
           formData.append("name", name.trim());
         }

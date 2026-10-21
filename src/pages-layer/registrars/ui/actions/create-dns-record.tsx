@@ -22,6 +22,7 @@ import {
   StyledInput,
   useToast,
 } from "@shared/ui";
+import { defaultNameservers, parseNameservers, validNameservers } from "@entities/registrars/nameservers";
 import { RecordTypeTabs } from "./record-type-tabs";
 
 type CreateDnsRecordProps = {
@@ -39,7 +40,8 @@ const apiErrorMessage = (error: unknown, fallback: string) => {
 
 export function CreateDnsRecord({ registrar, profile, domain }: CreateDnsRecordProps) {
   const isNameSilo = registrar === RegistrarProviderType.NAME_SILO;
-  const [recordType, setRecordType] = useState(isNameSilo ? DnsBulkRecordType.TXT : DnsBulkRecordType.A);
+  const [recordType, setRecordType] = useState(DnsBulkRecordType.A);
+  const [nameservers, setNameservers] = useState(defaultNameservers(registrar).join(", "));
   const [aHost, setAHost] = useState("@");
   const [ipv4, setIpv4] = useState("");
   const [txtHost, setTxtHost] = useState("@");
@@ -53,8 +55,12 @@ export function CreateDnsRecord({ registrar, profile, domain }: CreateDnsRecordP
   const isCreateLoading = isCreateALoading || isCreateNsLoading || isCreateTxtLoading;
 
   const handleCreate = async () => {
-    if (isNameSilo && (recordType !== DnsBulkRecordType.TXT || !/^google-site-verification=[A-Za-z0-9_-]+$/.test(text.trim()))) {
-      showToast({ variant: "error", message: "Укажите google-site-verification= с токеном Google. NameSilo поддерживает только TXT в корне домена." });
+    if (isNameSilo && recordType === DnsBulkRecordType.TXT && !/^google-site-verification=[A-Za-z0-9_-]+$/.test(text.trim())) {
+      showToast({ variant: "error", message: "Укажите google-site-verification= с токеном Google. NameSilo поддерживает TXT только в корне домена." });
+      return;
+    }
+    if (recordType === DnsBulkRecordType.NS && !validNameservers(parseNameservers(nameservers), registrar)) {
+      showToast({ variant: "error", message: isNameSilo ? "Укажите от 2 до 13 корректных NS-серверов через запятую." : "Укажите два корректных NS-сервера через запятую." });
       return;
     }
     if (recordType === DnsBulkRecordType.A && !ipv4.trim()) {
@@ -67,6 +73,11 @@ export function CreateDnsRecord({ registrar, profile, domain }: CreateDnsRecordP
     }
     try {
       const noteSuffix = (note?: string | null) => (note ? ` (${note})` : "");
+      const checkResult = (response: { result: string; errorText?: string | null }) => {
+        if (isNameSilo && response.result !== "success") {
+          throw { data: { message: response.errorText || "NameSilo не подтвердил изменение DNS. Проверьте записи перед повторной попыткой." } };
+        }
+      };
       if (recordType === DnsBulkRecordType.A) {
         const response = await createARecord({
           registrar,
@@ -75,6 +86,7 @@ export function CreateDnsRecord({ registrar, profile, domain }: CreateDnsRecordP
           subdomain: aHost.trim() || "@",
           ipv4: ipv4.trim(),
         }).unwrap();
+        checkResult(response);
         const message = `A-запись создана${noteSuffix(response.note)}.`;
         setResultMessage(message);
         showToast({ variant: "success", message });
@@ -88,22 +100,19 @@ export function CreateDnsRecord({ registrar, profile, domain }: CreateDnsRecordP
           subdomain: isNameSilo ? "@" : txtHost.trim() || "@",
           text: text.trim(),
         }).unwrap();
-        if (isNameSilo && response.result !== "success") {
-          const message = response.errorText || "NameSilo TXT not confirmed. Read DNS before retrying.";
-          setResultMessage(message);
-          showToast({ variant: "error", message });
-          return;
-        }
+        checkResult(response);
         const message = `TXT-запись создана${noteSuffix(response.note)}.`;
         setResultMessage(message);
         showToast({ variant: "success", message });
         return;
       }
       const response = await createNsRecord({
+        nameservers: parseNameservers(nameservers),
         registrar,
         profileId: profile,
         domain,
       }).unwrap();
+      checkResult(response);
       const message = `NS-запись создана${noteSuffix(response.note)}.`;
       setResultMessage(message);
       showToast({ variant: "success", message });
@@ -120,11 +129,16 @@ export function CreateDnsRecord({ registrar, profile, domain }: CreateDnsRecordP
 
   return (
     <FormStack>
-      {isNameSilo ? <PlaceholderText>NameSilo: только корневая TXT-запись для подтверждения Google Search Console. Хост: @.</PlaceholderText>
-        : <RecordTypeTabs value={recordType} onChange={setRecordType} />}
+      <RecordTypeTabs value={recordType} onChange={setRecordType} />
       <FormCard>
         <FormRow>
           <FormFields>
+            {recordType === DnsBulkRecordType.NS ? (
+              <FormField>
+                <FieldLabel>NS-серверы (через запятую)</FieldLabel>
+                <StyledInput value={nameservers} onChange={(event) => setNameservers(event.target.value)} />
+              </FormField>
+            ) : null}
             {recordType === DnsBulkRecordType.A ? (
               <>
                 <FormField>

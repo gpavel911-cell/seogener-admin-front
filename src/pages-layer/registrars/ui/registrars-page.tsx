@@ -111,7 +111,6 @@ export function RegistrarsPage() {
   };
 
   const openOverlay = (next: RegistrarsOverlay) => {
-    if (activeRegistrar === RegistrarProviderType.NAME_SILO && (next.type === "bulk-dns" || next.type === "generate")) return;
     setNestedDialogs(EMPTY_NESTED_DIALOGS);
     setOverlay(next);
   };
@@ -174,10 +173,10 @@ export function RegistrarsPage() {
   );
   const tableToolbarRightSlot = (
     <>
-      <Button type="button" disabled={resolvedProvider === RegistrarProviderType.NAME_SILO} onClick={() => openOverlay({ type: "bulk-dns" })}>
+      <Button type="button" onClick={() => openOverlay({ type: "bulk-dns" })}>
         Создать DNS записи
       </Button>
-      <Button type="button" disabled={resolvedProvider === RegistrarProviderType.NAME_SILO} onClick={() => openOverlay({ type: "generate" })}>
+      <Button type="button" onClick={() => openOverlay({ type: "generate" })}>
         Генерация доменов
       </Button>
     </>
@@ -233,7 +232,7 @@ export function RegistrarsPage() {
             domain={overlay.domain}
           />
         ) : null}
-        {overlay?.type === "bulk-dns" && resolvedProvider && resolvedProvider !== RegistrarProviderType.NAME_SILO && resolvedProfile ? (
+        {overlay?.type === "bulk-dns" && resolvedProvider && resolvedProfile ? (
           <BulkDnsOverlay
             registrar={resolvedProvider}
             profile={resolvedProfile}
@@ -242,8 +241,9 @@ export function RegistrarsPage() {
             }}
           />
         ) : null}
-        {overlay?.type === "generate" && resolvedProvider === RegistrarProviderType.REG_RU && resolvedProfile ? (
+        {overlay?.type === "generate" && resolvedProvider && resolvedProfile ? (
           <DomainMatrixPage
+            fixedRegistrar={resolvedProvider}
             fixedProfileId={resolvedProfile}
             hideTitle
             onNestedDialogOpenChange={(open) => {
