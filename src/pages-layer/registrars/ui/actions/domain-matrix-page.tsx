@@ -480,11 +480,11 @@ export function DomainMatrixPage({
       const response = await purchaseRow({ rowId }).unwrap();
       await refreshTableData();
       if (response.status === DomainMatrixPurchaseItemStatus.SUCCESS) {
-        showToast({ variant: "success", message: "Домен куплен." });
+        showToast({ variant: "success", message: response.row?.providerWarning ? `Домен куплен. ${response.row.providerWarning}` : "Домен куплен." });
       } else if (response.status === DomainMatrixPurchaseItemStatus.SKIPPED) {
-        showToast({ variant: "success", message: "Покупка пропущена: домен уже куплен или не готов." });
+        showToast({ variant: response.row?.lastError ? "error" : "success", message: response.row?.lastError ?? response.row?.providerWarning ?? "Покупка пропущена: домен уже куплен или не готов." });
       } else {
-        showToast({ variant: "error", message: "Не удалось купить домен." });
+        showToast({ variant: "error", message: response.row?.lastError ?? "Не удалось купить домен." });
       }
     } catch {
       showToast({ variant: "error", message: "Не удалось купить домен." });
@@ -635,6 +635,8 @@ export function DomainMatrixPage({
                             <RowStatusBadge data-variant={getRowStatusVariant(row.rowStatus)}>
                               {getRowStatusLabel(row.rowStatus)}
                             </RowStatusBadge>
+                            {row.lastError ? <RowPurchaseMessage data-variant="error">Ошибка: {row.lastError}</RowPurchaseMessage> : null}
+                            {row.providerWarning ? <RowPurchaseMessage data-variant="warning">Предупреждение: {row.providerWarning}</RowPurchaseMessage> : null}
                           </TableCell>
                           <TableCell>
                             <ActionButtonsRow>
@@ -936,6 +938,20 @@ const RowStatusBadge = styled.span`
   &[data-variant="neutral"] {
     background: #f2f4f7;
     color: #667085;
+  }
+`;
+
+const RowPurchaseMessage = styled.div`
+  margin-top: 6px;
+  max-width: 360px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #b54708;
+
+  &[data-variant="error"] {
+    color: #b42318;
   }
 `;
 

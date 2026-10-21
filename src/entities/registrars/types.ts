@@ -316,6 +316,8 @@ export type DomainMatrixImportDto = {
 };
 
 export type DomainMatrixImportRowDto = {
+  lastError?: string | null;
+  providerWarning?: string | null;
   id: number;
   phrase1: string;
   phrase2: string;
